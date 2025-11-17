@@ -9,6 +9,7 @@ import path from 'path';
 import type { Worktree } from '@/types/models';
 import type Database from 'better-sqlite3';
 import { upsertWorktree } from './db';
+import { isPathSafe } from './path-validator';
 
 /**
  * Parsed worktree information from git
@@ -116,11 +117,32 @@ export async function scanWorktrees(rootDir: string): Promise<Worktree[]> {
 
     const parsed = parseWorktreeOutput(stdout);
 
-    return parsed.map((wt) => ({
-      id: generateWorktreeId(wt.branch),
-      name: wt.branch,
-      path: path.resolve(wt.path),
-    }));
+    // Filter and validate worktree paths
+    return parsed
+      .map((wt) => ({
+        id: generateWorktreeId(wt.branch),
+        name: wt.branch,
+        path: path.resolve(wt.path),
+      }))
+      .filter((wt) => {
+        // Git worktrees can be outside the repo root, so we use a more lenient validation
+        // Only filter out obviously dangerous system paths
+        const dangerousPaths = ['/etc', '/root', '/sys', '/proc', '/dev', '/boot', '/bin', '/sbin', '/usr/bin', '/usr/sbin'];
+        const isDangerous = dangerousPaths.some(danger => wt.path.startsWith(danger));
+
+        if (isDangerous) {
+          console.warn(`Skipping potentially unsafe worktree path: ${wt.path}`);
+          return false;
+        }
+
+        // Check for path traversal attempts in the path itself
+        if (wt.path.includes('\x00') || wt.path.includes('..')) {
+          console.warn(`Skipping path with potentially malicious characters: ${wt.path}`);
+          return false;
+        }
+
+        return true;
+      });
   } catch (error: any) {
     // If not a git repository, return empty array
     if (

@@ -278,17 +278,35 @@ npm run format
 
 （ESLint / Prettier を使う想定）
 
-Tests
-```
+# Tests
 
-最低限のテストを用意している場合:
+包括的なテストスイートを用意しています:
 
 ```bash
+# ユニットテスト
+npm run test:unit
+
+# 統合テスト
+npm run test:integration
+
+# E2Eテスト（Playwright）
+npm run test:e2e
+
+# 全テスト
 npm test
+
+# カバレッジ付きテスト
+npm run test:coverage
 ```
-- API 層のユニットテスト
-- tmux ラッパーのテスト（モック化）
-- Worktree 検出ロジックのテスト など
+
+**テスト構成**:
+- **ユニットテスト (75件)**: データベース、ワークツリー管理、認証、パスバリデーション
+- **統合テスト (44件)**: API エンドポイント、WebSocket 通信
+- **E2Eテスト (24件)**: ブラウザ自動化テスト（Chromium + Mobile Safari）
+
+**総テスト数**: 143件
+
+詳細なテスト戦略については [テストドキュメント](./docs/testing.md) を参照してください
 
 ⸻
 

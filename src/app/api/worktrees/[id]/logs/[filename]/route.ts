@@ -6,6 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbInstance } from '@/lib/db-instance';
 import { getWorktreeById } from '@/lib/db';
+import { validateWorktreePath } from '@/lib/path-validator';
+import { getEnv } from '@/lib/env';
 import fs from 'fs';
 import path from 'path';
 
@@ -15,6 +17,7 @@ export async function GET(
 ) {
   try {
     const db = getDbInstance();
+    const env = getEnv();
 
     // Check if worktree exists
     const worktree = getWorktreeById(db, params.id);
@@ -25,16 +28,19 @@ export async function GET(
       );
     }
 
-    // Validate filename to prevent path traversal attacks
-    const filename = params.filename;
-
-    // Check for path traversal attempts
-    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+    // Validate worktree path is within root directory
+    try {
+      validateWorktreePath(worktree.path, env.MCBD_ROOT_DIR);
+    } catch (error) {
+      console.error('Worktree path validation failed:', error);
       return NextResponse.json(
-        { error: 'Invalid filename: path traversal not allowed' },
-        { status: 400 }
+        { error: 'Invalid worktree path' },
+        { status: 500 }
       );
     }
+
+    // Validate filename to prevent path traversal attacks
+    const filename = params.filename;
 
     // Only allow .jsonl files
     if (!filename.endsWith('.jsonl')) {
@@ -44,11 +50,21 @@ export async function GET(
       );
     }
 
-    // Construct file path
+    // Construct logs directory path
     const logsDir = path.join(worktree.path, '.claude', 'logs');
-    const filePath = path.join(logsDir, filename);
 
-    // Verify the file exists and is within the logs directory
+    // Validate and resolve the file path to prevent path traversal
+    let filePath: string;
+    try {
+      filePath = validateWorktreePath(filename, logsDir);
+    } catch (error) {
+      return NextResponse.json(
+        { error: 'Invalid filename: path traversal not allowed' },
+        { status: 400 }
+      );
+    }
+
+    // Verify the file exists
     if (!fs.existsSync(filePath)) {
       return NextResponse.json(
         { error: `Log file '${filename}' not found` },
