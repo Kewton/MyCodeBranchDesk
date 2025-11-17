@@ -4,9 +4,9 @@
   "private": true,
   "description": "Git worktree management with Claude CLI and tmux sessions",
   "scripts": {
-    "dev": "next dev",
+    "dev": "tsx server.ts",
     "build": "next build",
-    "start": "next start",
+    "start": "NODE_ENV=production tsx server.ts",
     "lint": "next lint",
     "test": "vitest",
     "test:ui": "vitest --ui",
