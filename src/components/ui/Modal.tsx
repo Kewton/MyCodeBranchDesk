@@ -65,11 +65,11 @@ export function Modal({
   if (!isOpen) return null;
 
   const sizeClasses = {
-    sm: 'max-w-md w-full mx-4',
-    md: 'max-w-2xl w-full mx-4',
-    lg: 'max-w-4xl w-full mx-4',
-    xl: 'max-w-6xl w-full mx-4',
-    full: 'max-w-[95vw] w-full mx-4',
+    sm: 'w-[calc(100vw-1rem)] sm:max-w-md sm:w-full',
+    md: 'w-[calc(100vw-1rem)] sm:max-w-2xl sm:w-full',
+    lg: 'w-[calc(100vw-1rem)] sm:max-w-4xl sm:w-full',
+    xl: 'w-[calc(100vw-1rem)] sm:max-w-6xl sm:w-full',
+    full: 'w-[calc(100vw-1rem)] sm:max-w-[95vw] sm:w-full',
   };
 
   return (
@@ -81,7 +81,7 @@ export function Modal({
       />
 
       {/* Modal */}
-      <div className="flex min-h-full items-center justify-center p-4">
+      <div className="flex min-h-full items-center justify-center p-2 sm:p-4">
         <div
           ref={modalRef}
           className={`relative w-full ${sizeClasses[size]} bg-white rounded-lg shadow-xl transform transition-all`}
