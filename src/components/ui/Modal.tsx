@@ -65,11 +65,11 @@ export function Modal({
   if (!isOpen) return null;
 
   const sizeClasses = {
-    sm: 'w-[calc(100vw-1rem)] sm:max-w-md sm:w-full',
-    md: 'w-[calc(100vw-1rem)] sm:max-w-2xl sm:w-full',
-    lg: 'w-[calc(100vw-1rem)] sm:max-w-4xl sm:w-full',
-    xl: 'w-[calc(100vw-1rem)] sm:max-w-6xl sm:w-full',
-    full: 'w-[calc(100vw-1rem)] sm:max-w-[95vw] sm:w-full',
+    sm: 'max-w-[calc(100vw-2rem)] sm:max-w-md',
+    md: 'max-w-[calc(100vw-2rem)] sm:max-w-2xl',
+    lg: 'max-w-[calc(100vw-2rem)] sm:max-w-4xl',
+    xl: 'max-w-[calc(100vw-2rem)] sm:max-w-6xl',
+    full: 'max-w-[calc(100vw-2rem)] sm:max-w-[95vw]',
   };
 
   return (
