@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbInstance } from '@/lib/db-instance';
-import { getWorktreeById, createMessage } from '@/lib/db';
+import { getWorktreeById, createMessage, updateLastUserMessage } from '@/lib/db';
 import {
   startClaudeSession,
   isClaudeRunning,
@@ -88,12 +88,16 @@ export async function POST(
     }
 
     // Create user message in database
+    const timestamp = new Date();
     const message = createMessage(db, {
       worktreeId: params.id,
       role: 'user',
       content: body.content,
-      timestamp: new Date(),
+      timestamp,
     });
+
+    // Update last user message for worktree
+    updateLastUserMessage(db, params.id, body.content, timestamp);
 
     // Start polling for Claude's response
     startPolling(params.id);

@@ -18,6 +18,7 @@ import {
   getSessionState,
   updateSessionState,
 } from '@/lib/db';
+import { runMigrations } from '@/lib/db-migrations';
 
 describe('Database Operations', () => {
   let testDb: Database.Database;
@@ -25,7 +26,8 @@ describe('Database Operations', () => {
   beforeEach(() => {
     // Create in-memory database for testing
     testDb = new Database(':memory:');
-    initDatabase(testDb);
+    // Run migrations to set up latest schema
+    runMigrations(testDb);
   });
 
   afterEach(() => {
@@ -67,6 +69,8 @@ describe('Database Operations', () => {
           id: 'main',
           name: 'main',
           path: '/path/to/main',
+          repositoryPath: '/path/to/repo',
+          repositoryName: 'repo',
         };
 
         upsertWorktree(testDb, worktree);
@@ -77,6 +81,8 @@ describe('Database Operations', () => {
           id: 'main',
           name: 'main',
           path: '/path/to/main',
+          repositoryPath: '/path/to/repo',
+          repositoryName: 'repo',
         });
       });
 
@@ -85,6 +91,8 @@ describe('Database Operations', () => {
           id: 'main',
           name: 'main',
           path: '/path/to/main',
+          repositoryPath: '/path/to/repo',
+          repositoryName: 'repo',
         };
 
         upsertWorktree(testDb, worktree);
@@ -105,12 +113,16 @@ describe('Database Operations', () => {
           id: 'main',
           name: 'main',
           path: '/path/to/main',
+          repositoryPath: '/path/to/repo',
+          repositoryName: 'repo',
         };
 
         const worktree2: Worktree = {
           id: 'feature-foo',
           name: 'feature/foo',
           path: '/path/to/main', // Same path
+          repositoryPath: '/path/to/repo',
+          repositoryName: 'repo',
         };
 
         upsertWorktree(testDb, worktree1);
@@ -135,6 +147,8 @@ describe('Database Operations', () => {
           id: 'main',
           name: 'main',
           path: '/path/to/main',
+          repositoryPath: '/path/to/repo',
+          repositoryName: 'repo',
           updatedAt: earlier,
         });
 
@@ -142,6 +156,8 @@ describe('Database Operations', () => {
           id: 'feature-foo',
           name: 'feature/foo',
           path: '/path/to/feature-foo',
+          repositoryPath: '/path/to/repo',
+          repositoryName: 'repo',
           updatedAt: now,
         });
 
@@ -159,6 +175,8 @@ describe('Database Operations', () => {
           id: 'main',
           name: 'main',
           path: '/path/to/main',
+          repositoryPath: '/path/to/repo',
+          repositoryName: 'repo',
         });
 
         const result = getWorktreeById(testDb, 'main');
@@ -181,6 +199,8 @@ describe('Database Operations', () => {
         id: 'main',
         name: 'main',
         path: '/path/to/main',
+        repositoryPath: '/path/to/repo',
+        repositoryName: 'repo',
       });
     });
 
@@ -321,6 +341,8 @@ describe('Database Operations', () => {
           id: 'empty',
           name: 'empty',
           path: '/path/to/empty',
+          repositoryPath: '/path/to/repo',
+          repositoryName: 'repo',
         });
 
         const messages = getMessages(testDb, 'empty');
@@ -335,6 +357,8 @@ describe('Database Operations', () => {
         id: 'main',
         name: 'main',
         path: '/path/to/main',
+        repositoryPath: '/path/to/repo',
+        repositoryName: 'repo',
       });
     });
 

@@ -36,6 +36,8 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabView>('messages');
   const [waitingForResponse, setWaitingForResponse] = useState(false);
+  const [isEditingMemo, setIsEditingMemo] = useState(false);
+  const [memoText, setMemoText] = useState('');
 
   /**
    * Fetch worktree data
@@ -75,6 +77,37 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
 
     fetchData();
   }, [fetchWorktree, fetchMessages]);
+
+  /**
+   * Sync memo text when worktree changes
+   */
+  useEffect(() => {
+    if (worktree) {
+      setMemoText(worktree.memo || '');
+    }
+  }, [worktree]);
+
+  /**
+   * Save memo
+   */
+  const handleSaveMemo = async () => {
+    try {
+      setError(null);
+      const updated = await worktreeApi.updateMemo(worktreeId, memoText);
+      setWorktree(updated);
+      setIsEditingMemo(false);
+    } catch (err) {
+      setError(handleApiError(err));
+    }
+  };
+
+  /**
+   * Cancel memo edit
+   */
+  const handleCancelMemo = () => {
+    setMemoText(worktree?.memo || '');
+    setIsEditingMemo(false);
+  };
 
   /**
    * WebSocket for real-time updates
@@ -240,6 +273,49 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
                   <dd className="text-sm font-medium text-gray-900">{messages.length}</dd>
                 </div>
               </dl>
+            </CardContent>
+          </Card>
+
+          {/* Memo */}
+          <Card padding="lg">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Memo</CardTitle>
+                {!isEditingMemo && (
+                  <Button variant="ghost" size="sm" onClick={() => setIsEditingMemo(true)}>
+                    Edit
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isEditingMemo ? (
+                <div className="space-y-3">
+                  <textarea
+                    value={memoText}
+                    onChange={(e) => setMemoText(e.target.value)}
+                    placeholder="Add notes about this branch..."
+                    className="input w-full min-h-[120px] resize-y"
+                    autoFocus
+                  />
+                  <div className="flex gap-2">
+                    <Button variant="primary" size="sm" onClick={handleSaveMemo} fullWidth>
+                      Save
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={handleCancelMemo} fullWidth>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  {worktree?.memo ? (
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{worktree.memo}</p>
+                  ) : (
+                    <p className="text-sm text-gray-400 italic">No memo added yet</p>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 

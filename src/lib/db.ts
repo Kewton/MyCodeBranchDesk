@@ -407,9 +407,8 @@ function updateWorktreeTimestamp(
 
 /**
  * Update worktree's last user message
- * @private
  */
-function updateLastUserMessage(
+export function updateLastUserMessage(
   db: Database.Database,
   worktreeId: string,
   message: string,

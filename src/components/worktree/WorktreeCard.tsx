@@ -25,11 +25,16 @@ export interface WorktreeCardProps {
  * ```
  */
 export function WorktreeCard({ worktree }: WorktreeCardProps) {
-  const { id, name, path, lastMessageSummary, updatedAt } = worktree;
+  const { id, name, path, memo, lastUserMessage, lastUserMessageAt, updatedAt } = worktree;
 
-  // Format relative time
+  // Format relative time for last update
   const relativeTime = updatedAt
     ? formatDistanceToNow(new Date(updatedAt), { addSuffix: true, locale: ja })
+    : null;
+
+  // Format relative time for last user message
+  const lastMessageTime = lastUserMessageAt
+    ? formatDistanceToNow(new Date(lastUserMessageAt), { addSuffix: true, locale: ja })
     : null;
 
   // Determine if this is the main branch
@@ -57,11 +62,24 @@ export function WorktreeCard({ worktree }: WorktreeCardProps) {
               </p>
             </div>
 
-            {/* Last Message Summary */}
-            {lastMessageSummary && (
+            {/* Memo */}
+            {memo && (
               <div>
-                <p className="text-xs text-gray-500 mb-1">Latest Activity</p>
-                <p className="text-sm text-gray-700 line-clamp-2">{lastMessageSummary}</p>
+                <p className="text-xs text-gray-500 mb-1">Memo</p>
+                <p className="text-sm text-gray-700 line-clamp-2 whitespace-pre-wrap">{memo}</p>
+              </div>
+            )}
+
+            {/* Last User Message */}
+            {lastUserMessage && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs text-gray-500">Last Message</p>
+                  {lastMessageTime && (
+                    <p className="text-xs text-gray-400">{lastMessageTime}</p>
+                  )}
+                </div>
+                <p className="text-sm text-gray-700 line-clamp-2">{lastUserMessage}</p>
               </div>
             )}
 

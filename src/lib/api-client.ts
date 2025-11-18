@@ -89,6 +89,16 @@ export const worktreeApi = {
   },
 
   /**
+   * Update worktree memo
+   */
+  async updateMemo(id: string, memo: string): Promise<Worktree> {
+    return fetchApi<Worktree>(`/api/worktrees/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ memo }),
+    });
+  },
+
+  /**
    * Get messages for a worktree
    */
   async getMessages(id: string): Promise<ChatMessage[]> {
