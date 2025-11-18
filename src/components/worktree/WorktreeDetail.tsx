@@ -38,6 +38,8 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
   const [waitingForResponse, setWaitingForResponse] = useState(false);
   const [isEditingMemo, setIsEditingMemo] = useState(false);
   const [memoText, setMemoText] = useState('');
+  const [isEditingLink, setIsEditingLink] = useState(false);
+  const [linkText, setLinkText] = useState('');
   const [showNewMessageNotification, setShowNewMessageNotification] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [generatingContent, setGeneratingContent] = useState<string>('');
@@ -82,11 +84,12 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
   }, [fetchWorktree, fetchMessages]);
 
   /**
-   * Sync memo text when worktree changes
+   * Sync memo and link text when worktree changes
    */
   useEffect(() => {
     if (worktree) {
       setMemoText(worktree.memo || '');
+      setLinkText(worktree.link || '');
     }
   }, [worktree]);
 
@@ -110,6 +113,28 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
   const handleCancelMemo = () => {
     setMemoText(worktree?.memo || '');
     setIsEditingMemo(false);
+  };
+
+  /**
+   * Save link
+   */
+  const handleSaveLink = async () => {
+    try {
+      setError(null);
+      const updated = await worktreeApi.updateLink(worktreeId, linkText);
+      setWorktree(updated);
+      setIsEditingLink(false);
+    } catch (err) {
+      setError(handleApiError(err));
+    }
+  };
+
+  /**
+   * Cancel link editing
+   */
+  const handleCancelLink = () => {
+    setLinkText(worktree?.link || '');
+    setIsEditingLink(false);
   };
 
   /**
@@ -448,15 +473,22 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
             )}
           </button>
 
-          <MessageList
-            messages={messages}
-            worktreeId={worktree!.id}
-            loading={false}
-            waitingForResponse={waitingForResponse}
-            generatingContent={generatingContent}
-          />
-          <div className="sticky bottom-0 flex-shrink-0 px-4 pb-4 pt-2 bg-gray-50 border-t border-gray-200">
-            <MessageInput worktreeId={worktreeId} onMessageSent={handleMessageSent} />
+          {/* Message List - constrained width to match tabs */}
+          <div className="flex-1 w-full max-w-7xl mx-auto">
+            <MessageList
+              messages={messages}
+              worktreeId={worktree!.id}
+              loading={false}
+              waitingForResponse={waitingForResponse}
+              generatingContent={generatingContent}
+            />
+          </div>
+
+          {/* Message Input - constrained width to match tabs */}
+          <div className="sticky bottom-0 flex-shrink-0 w-full max-w-7xl mx-auto bg-gray-50 border-t border-gray-200">
+            <div className="px-4 sm:px-6 lg:px-8 pb-4 pt-2">
+              <MessageInput worktreeId={worktreeId} onMessageSent={handleMessageSent} />
+            </div>
           </div>
         </div>
       )}
@@ -489,47 +521,114 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
         )}
 
         {activeTab === 'memo' && (
-          <Card padding="lg">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Memo</CardTitle>
-                {!isEditingMemo && (
-                  <Button variant="ghost" size="sm" onClick={() => setIsEditingMemo(true)}>
-                    Edit
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {isEditingMemo ? (
-                <div className="space-y-3">
-                  <textarea
-                    value={memoText}
-                    onChange={(e) => setMemoText(e.target.value)}
-                    placeholder="Add notes about this branch..."
-                    className="input w-full min-h-[300px] resize-y"
-                    autoFocus
-                  />
-                  <div className="flex gap-2">
-                    <Button variant="primary" size="sm" onClick={handleSaveMemo}>
-                      Save
+          <div className="space-y-6">
+            {/* Memo Section */}
+            <Card padding="lg">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Memo</CardTitle>
+                  {!isEditingMemo && (
+                    <Button variant="ghost" size="sm" onClick={() => setIsEditingMemo(true)}>
+                      Edit
                     </Button>
-                    <Button variant="secondary" size="sm" onClick={handleCancelMemo}>
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="min-h-[200px] max-w-none">
-                  {worktree?.memo ? (
-                    <p className="text-base text-gray-700 whitespace-pre-wrap leading-relaxed">{worktree.memo}</p>
-                  ) : (
-                    <p className="text-base text-gray-400 italic">No memo added yet</p>
                   )}
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardHeader>
+              <CardContent>
+                {isEditingMemo ? (
+                  <div className="space-y-3">
+                    <textarea
+                      value={memoText}
+                      onChange={(e) => setMemoText(e.target.value)}
+                      placeholder="Add notes about this branch..."
+                      className="input w-full min-h-[300px] resize-y"
+                      autoFocus
+                    />
+                    <div className="flex gap-2">
+                      <Button variant="primary" size="sm" onClick={handleSaveMemo}>
+                        Save
+                      </Button>
+                      <Button variant="secondary" size="sm" onClick={handleCancelMemo}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="min-h-[200px] max-w-none">
+                    {worktree?.memo ? (
+                      <p className="text-base text-gray-700 whitespace-pre-wrap leading-relaxed">{worktree.memo}</p>
+                    ) : (
+                      <p className="text-base text-gray-400 italic">No memo added yet</p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Link Section */}
+            <Card padding="lg">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Link</CardTitle>
+                  {!isEditingLink && (
+                    <Button variant="ghost" size="sm" onClick={() => setIsEditingLink(true)}>
+                      Edit
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isEditingLink ? (
+                  <div className="space-y-3">
+                    <input
+                      type="url"
+                      value={linkText}
+                      onChange={(e) => setLinkText(e.target.value)}
+                      placeholder="https://example.com (e.g., issue tracker, PR, documentation)"
+                      className="input w-full"
+                      autoFocus
+                    />
+                    <div className="flex gap-2">
+                      <Button variant="primary" size="sm" onClick={handleSaveLink}>
+                        Save
+                      </Button>
+                      <Button variant="secondary" size="sm" onClick={handleCancelLink}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="min-h-[100px] max-w-none">
+                    {worktree?.link ? (
+                      <a
+                        href={worktree.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                          />
+                        </svg>
+                        <span className="text-base">{worktree.link}</span>
+                      </a>
+                    ) : (
+                      <p className="text-base text-gray-400 italic">No link added yet</p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         )}
       </div>
     </div>

@@ -12,7 +12,7 @@ import { worktreeApi, handleApiError, type RepositorySummary } from '@/lib/api-c
 import { useWebSocket } from '@/hooks/useWebSocket';
 import type { Worktree } from '@/types/models';
 
-export type SortOption = 'name' | 'updated' | 'path';
+export type SortOption = 'name' | 'updated' | 'favorite';
 export type SortDirection = 'asc' | 'desc';
 
 export interface WorktreeListProps {
@@ -37,6 +37,7 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
   const [sortBy, setSortBy] = useState<SortOption>('updated');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [selectedRepository, setSelectedRepository] = useState<string | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<'todo' | 'doing' | 'done' | 'unset' | null>(null);
 
   /**
    * Fetch worktrees from API
@@ -97,6 +98,15 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
       result = result.filter((wt) => wt.repositoryPath === selectedRepository);
     }
 
+    // Filter by status
+    if (selectedStatus !== null) {
+      if (selectedStatus === 'unset') {
+        result = result.filter((wt) => !wt.status);
+      } else {
+        result = result.filter((wt) => wt.status === selectedStatus);
+      }
+    }
+
     // Filter by search query
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -118,13 +128,15 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
         case 'name':
           compareValue = a.name.localeCompare(b.name);
           break;
-        case 'path':
-          compareValue = a.path.localeCompare(b.path);
-          break;
         case 'updated':
           const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
           const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
           compareValue = aTime - bTime;
+          break;
+        case 'favorite':
+          const aFav = a.favorite ? 1 : 0;
+          const bFav = b.favorite ? 1 : 0;
+          compareValue = aFav - bFav;
           break;
       }
 
@@ -132,7 +144,7 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
     });
 
     return result;
-  }, [worktrees, selectedRepository, searchQuery, sortBy, sortDirection]);
+  }, [worktrees, selectedRepository, selectedStatus, searchQuery, sortBy, sortDirection]);
 
   /**
    * Group worktrees by repository
@@ -165,11 +177,10 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header with Search and Filters */}
+      {/* Header with Badges and Refresh */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div className="flex items-center gap-2 flex-wrap">
-          <h2>Worktrees</h2>
-          <Badge variant="gray">{worktrees.length}</Badge>
+          <Badge variant="gray">{worktrees.length} branches</Badge>
           {repositories.length > 0 && (
             <Badge variant="blue">{repositories.length} {repositories.length === 1 ? 'repository' : 'repositories'}</Badge>
           )}
@@ -187,10 +198,20 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
         </div>
       </div>
 
+      {/* Search Bar - First */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <input
+          type="text"
+          placeholder="Search worktrees..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="input flex-1"
+        />
+      </div>
+
       {/* Repository Filter */}
       {repositories.length > 1 && (
         <div className="flex gap-2 flex-wrap items-center">
-          <span className="text-sm text-gray-600">Filter by repository:</span>
           <Button
             variant={selectedRepository === null ? 'primary' : 'ghost'}
             size="sm"
@@ -211,20 +232,55 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
         </div>
       )}
 
-      {/* Search Bar */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <input
-          type="text"
-          placeholder="Search worktrees..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="input flex-1"
-        />
+      {/* Status Filter */}
+      <div className="flex gap-2 flex-wrap items-center">
+        <Button
+          variant={selectedStatus === null ? 'primary' : 'ghost'}
+          size="sm"
+          onClick={() => setSelectedStatus(null)}
+        >
+          All
+        </Button>
+        <Button
+          variant={selectedStatus === 'todo' ? 'primary' : 'ghost'}
+          size="sm"
+          onClick={() => setSelectedStatus('todo')}
+        >
+          📝 ToDo
+        </Button>
+        <Button
+          variant={selectedStatus === 'doing' ? 'primary' : 'ghost'}
+          size="sm"
+          onClick={() => setSelectedStatus('doing')}
+        >
+          🚧 Doing
+        </Button>
+        <Button
+          variant={selectedStatus === 'done' ? 'primary' : 'ghost'}
+          size="sm"
+          onClick={() => setSelectedStatus('done')}
+        >
+          ✅ Done
+        </Button>
+        <Button
+          variant={selectedStatus === 'unset' ? 'primary' : 'ghost'}
+          size="sm"
+          onClick={() => setSelectedStatus('unset')}
+        >
+          Not set
+        </Button>
       </div>
 
       {/* Sort Options */}
       <div className="flex gap-2 flex-wrap">
         <span className="text-sm text-gray-600 self-center">Sort by:</span>
+        <Button
+          variant={sortBy === 'favorite' ? 'primary' : 'ghost'}
+          size="sm"
+          onClick={() => toggleSort('favorite')}
+        >
+          ⭐ Favorite {sortBy === 'favorite' && (sortDirection === 'asc' ? '↑' : '↓')}
+        </Button>
         <Button
           variant={sortBy === 'name' ? 'primary' : 'ghost'}
           size="sm"
@@ -238,13 +294,6 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
           onClick={() => toggleSort('updated')}
         >
           Updated {sortBy === 'updated' && (sortDirection === 'asc' ? '↑' : '↓')}
-        </Button>
-        <Button
-          variant={sortBy === 'path' ? 'primary' : 'ghost'}
-          size="sm"
-          onClick={() => toggleSort('path')}
-        >
-          Path {sortBy === 'path' && (sortDirection === 'asc' ? '↑' : '↓')}
         </Button>
       </div>
 
@@ -299,7 +348,6 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
                   <div className="flex items-center gap-3 pb-2 border-b border-gray-200">
                     <h3 className="text-xl font-semibold text-gray-900">{repoName}</h3>
                     <Badge variant="gray">{repoWorktrees.length}</Badge>
-                    <span className="text-sm text-gray-500">{repoPath}</span>
                   </div>
                 )}
 
@@ -310,6 +358,7 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
                       key={worktree.id}
                       worktree={worktree}
                       onSessionKilled={fetchWorktrees}
+                      onStatusChanged={fetchWorktrees}
                     />
                   ))}
                 </div>

@@ -28,6 +28,12 @@ export interface Worktree {
   updatedAt?: Date;
   /** Whether a tmux session is currently running for this worktree */
   isSessionRunning?: boolean;
+  /** Whether this worktree is marked as favorite */
+  favorite?: boolean;
+  /** Worktree status: todo, doing, done, or null if not set */
+  status?: 'todo' | 'doing' | 'done' | null;
+  /** External link URL (e.g., issue tracker, PR, documentation) */
+  link?: string;
 }
 
 /**

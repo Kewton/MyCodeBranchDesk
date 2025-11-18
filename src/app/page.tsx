@@ -1,9 +1,18 @@
 'use client';
 
+import { useState, useCallback } from 'react';
 import { MainLayout } from '@/components/layout';
 import { WorktreeList } from '@/components/worktree';
+import { RepositoryManager } from '@/components/repository';
 
 export default function Home() {
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const handleRepositoryAdded = useCallback(() => {
+    // Trigger worktree list refresh
+    setRefreshTrigger((prev) => prev + 1);
+  }, []);
+
   return (
     <MainLayout>
       <div className="container-custom py-8">
@@ -14,8 +23,13 @@ export default function Home() {
           </p>
         </div>
 
+        {/* Repository Management */}
+        <div className="mb-8">
+          <RepositoryManager onRepositoryAdded={handleRepositoryAdded} />
+        </div>
+
         {/* Worktree List */}
-        <WorktreeList />
+        <WorktreeList key={refreshTrigger} />
       </div>
     </MainLayout>
   );

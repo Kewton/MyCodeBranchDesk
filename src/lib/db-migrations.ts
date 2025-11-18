@@ -11,7 +11,7 @@ import { initDatabase } from './db';
  * Current schema version
  * Increment this when adding new migrations
  */
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 6;
 
 /**
  * Migration definition
@@ -180,6 +180,70 @@ const migrations: Migration[] = [
     down: (db) => {
       // No down migration needed - this is a data fix
       console.log('No rollback needed for repository path fix');
+    }
+  },
+  {
+    version: 4,
+    name: 'add-favorite-field',
+    up: (db) => {
+      // Add favorite column to worktrees table
+      db.exec(`
+        ALTER TABLE worktrees ADD COLUMN favorite INTEGER DEFAULT 0;
+      `);
+
+      // Create index on favorite for faster sorting
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_worktrees_favorite
+        ON worktrees(favorite DESC, updated_at DESC);
+      `);
+    },
+    down: (db) => {
+      // Remove favorite column (SQLite doesn't support DROP COLUMN directly)
+      // We need to recreate the table without the favorite column
+      db.exec(`
+        -- Drop the index first
+        DROP INDEX IF EXISTS idx_worktrees_favorite;
+
+        -- Note: In production, you'd need to recreate the table without the favorite column
+        -- This is a simplified down migration
+      `);
+    }
+  },
+  {
+    version: 5,
+    name: 'add-status-field',
+    up: (db) => {
+      // Add status column to worktrees table
+      // Values: 'todo', 'doing', 'done', or NULL (not set)
+      db.exec(`
+        ALTER TABLE worktrees ADD COLUMN status TEXT DEFAULT NULL;
+      `);
+
+      // Create index on status for faster filtering
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_worktrees_status
+        ON worktrees(status);
+      `);
+    },
+    down: (db) => {
+      // Remove status index
+      db.exec(`
+        DROP INDEX IF EXISTS idx_worktrees_status;
+      `);
+    }
+  },
+  {
+    version: 6,
+    name: 'add-link-field',
+    up: (db) => {
+      // Add link column to worktrees table for storing external URLs
+      db.exec(`
+        ALTER TABLE worktrees ADD COLUMN link TEXT DEFAULT NULL;
+      `);
+    },
+    down: (db) => {
+      // No down migration needed - SQLite doesn't support DROP COLUMN directly
+      console.log('No rollback needed for link field');
     }
   }
 ];

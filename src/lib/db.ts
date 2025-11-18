@@ -82,7 +82,7 @@ export function getWorktrees(
 ): Worktree[] {
   let query = `
     SELECT id, name, path, repository_path, repository_name, memo,
-           last_user_message, last_user_message_at, last_message_summary, updated_at
+           last_user_message, last_user_message_at, last_message_summary, updated_at, favorite, status, link
     FROM worktrees
   `;
 
@@ -107,6 +107,9 @@ export function getWorktrees(
     last_user_message_at: number | null;
     last_message_summary: string | null;
     updated_at: number | null;
+    favorite: number | null;
+    status: string | null;
+    link: string | null;
   }>;
 
   return rows.map((row) => ({
@@ -120,6 +123,9 @@ export function getWorktrees(
     lastUserMessageAt: row.last_user_message_at ? new Date(row.last_user_message_at) : undefined,
     lastMessageSummary: row.last_message_summary || undefined,
     updatedAt: row.updated_at ? new Date(row.updated_at) : undefined,
+    favorite: row.favorite === 1,
+    status: (row.status as 'todo' | 'doing' | 'done' | null) || null,
+    link: row.link || undefined,
   }));
 }
 
@@ -164,7 +170,7 @@ export function getWorktreeById(
 ): Worktree | null {
   const stmt = db.prepare(`
     SELECT id, name, path, repository_path, repository_name, memo,
-           last_user_message, last_user_message_at, last_message_summary, updated_at
+           last_user_message, last_user_message_at, last_message_summary, updated_at, favorite, status, link
     FROM worktrees
     WHERE id = ?
   `);
@@ -180,6 +186,9 @@ export function getWorktreeById(
     last_user_message_at: number | null;
     last_message_summary: string | null;
     updated_at: number | null;
+    favorite: number | null;
+    status: string | null;
+    link: string | null;
   } | undefined;
 
   if (!row) {
@@ -197,6 +206,9 @@ export function getWorktreeById(
     lastUserMessageAt: row.last_user_message_at ? new Date(row.last_user_message_at) : undefined,
     lastMessageSummary: row.last_message_summary || undefined,
     updatedAt: row.updated_at ? new Date(row.updated_at) : undefined,
+    favorite: row.favorite === 1,
+    status: (row.status as 'todo' | 'doing' | 'done' | null) || null,
+    link: row.link || undefined,
   };
 }
 
@@ -254,6 +266,23 @@ export function updateWorktreeMemo(
   `);
 
   stmt.run(memo || null, worktreeId);
+}
+
+/**
+ * Update worktree link
+ */
+export function updateWorktreeLink(
+  db: Database.Database,
+  worktreeId: string,
+  link: string
+): void {
+  const stmt = db.prepare(`
+    UPDATE worktrees
+    SET link = ?
+    WHERE id = ?
+  `);
+
+  stmt.run(link || null, worktreeId);
 }
 
 /**
@@ -501,6 +530,40 @@ export function updatePromptData(
   `);
 
   stmt.run(JSON.stringify(promptData), messageId);
+}
+
+/**
+ * Update favorite status for a worktree
+ */
+export function updateFavorite(
+  db: Database.Database,
+  id: string,
+  favorite: boolean
+): void {
+  const stmt = db.prepare(`
+    UPDATE worktrees
+    SET favorite = ?
+    WHERE id = ?
+  `);
+
+  stmt.run(favorite ? 1 : 0, id);
+}
+
+/**
+ * Update status for a worktree
+ */
+export function updateStatus(
+  db: Database.Database,
+  id: string,
+  status: 'todo' | 'doing' | 'done' | null
+): void {
+  const stmt = db.prepare(`
+    UPDATE worktrees
+    SET status = ?
+    WHERE id = ?
+  `);
+
+  stmt.run(status, id);
 }
 
 /**

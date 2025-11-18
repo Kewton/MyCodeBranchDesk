@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbInstance } from '@/lib/db-instance';
-import { getWorktreeById, updateWorktreeMemo } from '@/lib/db';
+import { getWorktreeById, updateWorktreeMemo, updateWorktreeLink, updateFavorite, updateStatus } from '@/lib/db';
 import { isClaudeRunning } from '@/lib/claude-session';
 
 export async function GET(
@@ -62,6 +62,24 @@ export async function PATCH(
     // Update memo if provided
     if ('memo' in body) {
       updateWorktreeMemo(db, params.id, body.memo);
+    }
+
+    // Update link if provided
+    if ('link' in body) {
+      updateWorktreeLink(db, params.id, body.link);
+    }
+
+    // Update favorite if provided
+    if ('favorite' in body && typeof body.favorite === 'boolean') {
+      updateFavorite(db, params.id, body.favorite);
+    }
+
+    // Update status if provided
+    if ('status' in body) {
+      const validStatuses = ['todo', 'doing', 'done', null];
+      if (validStatuses.includes(body.status)) {
+        updateStatus(db, params.id, body.status);
+      }
     }
 
     // Return updated worktree with session status

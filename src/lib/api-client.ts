@@ -109,6 +109,36 @@ export const worktreeApi = {
   },
 
   /**
+   * Update worktree link
+   */
+  async updateLink(id: string, link: string): Promise<Worktree> {
+    return fetchApi<Worktree>(`/api/worktrees/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ link }),
+    });
+  },
+
+  /**
+   * Toggle worktree favorite status
+   */
+  async toggleFavorite(id: string, favorite: boolean): Promise<Worktree> {
+    return fetchApi<Worktree>(`/api/worktrees/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ favorite }),
+    });
+  },
+
+  /**
+   * Update worktree status
+   */
+  async updateStatus(id: string, status: 'todo' | 'doing' | 'done' | null): Promise<Worktree> {
+    return fetchApi<Worktree>(`/api/worktrees/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+  },
+
+  /**
    * Get messages for a worktree
    */
   async getMessages(id: string): Promise<ChatMessage[]> {
@@ -152,6 +182,42 @@ export const worktreeApi = {
       `/api/worktrees/${id}/kill-session`,
       { method: 'POST' }
     );
+  },
+};
+
+/**
+ * Repository API client
+ */
+export const repositoryApi = {
+  /**
+   * Scan a new repository path for worktrees
+   */
+  async scan(repositoryPath: string): Promise<{
+    success: boolean;
+    message: string;
+    worktreeCount: number;
+    repositoryPath: string;
+    repositoryName: string;
+  }> {
+    return fetchApi('/api/repositories/scan', {
+      method: 'POST',
+      body: JSON.stringify({ repositoryPath }),
+    });
+  },
+
+  /**
+   * Re-sync all configured repositories
+   */
+  async sync(): Promise<{
+    success: boolean;
+    message: string;
+    worktreeCount: number;
+    repositoryCount: number;
+    repositories: string[];
+  }> {
+    return fetchApi('/api/repositories/sync', {
+      method: 'POST',
+    });
   },
 };
 
