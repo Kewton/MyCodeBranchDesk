@@ -94,7 +94,41 @@ export function parseWorktreeOutput(output: string): ParsedWorktree[] {
 }
 
 /**
- * Scan git worktrees in the root directory
+ * Get repository paths from environment variables
+ * Supports both WORKTREE_REPOS (comma-separated) and MCBD_ROOT_DIR (single path)
+ *
+ * @returns Array of repository root paths
+ *
+ * @example
+ * ```typescript
+ * // WORKTREE_REPOS="/path/to/repo1,/path/to/repo2"
+ * getRepositoryPaths(); // => ['/path/to/repo1', '/path/to/repo2']
+ *
+ * // MCBD_ROOT_DIR="/path/to/repo"
+ * getRepositoryPaths(); // => ['/path/to/repo']
+ * ```
+ */
+export function getRepositoryPaths(): string[] {
+  // Try WORKTREE_REPOS first (supports multiple repos)
+  const worktreeRepos = process.env.WORKTREE_REPOS;
+  if (worktreeRepos && worktreeRepos.trim()) {
+    return worktreeRepos
+      .split(',')
+      .map(p => p.trim())
+      .filter(p => p.length > 0);
+  }
+
+  // Fallback to MCBD_ROOT_DIR for backward compatibility
+  const mcbdRootDir = process.env.MCBD_ROOT_DIR;
+  if (mcbdRootDir && mcbdRootDir.trim()) {
+    return [mcbdRootDir.trim()];
+  }
+
+  return [];
+}
+
+/**
+ * Scan git worktrees in a single repository
  *
  * @param rootDir - Root directory to scan for worktrees
  * @returns Array of Worktree objects
@@ -117,12 +151,18 @@ export async function scanWorktrees(rootDir: string): Promise<Worktree[]> {
 
     const parsed = parseWorktreeOutput(stdout);
 
+    // Get repository name from path
+    const repositoryPath = path.resolve(rootDir);
+    const repositoryName = path.basename(repositoryPath);
+
     // Filter and validate worktree paths
     return parsed
       .map((wt) => ({
         id: generateWorktreeId(wt.branch),
         name: wt.branch,
         path: path.resolve(wt.path),
+        repositoryPath,
+        repositoryName,
       }))
       .filter((wt) => {
         // Git worktrees can be outside the repo root, so we use a more lenient validation
@@ -155,6 +195,38 @@ export async function scanWorktrees(rootDir: string): Promise<Worktree[]> {
     // Re-throw other errors
     throw error;
   }
+}
+
+/**
+ * Scan git worktrees in multiple repositories
+ *
+ * @param repositoryPaths - Array of repository root paths
+ * @returns Array of all Worktree objects from all repositories
+ *
+ * @example
+ * ```typescript
+ * const repos = ['/path/to/repo1', '/path/to/repo2'];
+ * const worktrees = await scanMultipleRepositories(repos);
+ * ```
+ */
+export async function scanMultipleRepositories(
+  repositoryPaths: string[]
+): Promise<Worktree[]> {
+  const allWorktrees: Worktree[] = [];
+
+  for (const repoPath of repositoryPaths) {
+    try {
+      console.log(`Scanning repository: ${repoPath}`);
+      const worktrees = await scanWorktrees(repoPath);
+      allWorktrees.push(...worktrees);
+      console.log(`  Found ${worktrees.length} worktree(s)`);
+    } catch (error) {
+      console.error(`Error scanning repository ${repoPath}:`, error);
+      // Continue with other repositories even if one fails
+    }
+  }
+
+  return allWorktrees;
 }
 
 /**

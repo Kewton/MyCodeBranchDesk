@@ -6,6 +6,23 @@
 import type { Worktree, ChatMessage } from '@/types/models';
 
 /**
+ * Repository summary from API
+ */
+export interface RepositorySummary {
+  path: string;
+  name: string;
+  worktreeCount: number;
+}
+
+/**
+ * Worktrees API response
+ */
+export interface WorktreesResponse {
+  worktrees: Worktree[];
+  repositories: RepositorySummary[];
+}
+
+/**
  * API Error class
  */
 export class ApiError extends Error {
@@ -58,10 +75,10 @@ async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
  */
 export const worktreeApi = {
   /**
-   * Get all worktrees
+   * Get all worktrees and repositories
    */
-  async getAll(): Promise<Worktree[]> {
-    return fetchApi<Worktree[]>('/api/worktrees');
+  async getAll(): Promise<WorktreesResponse> {
+    return fetchApi<WorktreesResponse>('/api/worktrees');
   },
 
   /**

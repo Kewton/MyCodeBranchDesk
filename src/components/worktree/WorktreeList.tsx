@@ -8,7 +8,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { WorktreeCard } from './WorktreeCard';
 import { Button, Badge } from '@/components/ui';
-import { worktreeApi, handleApiError } from '@/lib/api-client';
+import { worktreeApi, handleApiError, type RepositorySummary } from '@/lib/api-client';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import type { Worktree } from '@/types/models';
 
@@ -30,11 +30,13 @@ export interface WorktreeListProps {
  */
 export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
   const [worktrees, setWorktrees] = useState<Worktree[]>(initialWorktrees);
+  const [repositories, setRepositories] = useState<RepositorySummary[]>([]);
   const [loading, setLoading] = useState(!initialWorktrees.length);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('updated');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [selectedRepository, setSelectedRepository] = useState<string | null>(null);
 
   // WebSocket connection for real-time updates
   const { status: wsStatus } = useWebSocket({
@@ -54,7 +56,8 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
       setLoading(true);
       setError(null);
       const data = await worktreeApi.getAll();
-      setWorktrees(data);
+      setWorktrees(data.worktrees);
+      setRepositories(data.repositories);
     } catch (err) {
       setError(handleApiError(err));
     } finally {
@@ -75,6 +78,11 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
   const filteredAndSortedWorktrees = useMemo(() => {
     let result = [...worktrees];
 
+    // Filter by repository
+    if (selectedRepository) {
+      result = result.filter((wt) => wt.repositoryPath === selectedRepository);
+    }
+
     // Filter by search query
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -82,7 +90,9 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
         (wt) =>
           wt.name.toLowerCase().includes(query) ||
           wt.path.toLowerCase().includes(query) ||
-          wt.lastMessageSummary?.toLowerCase().includes(query)
+          wt.repositoryName.toLowerCase().includes(query) ||
+          wt.lastMessageSummary?.toLowerCase().includes(query) ||
+          wt.memo?.toLowerCase().includes(query)
       );
     }
 
@@ -108,7 +118,24 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
     });
 
     return result;
-  }, [worktrees, searchQuery, sortBy, sortDirection]);
+  }, [worktrees, selectedRepository, searchQuery, sortBy, sortDirection]);
+
+  /**
+   * Group worktrees by repository
+   */
+  const worktreesByRepository = useMemo(() => {
+    const grouped = new Map<string, Worktree[]>();
+
+    for (const wt of filteredAndSortedWorktrees) {
+      const repoPath = wt.repositoryPath || 'unknown';
+      if (!grouped.has(repoPath)) {
+        grouped.set(repoPath, []);
+      }
+      grouped.get(repoPath)!.push(wt);
+    }
+
+    return grouped;
+  }, [filteredAndSortedWorktrees]);
 
   /**
    * Toggle sort direction
@@ -126,9 +153,12 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
     <div className="space-y-6">
       {/* Header with Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <h2>Worktrees</h2>
           <Badge variant="gray">{worktrees.length}</Badge>
+          {repositories.length > 0 && (
+            <Badge variant="blue">{repositories.length} {repositories.length === 1 ? 'repository' : 'repositories'}</Badge>
+          )}
           {wsStatus === 'connected' && (
             <Badge variant="success" dot>
               Live
@@ -142,6 +172,30 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
           </Button>
         </div>
       </div>
+
+      {/* Repository Filter */}
+      {repositories.length > 1 && (
+        <div className="flex gap-2 flex-wrap items-center">
+          <span className="text-sm text-gray-600">Filter by repository:</span>
+          <Button
+            variant={selectedRepository === null ? 'primary' : 'ghost'}
+            size="sm"
+            onClick={() => setSelectedRepository(null)}
+          >
+            All ({worktrees.length})
+          </Button>
+          {repositories.map((repo) => (
+            <Button
+              key={repo.path}
+              variant={selectedRepository === repo.path ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => setSelectedRepository(repo.path)}
+            >
+              {repo.name} ({repo.worktreeCount})
+            </Button>
+          ))}
+        </div>
+      )}
 
       {/* Search Bar */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -217,12 +271,33 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
         </div>
       )}
 
-      {/* Worktree Grid */}
+      {/* Worktree Grid - Grouped by Repository */}
       {!loading && filteredAndSortedWorktrees.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredAndSortedWorktrees.map((worktree) => (
-            <WorktreeCard key={worktree.id} worktree={worktree} />
-          ))}
+        <div className="space-y-8">
+          {Array.from(worktreesByRepository.entries()).map(([repoPath, repoWorktrees]) => {
+            const repoInfo = repositories.find((r) => r.path === repoPath);
+            const repoName = repoInfo?.name || 'Unknown Repository';
+
+            return (
+              <div key={repoPath} className="space-y-4">
+                {/* Repository Header (only show if multiple repositories or not filtered) */}
+                {(repositories.length > 1 || !selectedRepository) && (
+                  <div className="flex items-center gap-3 pb-2 border-b border-gray-200">
+                    <h3 className="text-xl font-semibold text-gray-900">{repoName}</h3>
+                    <Badge variant="gray">{repoWorktrees.length}</Badge>
+                    <span className="text-sm text-gray-500">{repoPath}</span>
+                  </div>
+                )}
+
+                {/* Worktree Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {repoWorktrees.map((worktree) => (
+                    <WorktreeCard key={worktree.id} worktree={worktree} />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

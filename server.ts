@@ -7,7 +7,11 @@ import { createServer } from 'http';
 import { parse } from 'url';
 import next from 'next';
 import { setupWebSocket, closeWebSocket } from './src/lib/ws-server';
-import { scanWorktrees, syncWorktreesToDB } from './src/lib/worktrees';
+import {
+  getRepositoryPaths,
+  scanMultipleRepositories,
+  syncWorktreesToDB
+} from './src/lib/worktrees';
 import { getDbInstance } from './src/lib/db-instance';
 import { stopAllPolling } from './src/lib/claude-poller';
 import { runMigrations } from './src/lib/db-migrations';
@@ -44,16 +48,27 @@ app.prepare().then(() => {
       const db = getDbInstance();
       runMigrations(db);
 
-      const rootDir = process.env.MCBD_ROOT_DIR;
-      if (!rootDir) {
-        console.warn('Warning: MCBD_ROOT_DIR not set, skipping worktree scan');
+      // Get repository paths from environment variables
+      const repositoryPaths = getRepositoryPaths();
+
+      if (repositoryPaths.length === 0) {
+        console.warn('Warning: No repository paths configured');
+        console.warn('Set WORKTREE_REPOS (comma-separated) or MCBD_ROOT_DIR');
         return;
       }
 
-      console.log(`Scanning worktrees in: ${rootDir}`);
-      const worktrees = await scanWorktrees(rootDir);
+      console.log(`Configured repositories: ${repositoryPaths.length}`);
+      repositoryPaths.forEach((path, i) => {
+        console.log(`  ${i + 1}. ${path}`);
+      });
+
+      // Scan all repositories
+      const worktrees = await scanMultipleRepositories(repositoryPaths);
+
+      // Sync to database
       syncWorktreesToDB(db, worktrees);
-      console.log(`✓ Found and synced ${worktrees.length} worktrees`);
+
+      console.log(`✓ Total: ${worktrees.length} worktree(s) synced to database`);
     } catch (error) {
       console.error('Error initializing worktrees:', error);
     }

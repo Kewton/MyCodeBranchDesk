@@ -74,16 +74,29 @@ export function initDatabase(db: Database.Database): void {
 
 /**
  * Get all worktrees sorted by updated_at (desc)
+ * Optionally filter by repository path
  */
-export function getWorktrees(db: Database.Database): Worktree[] {
-  const stmt = db.prepare(`
+export function getWorktrees(
+  db: Database.Database,
+  repositoryPath?: string
+): Worktree[] {
+  let query = `
     SELECT id, name, path, repository_path, repository_name, memo,
            last_user_message, last_user_message_at, last_message_summary, updated_at
     FROM worktrees
-    ORDER BY updated_at DESC NULLS LAST
-  `);
+  `;
 
-  const rows = stmt.all() as Array<{
+  const params: any[] = [];
+
+  if (repositoryPath) {
+    query += ` WHERE repository_path = ?`;
+    params.push(repositoryPath);
+  }
+
+  query += ` ORDER BY updated_at DESC NULLS LAST`;
+
+  const stmt = db.prepare(query);
+  const rows = stmt.all(...params) as Array<{
     id: string;
     name: string;
     path: string;
@@ -107,6 +120,38 @@ export function getWorktrees(db: Database.Database): Worktree[] {
     lastUserMessageAt: row.last_user_message_at ? new Date(row.last_user_message_at) : undefined,
     lastMessageSummary: row.last_message_summary || undefined,
     updatedAt: row.updated_at ? new Date(row.updated_at) : undefined,
+  }));
+}
+
+/**
+ * Get list of unique repositories from worktrees
+ */
+export function getRepositories(db: Database.Database): Array<{
+  path: string;
+  name: string;
+  worktreeCount: number;
+}> {
+  const stmt = db.prepare(`
+    SELECT
+      repository_path as path,
+      repository_name as name,
+      COUNT(*) as worktree_count
+    FROM worktrees
+    WHERE repository_path IS NOT NULL
+    GROUP BY repository_path, repository_name
+    ORDER BY repository_name ASC
+  `);
+
+  const rows = stmt.all() as Array<{
+    path: string;
+    name: string;
+    worktree_count: number;
+  }>;
+
+  return rows.map((row) => ({
+    path: row.path,
+    name: row.name,
+    worktreeCount: row.worktree_count,
   }));
 }
 
