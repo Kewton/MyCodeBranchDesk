@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { useState, FormEvent } from 'react';
+import React, { useState, FormEvent, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui';
 import { worktreeApi, handleApiError } from '@/lib/api-client';
 
@@ -26,12 +26,32 @@ export function MessageInput({ worktreeId, onMessageSent }: MessageInputProps) {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isComposing, setIsComposing] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const compositionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const justFinishedComposingRef = useRef(false);
+
+  /**
+   * Auto-resize textarea based on content
+   */
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
+    }
+  }, [message]);
 
   /**
    * Handle message submission
    */
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+
+    // Prevent submission if composing with IME
+    if (isComposing) {
+      return;
+    }
 
     if (!message.trim() || sending) {
       return;
@@ -51,11 +71,55 @@ export function MessageInput({ worktreeId, onMessageSent }: MessageInputProps) {
   };
 
   /**
+   * Handle composition start (IME starts)
+   */
+  const handleCompositionStart = () => {
+    setIsComposing(true);
+    justFinishedComposingRef.current = false;
+
+    // Clear any existing timeout
+    if (compositionTimeoutRef.current) {
+      clearTimeout(compositionTimeoutRef.current);
+    }
+  };
+
+  /**
+   * Handle composition end (IME finishes)
+   */
+  const handleCompositionEnd = () => {
+    setIsComposing(false);
+    justFinishedComposingRef.current = true;
+
+    // Clear the flag after a longer delay to catch the Enter key event
+    // that might follow immediately after composition end
+    if (compositionTimeoutRef.current) {
+      clearTimeout(compositionTimeoutRef.current);
+    }
+    compositionTimeoutRef.current = setTimeout(() => {
+      justFinishedComposingRef.current = false;
+    }, 300);
+  };
+
+  /**
    * Handle keyboard shortcuts
    */
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // Submit on Enter
-    if (e.key === 'Enter') {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Check for IME composition using keyCode
+    // keyCode 229 indicates IME composition in progress
+    const keyCode = (e.nativeEvent as any).keyCode;
+    if (keyCode === 229) {
+      return;
+    }
+
+    // If we just finished composing, ignore the next Enter key
+    if (justFinishedComposingRef.current && e.key === 'Enter') {
+      justFinishedComposingRef.current = false;
+      return;
+    }
+
+    // Submit on Enter (but not when Shift is pressed or composing with IME)
+    // Shift+Enter allows line breaks
+    if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
       e.preventDefault();
       handleSubmit(e as any);
     }
@@ -69,15 +133,19 @@ export function MessageInput({ worktreeId, onMessageSent }: MessageInputProps) {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-4 py-2 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500">
-        <input
-          type="text"
+      <form onSubmit={handleSubmit} className="flex items-end gap-2 bg-white border border-gray-300 rounded-lg px-4 py-2 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500">
+        <textarea
+          ref={textareaRef}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Type your message..."
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
+          placeholder="Type your message... (Shift+Enter for line break)"
           disabled={sending}
-          className="flex-1 outline-none bg-transparent"
+          rows={1}
+          className="flex-1 outline-none bg-transparent resize-none py-1 overflow-hidden"
+          style={{ minHeight: '24px', maxHeight: '160px' }}
         />
         <button
           type="submit"

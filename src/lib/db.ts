@@ -3,8 +3,37 @@
  * SQLite database client and CRUD operations
  */
 
+import { randomUUID } from 'crypto';
 import Database from 'better-sqlite3';
 import type { Worktree, ChatMessage, WorktreeSessionState } from '@/types/models';
+
+type ChatMessageRow = {
+  id: string;
+  worktree_id: string;
+  role: string;
+  content: string;
+  summary: string | null;
+  timestamp: number;
+  log_file_name: string | null;
+  request_id: string | null;
+  message_type: string | null;
+  prompt_data: string | null;
+};
+
+function mapChatMessage(row: ChatMessageRow): ChatMessage {
+  return {
+    id: row.id,
+    worktreeId: row.worktree_id,
+    role: row.role as 'user' | 'claude',
+    content: row.content,
+    summary: row.summary || undefined,
+    timestamp: new Date(row.timestamp),
+    logFileName: row.log_file_name || undefined,
+    requestId: row.request_id || undefined,
+    messageType: (row.message_type as any) || 'normal',
+    promptData: row.prompt_data ? JSON.parse(row.prompt_data) : undefined,
+  };
+}
 
 /**
  * Initialize database schema
@@ -292,7 +321,7 @@ export function createMessage(
   db: Database.Database,
   message: Omit<ChatMessage, 'id'>
 ): ChatMessage {
-  const id = generateUUID();
+  const id = randomUUID();
 
   const stmt = db.prepare(`
     INSERT INTO chat_messages
@@ -337,37 +366,56 @@ export function getMessages(
     SELECT id, worktree_id, role, content, summary, timestamp, log_file_name, request_id, message_type, prompt_data
     FROM chat_messages
     WHERE worktree_id = ? AND (? IS NULL OR timestamp < ?)
-    ORDER BY timestamp ASC
+    ORDER BY timestamp DESC
     LIMIT ?
   `);
 
   const beforeTs = before?.getTime() || null;
 
-  const rows = stmt.all(worktreeId, beforeTs, beforeTs, limit) as Array<{
-    id: string;
-    worktree_id: string;
-    role: string;
-    content: string;
-    summary: string | null;
-    timestamp: number;
-    log_file_name: string | null;
-    request_id: string | null;
-    message_type: string | null;
-    prompt_data: string | null;
-  }>;
+  const rows = stmt.all(worktreeId, beforeTs, beforeTs, limit) as ChatMessageRow[];
 
-  return rows.map((row) => ({
-    id: row.id,
-    worktreeId: row.worktree_id,
-    role: row.role as 'user' | 'claude',
-    content: row.content,
-    summary: row.summary || undefined,
-    timestamp: new Date(row.timestamp),
-    logFileName: row.log_file_name || undefined,
-    requestId: row.request_id || undefined,
-    messageType: (row.message_type as any) || 'normal',
-    promptData: row.prompt_data ? JSON.parse(row.prompt_data) : undefined,
-  }));
+  return rows.map(mapChatMessage);
+}
+
+/**
+ * Fetch the most recent user-authored message for a worktree.
+ */
+export function getLastUserMessage(
+  db: Database.Database,
+  worktreeId: string
+): ChatMessage | null {
+  const stmt = db.prepare(`
+    SELECT id, worktree_id, role, content, summary, timestamp, log_file_name, request_id, message_type, prompt_data
+    FROM chat_messages
+    WHERE worktree_id = ? AND role = 'user'
+    ORDER BY timestamp DESC
+    LIMIT 1
+  `);
+
+  const row = stmt.get(worktreeId) as ChatMessageRow | undefined;
+
+  return row ? mapChatMessage(row) : null;
+}
+
+/**
+ * Fetch the most recent message for a worktree (any role).
+ * Used to determine if waiting for Claude's response.
+ */
+export function getLastMessage(
+  db: Database.Database,
+  worktreeId: string
+): ChatMessage | null {
+  const stmt = db.prepare(`
+    SELECT id, worktree_id, role, content, summary, timestamp, log_file_name, request_id, message_type, prompt_data
+    FROM chat_messages
+    WHERE worktree_id = ?
+    ORDER BY timestamp DESC
+    LIMIT 1
+  `);
+
+  const row = stmt.get(worktreeId) as ChatMessageRow | undefined;
+
+  return row ? mapChatMessage(row) : null;
 }
 
 /**
@@ -502,35 +550,13 @@ export function getMessageById(
     WHERE id = ?
   `);
 
-  const row = stmt.get(messageId) as {
-    id: string;
-    worktree_id: string;
-    role: string;
-    content: string;
-    summary: string | null;
-    timestamp: number;
-    log_file_name: string | null;
-    request_id: string | null;
-    message_type: string | null;
-    prompt_data: string | null;
-  } | undefined;
+  const row = stmt.get(messageId) as ChatMessageRow | undefined;
 
   if (!row) {
     return null;
   }
 
-  return {
-    id: row.id,
-    worktreeId: row.worktree_id,
-    role: row.role as 'user' | 'claude',
-    content: row.content,
-    summary: row.summary || undefined,
-    timestamp: new Date(row.timestamp),
-    logFileName: row.log_file_name || undefined,
-    requestId: row.request_id || undefined,
-    messageType: (row.message_type as any) || 'normal',
-    promptData: row.prompt_data ? JSON.parse(row.prompt_data) : undefined,
-  };
+  return mapChatMessage(row);
 }
 
 /**
@@ -582,16 +608,4 @@ export function updateStatus(
   `);
 
   stmt.run(status, id);
-}
-
-/**
- * Generate UUID v4
- * @private
- */
-function generateUUID(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
 }

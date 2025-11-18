@@ -28,7 +28,7 @@ export interface WorktreeCardProps {
  * ```
  */
 export function WorktreeCard({ worktree, onSessionKilled, onStatusChanged }: WorktreeCardProps) {
-  const { id, name, memo, lastUserMessage, lastUserMessageAt, updatedAt, isSessionRunning, favorite, status, link } = worktree;
+  const { id, name, memo, lastUserMessage, lastUserMessageAt, updatedAt, isSessionRunning, isWaitingForResponse, favorite, status, link } = worktree;
   const [isKilling, setIsKilling] = useState(false);
   const [isFavorite, setIsFavorite] = useState(favorite || false);
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
@@ -161,9 +161,14 @@ export function WorktreeCard({ worktree, onSessionKilled, onStatusChanged }: Wor
               </button>
               <span className="truncate">{name}</span>
               {isMain && <Badge variant="info">Main</Badge>}
-              {isSessionRunning && (
+              {isSessionRunning && isWaitingForResponse && (
+                <Badge variant="warning" dot>
+                  レスポンス待ち
+                </Badge>
+              )}
+              {isSessionRunning && !isWaitingForResponse && (
                 <Badge variant="success" dot>
-                  セッション実行中
+                  レスポンス完了
                 </Badge>
               )}
             </CardTitle>

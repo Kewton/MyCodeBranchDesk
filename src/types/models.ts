@@ -28,6 +28,8 @@ export interface Worktree {
   updatedAt?: Date;
   /** Whether a tmux session is currently running for this worktree */
   isSessionRunning?: boolean;
+  /** Whether this worktree is waiting for Claude's response */
+  isWaitingForResponse?: boolean;
   /** Whether this worktree is marked as favorite */
   favorite?: boolean;
   /** Worktree status: todo, doing, done, or null if not set */

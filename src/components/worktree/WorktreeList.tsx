@@ -41,10 +41,13 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
 
   /**
    * Fetch worktrees from API
+   * @param silent - If true, don't show loading indicator (for background updates)
    */
-  const fetchWorktrees = useCallback(async () => {
+  const fetchWorktrees = useCallback(async (silent: boolean = false) => {
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       setError(null);
       const data = await worktreeApi.getAll();
       setWorktrees(data.worktrees);
@@ -52,7 +55,9 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
     } catch (err) {
       setError(handleApiError(err));
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -61,8 +66,8 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
    */
   const handleWebSocketMessage = useCallback((message: any) => {
     if (message.type === 'broadcast') {
-      // Refresh worktrees when updates occur
-      fetchWorktrees();
+      // Refresh worktrees when updates occur (silent mode)
+      fetchWorktrees(true);
     } else if (message.data?.type === 'session_status_changed') {
       // Update specific worktree's session status without full refresh
       setWorktrees((prev) =>
@@ -86,6 +91,15 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
       fetchWorktrees();
     }
   }, [initialWorktrees.length, fetchWorktrees]);
+
+  // Auto-refresh worktrees every 5 seconds (silent mode)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchWorktrees(true); // Silent update
+    }, 5000); // 5 seconds
+
+    return () => clearInterval(interval);
+  }, [fetchWorktrees]);
 
   /**
    * Filter and sort worktrees
@@ -182,7 +196,7 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
         <div className="flex items-center gap-2 flex-wrap">
           <Badge variant="gray">{worktrees.length} branches</Badge>
           {repositories.length > 0 && (
-            <Badge variant="blue">{repositories.length} {repositories.length === 1 ? 'repository' : 'repositories'}</Badge>
+            <Badge variant="info">{repositories.length} {repositories.length === 1 ? 'repository' : 'repositories'}</Badge>
           )}
           {wsStatus === 'connected' && (
             <Badge variant="success" dot>

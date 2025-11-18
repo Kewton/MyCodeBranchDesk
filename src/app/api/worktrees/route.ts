@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbInstance } from '@/lib/db-instance';
-import { getWorktrees, getRepositories } from '@/lib/db';
+import { getWorktrees, getRepositories, getLastMessage } from '@/lib/db';
 import { isClaudeRunning } from '@/lib/claude-session';
 
 export async function GET(request: NextRequest) {
@@ -20,13 +20,23 @@ export async function GET(request: NextRequest) {
     // Get worktrees (with optional filter)
     const worktrees = getWorktrees(db, repositoryFilter || undefined);
 
-    // Check session status for each worktree
+    // Check session status and response status for each worktree
     const worktreesWithStatus = await Promise.all(
       worktrees.map(async (worktree) => {
         const isRunning = await isClaudeRunning(worktree.id);
+
+        // Check if waiting for Claude's response
+        // Criteria: session is running AND last message is from user
+        let isWaitingForResponse = false;
+        if (isRunning) {
+          const lastMessage = getLastMessage(db, worktree.id);
+          isWaitingForResponse = lastMessage?.role === 'user';
+        }
+
         return {
           ...worktree,
           isSessionRunning: isRunning,
+          isWaitingForResponse,
         };
       })
     );

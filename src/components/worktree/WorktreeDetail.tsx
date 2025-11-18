@@ -83,7 +83,7 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
       // Then sync latest Claude message from log file
       try {
         const updatedMessages = await worktreeApi.getMessages(worktreeId);
-        const claudeMessages = updatedMessages.filter(m => m.role === 'assistant' && m.logFileName);
+        const claudeMessages = updatedMessages.filter(m => m.role === 'claude' && m.logFileName);
         const latestClaudeMessage = claudeMessages
           .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
 
@@ -202,7 +202,7 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
       setMessages(updatedMessages);
 
       // Then, sync the latest Claude message from log file
-      const claudeMessages = updatedMessages.filter(m => m.role === 'assistant' && m.logFileName);
+      const claudeMessages = updatedMessages.filter(m => m.role === 'claude' && m.logFileName);
       console.log('[handleManualRefresh] Claude messages with logFileName:', claudeMessages.length);
 
       const latestClaudeMessage = claudeMessages
@@ -482,7 +482,7 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
 
       {/* Content */}
       {activeTab === 'messages' && (
-        <div className="flex-1 flex flex-col relative">
+        <div className="flex-1 flex flex-col w-full max-w-7xl mx-auto relative">
           {/* New Message Notification */}
           {showNewMessageNotification && (
             <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20 bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg animate-fade-in">
@@ -494,7 +494,7 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
           <button
             onClick={handleManualRefresh}
             disabled={isRefreshing}
-            className="fixed bottom-24 right-6 z-20 bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-full shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="absolute bottom-24 right-4 sm:right-6 z-20 bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-full shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             title="最新のメッセージを取得"
           >
             {isRefreshing ? (
@@ -509,8 +509,8 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
             )}
           </button>
 
-          {/* Message List - constrained width to match tabs */}
-          <div className="flex-1 w-full max-w-7xl mx-auto">
+          {/* Message List */}
+          <div className="flex-1 w-full">
             <MessageList
               messages={messages}
               worktreeId={worktree!.id}
@@ -520,8 +520,8 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
             />
           </div>
 
-          {/* Message Input - constrained width to match tabs */}
-          <div className="sticky bottom-0 flex-shrink-0 w-full max-w-7xl mx-auto bg-gray-50 border-t border-gray-200">
+          {/* Message Input */}
+          <div className="sticky bottom-0 flex-shrink-0 w-full bg-gray-50 border-t border-gray-200">
             <div className="px-4 sm:px-6 lg:px-8 pb-4 pt-2">
               <MessageInput worktreeId={worktreeId} onMessageSent={handleMessageSent} />
             </div>
