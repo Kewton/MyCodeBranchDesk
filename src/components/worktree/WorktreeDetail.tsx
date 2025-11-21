@@ -119,9 +119,9 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
       try {
         const worktreeData = await worktreeApi.getById(worktreeId);
         setWorktree(worktreeData);
-        const initialCliTool = worktreeData.cliToolId || 'claude';
 
-        // Set active tab to match the CLI tool we're loading messages for
+        // Always default to claude tab on initial load
+        const initialCliTool = 'claude';
         setActiveTab(initialCliTool);
 
         const initialMessages = await worktreeApi.getMessages(worktreeId, initialCliTool);
