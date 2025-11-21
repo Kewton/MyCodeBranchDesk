@@ -29,6 +29,7 @@ export function LogViewer({ worktreeId }: LogViewerProps) {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [currentMatchIndex, setCurrentMatchIndex] = useState<number>(0);
+  const [cliToolFilter, setCliToolFilter] = useState<'all' | 'claude' | 'codex' | 'gemini'>('all');
 
   /**
    * Fetch log files list
@@ -49,6 +50,20 @@ export function LogViewer({ worktreeId }: LogViewerProps) {
 
     fetchLogFiles();
   }, [worktreeId]);
+
+  /**
+   * Filter log files by CLI tool
+   */
+  const filteredLogFiles = useMemo(() => {
+    if (cliToolFilter === 'all') {
+      return logFiles;
+    }
+
+    return logFiles.filter((file) => {
+      const lowerFile = file.toLowerCase();
+      return lowerFile.includes(cliToolFilter);
+    });
+  }, [logFiles, cliToolFilter]);
 
   /**
    * Load log file content
@@ -177,9 +192,43 @@ export function LogViewer({ worktreeId }: LogViewerProps) {
       {/* Log Files List */}
       <Card padding="md">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Log Files</CardTitle>
-            <Badge variant="gray">{logFiles.length}</Badge>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <CardTitle>Log Files</CardTitle>
+              <Badge variant="gray">{filteredLogFiles.length}</Badge>
+            </div>
+
+            {/* CLI Tool Filter */}
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                variant={cliToolFilter === 'all' ? 'primary' : 'ghost'}
+                size="sm"
+                onClick={() => setCliToolFilter('all')}
+              >
+                All ({logFiles.length})
+              </Button>
+              <Button
+                variant={cliToolFilter === 'claude' ? 'primary' : 'ghost'}
+                size="sm"
+                onClick={() => setCliToolFilter('claude')}
+              >
+                Claude ({logFiles.filter(f => f.toLowerCase().includes('claude')).length})
+              </Button>
+              <Button
+                variant={cliToolFilter === 'codex' ? 'primary' : 'ghost'}
+                size="sm"
+                onClick={() => setCliToolFilter('codex')}
+              >
+                Codex ({logFiles.filter(f => f.toLowerCase().includes('codex')).length})
+              </Button>
+              <Button
+                variant={cliToolFilter === 'gemini' ? 'primary' : 'ghost'}
+                size="sm"
+                onClick={() => setCliToolFilter('gemini')}
+              >
+                Gemini ({logFiles.filter(f => f.toLowerCase().includes('gemini')).length})
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -195,13 +244,15 @@ export function LogViewer({ worktreeId }: LogViewerProps) {
             </div>
           )}
 
-          {!loading && logFiles.length === 0 && !error && (
-            <p className="text-sm text-gray-600 text-center py-4">No log files found</p>
+          {!loading && filteredLogFiles.length === 0 && !error && (
+            <p className="text-sm text-gray-600 text-center py-4">
+              {cliToolFilter === 'all' ? 'No log files found' : `No ${cliToolFilter} log files found`}
+            </p>
           )}
 
-          {logFiles.length > 0 && (
+          {filteredLogFiles.length > 0 && (
             <div className="space-y-2">
-              {logFiles.map((file) => (
+              {filteredLogFiles.map((file) => (
                 <button
                   key={file}
                   onClick={() => loadLogFile(file)}

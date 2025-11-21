@@ -6,11 +6,12 @@
 import { randomUUID } from 'crypto';
 import Database from 'better-sqlite3';
 import type { Worktree, ChatMessage, WorktreeSessionState } from '@/types/models';
+import type { CLIToolType } from '@/lib/cli-tools/types';
 
 type ChatMessageRow = {
   id: string;
   worktree_id: string;
-  role: string;
+  role: 'user' | 'assistant';
   content: string;
   summary: string | null;
   timestamp: number;
@@ -25,7 +26,7 @@ function mapChatMessage(row: ChatMessageRow): ChatMessage {
   return {
     id: row.id,
     worktreeId: row.worktree_id,
-    role: row.role as 'user' | 'claude',
+    role: row.role,
     content: row.content,
     summary: row.summary || undefined,
     timestamp: new Date(row.timestamp),
@@ -33,7 +34,7 @@ function mapChatMessage(row: ChatMessageRow): ChatMessage {
     requestId: row.request_id || undefined,
     messageType: (row.message_type as any) || 'normal',
     promptData: row.prompt_data ? JSON.parse(row.prompt_data) : undefined,
-    cliToolId: (row.cli_tool_id as 'claude' | 'codex' | 'gemini') || 'claude',
+    cliToolId: (row.cli_tool_id as CLIToolType | null) ?? 'claude',
   };
 }
 
@@ -63,7 +64,7 @@ export function initDatabase(db: Database.Database): void {
     CREATE TABLE IF NOT EXISTS chat_messages (
       id TEXT PRIMARY KEY,
       worktree_id TEXT NOT NULL,
-      role TEXT NOT NULL CHECK(role IN ('user', 'claude')),
+      role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
       content TEXT NOT NULL,
       summary TEXT,
       timestamp INTEGER NOT NULL,
@@ -101,12 +102,43 @@ export function initDatabase(db: Database.Database): void {
   // Create session_states table
   db.exec(`
     CREATE TABLE IF NOT EXISTS session_states (
-      worktree_id TEXT PRIMARY KEY,
+      worktree_id TEXT NOT NULL,
+      cli_tool_id TEXT NOT NULL DEFAULT 'claude',
       last_captured_line INTEGER DEFAULT 0,
 
+      PRIMARY KEY (worktree_id, cli_tool_id),
       FOREIGN KEY (worktree_id) REFERENCES worktrees(id) ON DELETE CASCADE
     );
   `);
+}
+
+/**
+ * Get latest user message per CLI tool for a worktree
+ */
+function getLastMessagesByCli(
+  db: Database.Database,
+  worktreeId: string
+): { claude?: string; codex?: string; gemini?: string } {
+  const cliTools: CLIToolType[] = ['claude', 'codex', 'gemini'];
+  const result: { claude?: string; codex?: string; gemini?: string } = {};
+
+  for (const cliToolId of cliTools) {
+    const stmt = db.prepare(`
+      SELECT content
+      FROM chat_messages
+      WHERE worktree_id = ? AND cli_tool_id = ? AND role = 'user'
+      ORDER BY timestamp DESC
+      LIMIT 1
+    `);
+
+    const row = stmt.get(worktreeId, cliToolId) as { content: string } | undefined;
+    if (row) {
+      // Truncate to 50 characters
+      result[cliToolId] = row.content.substring(0, 50);
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -150,22 +182,27 @@ export function getWorktrees(
     cli_tool_id: string | null;
   }>;
 
-  return rows.map((row) => ({
-    id: row.id,
-    name: row.name,
-    path: row.path,
-    repositoryPath: row.repository_path || '',
-    repositoryName: row.repository_name || '',
-    memo: row.memo || undefined,
-    lastUserMessage: row.last_user_message || undefined,
-    lastUserMessageAt: row.last_user_message_at ? new Date(row.last_user_message_at) : undefined,
-    lastMessageSummary: row.last_message_summary || undefined,
-    updatedAt: row.updated_at ? new Date(row.updated_at) : undefined,
-    favorite: row.favorite === 1,
-    status: (row.status as 'todo' | 'doing' | 'done' | null) || null,
-    link: row.link || undefined,
-    cliToolId: (row.cli_tool_id as 'claude' | 'codex' | 'gemini') || 'claude',
-  }));
+  return rows.map((row) => {
+    const lastMessagesByCli = getLastMessagesByCli(db, row.id);
+
+    return {
+      id: row.id,
+      name: row.name,
+      path: row.path,
+      repositoryPath: row.repository_path || '',
+      repositoryName: row.repository_name || '',
+      memo: row.memo || undefined,
+      lastUserMessage: row.last_user_message || undefined,
+      lastUserMessageAt: row.last_user_message_at ? new Date(row.last_user_message_at) : undefined,
+      lastMessageSummary: row.last_message_summary || undefined,
+      lastMessagesByCli,
+      updatedAt: row.updated_at ? new Date(row.updated_at) : undefined,
+      favorite: row.favorite === 1,
+      status: (row.status as 'todo' | 'doing' | 'done' | null) || null,
+      link: row.link || undefined,
+      cliToolId: (row.cli_tool_id as CLIToolType | null) ?? 'claude',
+    };
+  });
 }
 
 /**
@@ -249,7 +286,7 @@ export function getWorktreeById(
     favorite: row.favorite === 1,
     status: (row.status as 'todo' | 'doing' | 'done' | null) || null,
     link: row.link || undefined,
-    cliToolId: (row.cli_tool_id as 'claude' | 'codex' | 'gemini') || 'claude',
+    cliToolId: (row.cli_tool_id as CLIToolType | null) ?? 'claude',
   };
 }
 
@@ -376,7 +413,7 @@ export function getMessages(
   worktreeId: string,
   before?: Date,
   limit: number = 50,
-  cliToolId?: 'claude' | 'codex' | 'gemini'
+  cliToolId?: CLIToolType
 ): ChatMessage[] {
   let query = `
     SELECT id, worktree_id, role, content, summary, timestamp, log_file_name, request_id, message_type, prompt_data, cli_tool_id
@@ -465,16 +502,18 @@ export function deleteAllMessages(
  */
 export function getSessionState(
   db: Database.Database,
-  worktreeId: string
+  worktreeId: string,
+  cliToolId: CLIToolType = 'claude'
 ): WorktreeSessionState | null {
   const stmt = db.prepare(`
-    SELECT worktree_id, last_captured_line
+    SELECT worktree_id, cli_tool_id, last_captured_line
     FROM session_states
-    WHERE worktree_id = ?
+    WHERE worktree_id = ? AND cli_tool_id = ?
   `);
 
-  const row = stmt.get(worktreeId) as {
+  const row = stmt.get(worktreeId, cliToolId) as {
     worktree_id: string;
+    cli_tool_id: string;
     last_captured_line: number;
   } | undefined;
 
@@ -484,6 +523,7 @@ export function getSessionState(
 
   return {
     worktreeId: row.worktree_id,
+    cliToolId: row.cli_tool_id as CLIToolType,
     lastCapturedLine: row.last_captured_line,
   };
 }
@@ -494,16 +534,17 @@ export function getSessionState(
 export function updateSessionState(
   db: Database.Database,
   worktreeId: string,
+  cliToolId: CLIToolType,
   lastCapturedLine: number
 ): void {
   const stmt = db.prepare(`
-    INSERT INTO session_states (worktree_id, last_captured_line)
-    VALUES (?, ?)
-    ON CONFLICT(worktree_id) DO UPDATE SET
+    INSERT INTO session_states (worktree_id, cli_tool_id, last_captured_line)
+    VALUES (?, ?, ?)
+    ON CONFLICT(worktree_id, cli_tool_id) DO UPDATE SET
       last_captured_line = excluded.last_captured_line
   `);
 
-  stmt.run(worktreeId, lastCapturedLine);
+  stmt.run(worktreeId, cliToolId, lastCapturedLine);
 }
 
 /**
@@ -512,14 +553,22 @@ export function updateSessionState(
  */
 export function deleteSessionState(
   db: Database.Database,
-  worktreeId: string
+  worktreeId: string,
+  cliToolId?: CLIToolType
 ): void {
-  const stmt = db.prepare(`
-    DELETE FROM session_states
-    WHERE worktree_id = ?
-  `);
-
-  stmt.run(worktreeId);
+  if (cliToolId) {
+    const stmt = db.prepare(`
+      DELETE FROM session_states
+      WHERE worktree_id = ? AND cli_tool_id = ?
+    `);
+    stmt.run(worktreeId, cliToolId);
+  } else {
+    const stmt = db.prepare(`
+      DELETE FROM session_states
+      WHERE worktree_id = ?
+    `);
+    stmt.run(worktreeId);
+  }
 }
 
 /**
@@ -632,4 +681,21 @@ export function updateStatus(
   `);
 
   stmt.run(status, id);
+}
+
+/**
+ * Update CLI tool ID for a worktree
+ */
+export function updateCliToolId(
+  db: Database.Database,
+  id: string,
+  cliToolId: CLIToolType
+): void {
+  const stmt = db.prepare(`
+    UPDATE worktrees
+    SET cli_tool_id = ?
+    WHERE id = ?
+  `);
+
+  stmt.run(cliToolId, id);
 }

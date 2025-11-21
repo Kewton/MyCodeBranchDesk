@@ -26,6 +26,12 @@ export interface Worktree {
   lastUserMessageAt?: Date;
   /** Summary of last message (for list view) - DEPRECATED: use lastUserMessage instead */
   lastMessageSummary?: string;
+  /** Latest messages per CLI tool (truncated to 50 chars each) */
+  lastMessagesByCli?: {
+    claude?: string;
+    codex?: string;
+    gemini?: string;
+  };
   /** Last updated timestamp */
   updatedAt?: Date;
   /** Whether a tmux session is currently running for this worktree */
@@ -162,6 +168,8 @@ export interface ChatMessage {
 export interface WorktreeSessionState {
   /** Associated worktree ID */
   worktreeId: string;
+  /** CLI tool identifier for this session state */
+  cliToolId: CLIToolType;
   /** Last captured line number from tmux */
   lastCapturedLine: number;
 }

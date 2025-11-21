@@ -12,14 +12,23 @@ import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
 import { LogViewer } from './LogViewer';
 import { worktreeApi, handleApiError } from '@/lib/api-client';
-import { useWebSocket } from '@/hooks/useWebSocket';
+import {
+  useWebSocket,
+  type WebSocketMessage,
+  type SessionStatusPayload,
+  type BroadcastPayload,
+} from '@/hooks/useWebSocket';
 import type { Worktree, ChatMessage } from '@/types/models';
+import type { CLIToolType } from '@/lib/cli-tools/types';
 
 export interface WorktreeDetailProps {
   worktreeId: string;
 }
 
 type TabView = 'claude' | 'codex' | 'gemini' | 'logs' | 'info' | 'memo';
+
+const CLI_TABS: CLIToolType[] = ['claude', 'codex', 'gemini'];
+const isCliTab = (tab: TabView): tab is CLIToolType => CLI_TABS.includes(tab as CLIToolType);
 
 /**
  * Worktree detail page component
@@ -40,11 +49,17 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
   const [memoText, setMemoText] = useState('');
   const [isEditingLink, setIsEditingLink] = useState(false);
   const [linkText, setLinkText] = useState('');
-  const [isEditingCliTool, setIsEditingCliTool] = useState(false);
-  const [selectedCliTool, setSelectedCliTool] = useState<'claude' | 'codex' | 'gemini'>('claude');
   const [showNewMessageNotification, setShowNewMessageNotification] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [generatingContent, setGeneratingContent] = useState<string>('');
+  const [pendingCliTool, setPendingCliTool] = useState<CLIToolType | null>(null);
+
+  const resolveActiveCliTool = useCallback((): CLIToolType => {
+    if (isCliTab(activeTab)) {
+      return activeTab;
+    }
+    return worktree?.cliToolId || 'claude';
+  }, [activeTab, worktree?.cliToolId]);
 
   /**
    * Fetch worktree data
@@ -60,17 +75,40 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
   }, [worktreeId]);
 
   /**
+   * Fetch latest content from log file
+   */
+  const fetchFromLogFile = useCallback(async (logFileName: string): Promise<string | null> => {
+    try {
+      console.log('[fetchFromLogFile] Fetching log file:', logFileName);
+      const response = await fetch(`/api/worktrees/${worktreeId}/logs/${logFileName}`);
+      console.log('[fetchFromLogFile] Response status:', response.status);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('[fetchFromLogFile] Failed to fetch:', response.status, errorData);
+        return null;
+      }
+      const data = await response.json();
+      console.log('[fetchFromLogFile] Successfully fetched, content length:', data.content?.length || 0);
+      return data.content || null;
+    } catch (err) {
+      console.error('[fetchFromLogFile] Error:', err);
+      return null;
+    }
+  }, [worktreeId]);
+
+  /**
    * Fetch messages for the active CLI tool tab
    */
   const fetchMessages = useCallback(async (cliTool?: 'claude' | 'codex' | 'gemini') => {
     try {
       setError(null);
-      const data = await worktreeApi.getMessages(worktreeId, cliTool);
+      const targetCliTool = cliTool || resolveActiveCliTool();
+      const data = await worktreeApi.getMessages(worktreeId, targetCliTool);
       setMessages(data);
     } catch (err) {
       setError(handleApiError(err));
     }
-  }, [worktreeId]);
+  }, [worktreeId, resolveActiveCliTool]);
 
   /**
    * Initial data fetch with log file sync
@@ -79,23 +117,28 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
     const fetchData = async () => {
       setLoading(true);
 
-      // Fetch worktree and messages from database (default: claude)
-      await Promise.all([fetchWorktree(), fetchMessages('claude')]);
-
-      // Then sync latest CLI tool message from log file
       try {
-        const updatedMessages = await worktreeApi.getMessages(worktreeId);
-        const claudeMessages = updatedMessages.filter(m => m.role === 'assistant' && m.logFileName);
-        const latestClaudeMessage = claudeMessages
+        const worktreeData = await worktreeApi.getById(worktreeId);
+        setWorktree(worktreeData);
+        const initialCliTool = worktreeData.cliToolId || 'claude';
+        const initialMessages = await worktreeApi.getMessages(worktreeId, initialCliTool);
+        setMessages(initialMessages);
+
+        // Then sync latest CLI tool message from log file
+        const updatedMessages = await worktreeApi.getMessages(worktreeId, initialCliTool);
+        const toolMessages = updatedMessages.filter(
+          m => m.cliToolId === initialCliTool && m.logFileName
+        );
+        const latestCliMessage = toolMessages
           .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
 
-        if (latestClaudeMessage?.logFileName) {
-          console.log('[Initial fetch] Syncing latest message from log file:', latestClaudeMessage.logFileName);
-          const logContent = await fetchFromLogFile(latestClaudeMessage.logFileName);
+        if (latestCliMessage?.logFileName) {
+          console.log('[Initial fetch] Syncing latest message from log file:', latestCliMessage.logFileName);
+          const logContent = await fetchFromLogFile(latestCliMessage.logFileName);
           if (logContent) {
             setMessages(prevMessages =>
               prevMessages.map(msg =>
-                msg.id === latestClaudeMessage.id
+                msg.id === latestCliMessage.id
                   ? { ...msg, content: logContent }
                   : msg
               )
@@ -103,35 +146,68 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
           }
         }
       } catch (err) {
-        console.error('[Initial fetch] Error syncing from log file:', err);
-        // Don't show error to user, just log it
+        console.error('[Initial fetch] Error fetching worktree or syncing logs:', err);
+        setError(handleApiError(err));
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
     };
 
     fetchData();
-  }, [fetchWorktree, fetchMessages, worktreeId]);
+  }, [worktreeId, fetchFromLogFile]);
 
   /**
-   * Sync memo, link, and CLI tool when worktree changes
+   * Sync memo and link when worktree changes
    */
   useEffect(() => {
     if (worktree) {
       setMemoText(worktree.memo || '');
       setLinkText(worktree.link || '');
-      setSelectedCliTool(worktree.cliToolId || 'claude');
     }
   }, [worktree]);
 
   /**
-   * Fetch messages when active tab changes (for CLI tool tabs)
+   * Check current session status when active tab changes
    */
   useEffect(() => {
     if (activeTab === 'claude' || activeTab === 'codex' || activeTab === 'gemini') {
       fetchMessages(activeTab);
+
+      // Check if there's an active session for this CLI tool
+      const checkSessionStatus = async () => {
+        try {
+          const response = await fetch(`/api/worktrees/${worktreeId}/current-output?cliTool=${activeTab}`);
+          if (!response.ok) {
+            console.error('Failed to fetch current output:', response.status);
+            return;
+          }
+
+          const data = await response.json();
+
+          if (data.isRunning && data.isGenerating) {
+            // Session is running and generating content
+            setWaitingForResponse(true);
+            setPendingCliTool(activeTab);
+            setGeneratingContent(data.content || '');
+          } else if (data.isRunning && !data.isGenerating) {
+            // Session is running but not generating (waiting for user input)
+            setWaitingForResponse(false);
+            setPendingCliTool(null);
+            setGeneratingContent('');
+          } else {
+            // Session is not running
+            setWaitingForResponse(false);
+            setPendingCliTool(null);
+            setGeneratingContent('');
+          }
+        } catch (err) {
+          console.error('Error checking session status:', err);
+        }
+      };
+
+      checkSessionStatus();
     }
-  }, [activeTab, fetchMessages]);
+  }, [activeTab, worktreeId, fetchMessages]);
 
   /**
    * Save memo
@@ -178,50 +254,6 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
   };
 
   /**
-   * Save CLI tool selection
-   */
-  const handleSaveCliTool = async () => {
-    try {
-      setError(null);
-      const updated = await worktreeApi.updateCliTool(worktreeId, selectedCliTool);
-      setWorktree(updated);
-      setIsEditingCliTool(false);
-    } catch (err) {
-      setError(handleApiError(err));
-    }
-  };
-
-  /**
-   * Cancel CLI tool editing
-   */
-  const handleCancelCliTool = () => {
-    setSelectedCliTool(worktree?.cliToolId || 'claude');
-    setIsEditingCliTool(false);
-  };
-
-  /**
-   * Fetch latest content from log file
-   */
-  const fetchFromLogFile = async (logFileName: string): Promise<string | null> => {
-    try {
-      console.log('[fetchFromLogFile] Fetching log file:', logFileName);
-      const response = await fetch(`/api/worktrees/${worktreeId}/logs/${logFileName}`);
-      console.log('[fetchFromLogFile] Response status:', response.status);
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('[fetchFromLogFile] Failed to fetch:', response.status, errorData);
-        return null;
-      }
-      const data = await response.json();
-      console.log('[fetchFromLogFile] Successfully fetched, content length:', data.content?.length || 0);
-      return data.content || null;
-    } catch (err) {
-      console.error('[fetchFromLogFile] Error:', err);
-      return null;
-    }
-  };
-
-  /**
    * Handle manual refresh with log file sync
    */
   const handleManualRefresh = async () => {
@@ -229,34 +261,35 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
     setIsRefreshing(true);
 
     try {
-      // First, fetch messages from DB
+      // First, fetch messages from DB for the active CLI tool
       setError(null);
-      const updatedMessages = await worktreeApi.getMessages(worktreeId);
+      const activeCliTool = resolveActiveCliTool();
+      const updatedMessages = await worktreeApi.getMessages(worktreeId, activeCliTool);
       console.log('[handleManualRefresh] Fetched messages from DB:', updatedMessages.length);
       setMessages(updatedMessages);
 
       // Then, sync the latest CLI tool message from log file
-      const claudeMessages = updatedMessages.filter(m => m.role === 'assistant' && m.logFileName);
-      console.log('[handleManualRefresh] Claude messages with logFileName:', claudeMessages.length);
+      const toolMessages = updatedMessages.filter(m => m.cliToolId === activeCliTool && m.logFileName);
+      console.log('[handleManualRefresh] Messages with logFileName for', activeCliTool, ':', toolMessages.length);
 
-      const latestClaudeMessage = claudeMessages
+      const latestCliMessage = toolMessages
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
 
-      if (latestClaudeMessage?.logFileName) {
-        console.log('[handleManualRefresh] Latest Claude message:', {
-          id: latestClaudeMessage.id,
-          logFileName: latestClaudeMessage.logFileName,
-          timestamp: latestClaudeMessage.timestamp,
-          currentContentLength: latestClaudeMessage.content.length
+      if (latestCliMessage?.logFileName) {
+        console.log('[handleManualRefresh] Latest CLI message:', {
+          id: latestCliMessage.id,
+          logFileName: latestCliMessage.logFileName,
+          timestamp: latestCliMessage.timestamp,
+          currentContentLength: latestCliMessage.content.length
         });
 
-        const logContent = await fetchFromLogFile(latestClaudeMessage.logFileName);
+        const logContent = await fetchFromLogFile(latestCliMessage.logFileName);
         if (logContent) {
           console.log('[handleManualRefresh] Updating message content');
           // Update the message content with log file content
           setMessages(prevMessages =>
             prevMessages.map(msg =>
-              msg.id === latestClaudeMessage.id
+              msg.id === latestCliMessage.id
                 ? { ...msg, content: logContent }
                 : msg
             )
@@ -265,7 +298,7 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
           console.warn('[handleManualRefresh] No log content received');
         }
       } else {
-        console.warn('[handleManualRefresh] No latest Claude message with logFileName found');
+        console.warn('[handleManualRefresh] No latest CLI message with logFileName found');
       }
 
       // Show brief notification
@@ -288,25 +321,38 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
   /**
    * Handle WebSocket messages
    */
-  const handleWebSocketMessage = useCallback((message: any) => {
+  const isSessionStatusPayload = (payload: BroadcastPayload | undefined): payload is SessionStatusPayload => {
+    return Boolean(payload && payload.type === 'session_status_changed');
+  };
+
+  const isChatPayload = (payload: BroadcastPayload | undefined): payload is Extract<BroadcastPayload, { message: ChatMessage }> => {
+    return Boolean(payload && 'message' in payload && payload.message);
+  };
+
+  const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
     if (message.type === 'broadcast' && message.worktreeId === worktreeId) {
-      // Claude response received - clear waiting state
       setWaitingForResponse(false);
-      // Refresh data when updates occur
-      fetchMessages();
-      // Show notification
+      setPendingCliTool(null);
+      setGeneratingContent('');
+      const cliToolFromMessage = isChatPayload(message.data)
+        ? message.data.message.cliToolId as CLIToolType | undefined
+        : undefined;
+      const targetCliTool = isCliTab(activeTab)
+        ? activeTab
+        : cliToolFromMessage || resolveActiveCliTool();
+      fetchMessages(targetCliTool);
       setShowNewMessageNotification(true);
       setTimeout(() => setShowNewMessageNotification(false), 3000);
-    } else if (message.data?.type === 'session_status_changed' && message.data.worktreeId === worktreeId) {
-      // Session was killed - check if messages should be cleared
+    } else if (isSessionStatusPayload(message.data) && message.data.worktreeId === worktreeId) {
       if (message.data.messagesCleared) {
         console.log('[WorktreeDetail] Session killed, clearing messages');
         setMessages([]);
         setWaitingForResponse(false);
+        setPendingCliTool(null);
         setGeneratingContent('');
       }
     }
-  }, [worktreeId, fetchMessages]);
+  }, [worktreeId, activeTab, fetchMessages, resolveActiveCliTool]);
 
   /**
    * WebSocket for real-time updates
@@ -316,21 +362,23 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
     onMessage: handleWebSocketMessage,
   });
 
+  const messageListCliTool = pendingCliTool || (isCliTab(activeTab) ? activeTab : resolveActiveCliTool());
+
   /**
    * Poll for current tmux output while waiting for response
    */
   useEffect(() => {
-    if (!waitingForResponse) {
+    if (!waitingForResponse || !pendingCliTool) {
       setGeneratingContent('');
       return;
     }
 
-    let pollInterval: NodeJS.Timeout;
     let isMounted = true;
+    const cliToolForPolling = pendingCliTool;
 
     const pollCurrentOutput = async () => {
       try {
-        const response = await fetch(`/api/worktrees/${worktreeId}/current-output`);
+        const response = await fetch(`/api/worktrees/${worktreeId}/current-output?cliTool=${cliToolForPolling}`);
         if (!response.ok) {
           console.error('Failed to fetch current output:', response.status);
           return;
@@ -340,16 +388,23 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
 
         if (!isMounted) return;
 
-        if (data.isRunning && data.isGenerating) {
+        if (!data.isRunning) {
+          setWaitingForResponse(false);
+          setPendingCliTool(null);
+          setGeneratingContent('');
+          return;
+        }
+
+        if (data.isGenerating) {
           // Update generating content with new content
           setGeneratingContent(data.content || '');
         }
 
         if (data.isComplete) {
-          // Response is complete - stop polling and fetch final messages
           setWaitingForResponse(false);
+          setPendingCliTool(null);
           setGeneratingContent('');
-          fetchMessages();
+          fetchMessages(cliToolForPolling);
         }
       } catch (err) {
         console.error('Error polling current output:', err);
@@ -360,24 +415,24 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
     pollCurrentOutput();
 
     // Then poll every 2.5 seconds
-    pollInterval = setInterval(pollCurrentOutput, 2500);
+    const pollInterval = setInterval(pollCurrentOutput, 2500);
 
     return () => {
       isMounted = false;
-      if (pollInterval) {
-        clearInterval(pollInterval);
-      }
+      clearInterval(pollInterval);
     };
-  }, [waitingForResponse, worktreeId, fetchMessages]);
+  }, [waitingForResponse, pendingCliTool, worktreeId, fetchMessages]);
 
   /**
    * Handle message sent
    */
-  const handleMessageSent = () => {
+  const handleMessageSent = (cliToolId?: CLIToolType) => {
     // Set waiting state when user sends a message
+    const toolId = cliToolId || resolveActiveCliTool();
     setWaitingForResponse(true);
+    setPendingCliTool(toolId);
     setGeneratingContent('');
-    fetchMessages();
+    fetchMessages(toolId);
   };
 
   if (loading) {
@@ -571,34 +626,13 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
               loading={false}
               waitingForResponse={waitingForResponse}
               generatingContent={generatingContent}
-              selectedCliTool={activeTab === 'claude' || activeTab === 'codex' || activeTab === 'gemini' ? activeTab : 'claude'}
+              selectedCliTool={messageListCliTool}
             />
           </div>
 
           {/* Message Input */}
           <div className="sticky bottom-0 flex-shrink-0 w-full bg-gray-50 border-t border-gray-200">
             <div className="px-4 sm:px-6 lg:px-8 pb-4 pt-2">
-              {/* Session Control */}
-              {worktree?.isSessionRunning && (
-                <div className="mb-3 flex justify-end">
-                  <button
-                    onClick={async () => {
-                      if (!confirm(`${activeTab} のセッションを終了しますか？`)) {
-                        return;
-                      }
-                      try {
-                        await worktreeApi.killSession(worktreeId, activeTab as 'claude' | 'codex' | 'gemini');
-                        fetchWorktree();
-                      } catch (err) {
-                        setError(handleApiError(err));
-                      }
-                    }}
-                    className="px-3 py-1 text-sm rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors"
-                  >
-                    セッション終了
-                  </button>
-                </div>
-              )}
               <MessageInput
                 worktreeId={worktreeId}
                 onMessageSent={handleMessageSent}
@@ -626,79 +660,6 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
                 <div>
                   <dt className="text-sm font-medium text-gray-500 mb-2">Path</dt>
                   <dd className="text-base font-mono text-gray-900 break-all">{worktree?.path}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500 mb-2">
-                    <div className="flex items-center justify-between">
-                      <span>CLI Tool</span>
-                      {!isEditingCliTool && (
-                        <Button variant="ghost" size="sm" onClick={() => setIsEditingCliTool(true)}>
-                          Edit
-                        </Button>
-                      )}
-                    </div>
-                  </dt>
-                  <dd className="text-base font-medium text-gray-900">
-                    {isEditingCliTool ? (
-                      <div className="space-y-3">
-                        <div className="flex flex-col gap-2">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="cliTool"
-                              value="claude"
-                              checked={selectedCliTool === 'claude'}
-                              onChange={(e) => setSelectedCliTool(e.target.value as any)}
-                              className="w-4 h-4 text-blue-600"
-                            />
-                            <span className="text-base">Claude Code</span>
-                          </label>
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="cliTool"
-                              value="codex"
-                              checked={selectedCliTool === 'codex'}
-                              onChange={(e) => setSelectedCliTool(e.target.value as any)}
-                              className="w-4 h-4 text-blue-600"
-                            />
-                            <span className="text-base">Codex CLI</span>
-                          </label>
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="cliTool"
-                              value="gemini"
-                              checked={selectedCliTool === 'gemini'}
-                              onChange={(e) => setSelectedCliTool(e.target.value as any)}
-                              className="w-4 h-4 text-blue-600"
-                            />
-                            <span className="text-base">Gemini CLI</span>
-                          </label>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button variant="primary" size="sm" onClick={handleSaveCliTool}>
-                            Save
-                          </Button>
-                          <Button variant="secondary" size="sm" onClick={handleCancelCliTool}>
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <Badge variant={
-                          worktree?.cliToolId === 'claude' ? 'info' :
-                          worktree?.cliToolId === 'codex' ? 'warning' :
-                          'success'
-                        }>
-                          {worktree?.cliToolId === 'claude' ? 'Claude Code' :
-                           worktree?.cliToolId === 'codex' ? 'Codex CLI' :
-                           'Gemini CLI'}
-                        </Badge>
-                      </div>
-                    )}
-                  </dd>
                 </div>
                 <div>
                   <dt className="text-sm font-medium text-gray-500 mb-2">Messages</dt>

@@ -9,7 +9,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { WorktreeCard } from './WorktreeCard';
 import { Button, Badge } from '@/components/ui';
 import { worktreeApi, handleApiError, type RepositorySummary } from '@/lib/api-client';
-import { useWebSocket } from '@/hooks/useWebSocket';
+import { useWebSocket, type WebSocketMessage, type SessionStatusPayload, type BroadcastPayload } from '@/hooks/useWebSocket';
 import type { Worktree } from '@/types/models';
 
 export type SortOption = 'name' | 'updated' | 'favorite';
@@ -64,11 +64,15 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
   /**
    * Handle WebSocket messages
    */
-  const handleWebSocketMessage = useCallback((message: any) => {
+  const isSessionStatusPayload = (payload: BroadcastPayload | undefined): payload is SessionStatusPayload => {
+    return Boolean(payload && payload.type === 'session_status_changed');
+  };
+
+  const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
     if (message.type === 'broadcast') {
       // Refresh worktrees when updates occur (silent mode)
       fetchWorktrees(true);
-    } else if (message.data?.type === 'session_status_changed') {
+    } else if (isSessionStatusPayload(message.data)) {
       // Update specific worktree's session status without full refresh
       setWorktrees((prev) =>
         prev.map((wt) =>

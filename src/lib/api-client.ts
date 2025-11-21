@@ -29,7 +29,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
-    public data?: any
+    public data?: unknown
   ) {
     super(message);
     this.name = 'ApiError';
@@ -58,11 +58,13 @@ async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
+      const errorBody = await response
+        .json()
+        .catch(() => ({})) as { error?: string };
       throw new ApiError(
-        error.error || `HTTP error ${response.status}`,
+        errorBody.error || `HTTP error ${response.status}`,
         response.status,
-        error
+        errorBody
       );
     }
 
@@ -73,7 +75,8 @@ async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
     }
     throw new ApiError(
       error instanceof Error ? error.message : 'Unknown error',
-      0
+      0,
+      error
     );
   }
 }
@@ -140,7 +143,7 @@ export const worktreeApi = {
    * Update worktree CLI tool
    */
   async updateCliTool(id: string, cliToolId: 'claude' | 'codex' | 'gemini'): Promise<Worktree> {
-    return fetchApi<Worktree>(`/api/worktrees/${id}/cli-tool`, {
+    return fetchApi<Worktree>(`/api/worktrees/${id}`, {
       method: 'PATCH',
       body: JSON.stringify({ cliToolId }),
     });

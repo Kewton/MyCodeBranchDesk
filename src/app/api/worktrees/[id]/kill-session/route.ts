@@ -1,6 +1,6 @@
 /**
  * API Route: POST /api/worktrees/:id/kill-session
- * Kills the tmux Claude session for a worktree
+ * Kills all CLI tool sessions (Claude, Codex, Gemini) for a worktree
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -10,6 +10,7 @@ import { CLIToolManager } from '@/lib/cli-tools/manager';
 import { killSession } from '@/lib/tmux';
 import { broadcast } from '@/lib/ws-server';
 import { stopPolling } from '@/lib/response-poller';
+import type { CLIToolType } from '@/lib/cli-tools/types';
 
 export async function POST(
   request: NextRequest,
@@ -27,55 +28,43 @@ export async function POST(
       );
     }
 
-    // Get CLI tool ID from request body (optional)
-    let body: { cliToolId?: string } = {};
-    try {
-      body = await request.json();
-    } catch {
-      // No body provided, use worktree's default CLI tool
-    }
-
-    // Determine which CLI tool to use - prioritize request body, then worktree default
-    const cliToolId = body.cliToolId || worktree.cliToolId || 'claude';
-
-    // Validate CLI tool ID
-    const validToolIds = ['claude', 'codex', 'gemini'];
-    if (!validToolIds.includes(cliToolId)) {
-      return NextResponse.json(
-        { error: `Invalid CLI tool ID: ${cliToolId}` },
-        { status: 400 }
-      );
-    }
-
-    // Get CLI tool instance from manager
+    // Get CLI tool manager
     const manager = CLIToolManager.getInstance();
-    const cliTool = manager.getTool(cliToolId as 'claude' | 'codex' | 'gemini');
+    const allToolIds: CLIToolType[] = ['claude', 'codex', 'gemini'];
 
-    // Check if session is running
-    const isRunning = await cliTool.isRunning(params.id);
-    if (!isRunning) {
+    // Track killed sessions
+    const killedSessions: string[] = [];
+    let anySessionRunning = false;
+
+    // Kill all CLI tool sessions
+    for (const cliToolId of allToolIds) {
+      const cliTool = manager.getTool(cliToolId);
+      const isRunning = await cliTool.isRunning(params.id);
+
+      if (isRunning) {
+        anySessionRunning = true;
+        const sessionName = cliTool.getSessionName(params.id);
+        const killed = await killSession(sessionName);
+
+        if (killed) {
+          killedSessions.push(sessionName);
+          console.log(`[kill-session] Killed ${cliToolId} session: ${sessionName}`);
+        }
+
+        // Stop poller if running
+        stopPolling(params.id, cliToolId);
+
+        // Clean up session state
+        deleteSessionState(db, params.id, cliToolId);
+      }
+    }
+
+    if (!anySessionRunning) {
       return NextResponse.json(
-        { error: 'No active session found for this worktree' },
+        { error: 'No active sessions found for this worktree' },
         { status: 404 }
       );
     }
-
-    // Kill the session
-    const sessionName = cliTool.getSessionName(params.id);
-    const killed = await killSession(sessionName);
-
-    if (!killed) {
-      return NextResponse.json(
-        { error: 'Failed to kill session' },
-        { status: 500 }
-      );
-    }
-
-    // Stop poller if running
-    stopPolling(params.id, cliToolId as 'claude' | 'codex' | 'gemini');
-
-    // Clean up session state (important: reset line count tracking)
-    deleteSessionState(db, params.id);
 
     // Clear all messages for this worktree (log files are preserved)
     deleteAllMessages(db, params.id);
@@ -91,14 +80,15 @@ export async function POST(
     return NextResponse.json(
       {
         success: true,
-        message: `Session '${sessionName}' killed successfully`,
+        message: `All sessions killed successfully: ${killedSessions.join(', ')}`,
+        killedSessions,
       },
       { status: 200 }
     );
   } catch (error: any) {
-    console.error('Error killing session:', error);
+    console.error('Error killing sessions:', error);
     return NextResponse.json(
-      { error: 'Failed to kill session' },
+      { error: 'Failed to kill sessions' },
       { status: 500 }
     );
   }

@@ -19,6 +19,7 @@
     "db:reset": "rm -f db.sqlite && npm run db:init"
   },
   "dependencies": {
+    "ansi-to-html": "^0.7.2",
     "autoprefixer": "^10.4.22",
     "better-sqlite3": "^12.4.1",
     "date-fns": "^4.1.0",

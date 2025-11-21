@@ -199,7 +199,7 @@ describe('tmux library', () => {
       await sendKeys('test-session', 'echo hello');
 
       expect(exec).toHaveBeenCalledWith(
-        `tmux send-keys -t "test-session" 'echo hello' Enter`,
+        `tmux send-keys -t "test-session" 'echo hello' C-m`,
         { timeout: 5000 },
         expect.any(Function)
       );
@@ -229,7 +229,7 @@ describe('tmux library', () => {
       await sendKeys('test-session', "echo 'hello'");
 
       expect(exec).toHaveBeenCalledWith(
-        `tmux send-keys -t "test-session" 'echo '\\''hello'\\''' Enter`,
+        String.raw`tmux send-keys -t "test-session" 'echo '\''hello'\''' C-m`,
         { timeout: 5000 },
         expect.any(Function)
       );

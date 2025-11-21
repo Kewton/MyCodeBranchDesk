@@ -28,7 +28,7 @@ export interface WorktreeCardProps {
  * ```
  */
 export function WorktreeCard({ worktree, onSessionKilled, onStatusChanged }: WorktreeCardProps) {
-  const { id, name, memo, lastUserMessage, lastUserMessageAt, updatedAt, isSessionRunning, isWaitingForResponse, favorite, status, link, cliToolId } = worktree;
+  const { id, name, memo, lastUserMessage, lastUserMessageAt, lastMessagesByCli, updatedAt, isSessionRunning, isWaitingForResponse, favorite, status, link, cliToolId } = worktree;
   const [isKilling, setIsKilling] = useState(false);
   const [isFavorite, setIsFavorite] = useState(favorite || false);
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
@@ -50,12 +50,13 @@ export function WorktreeCard({ worktree, onSessionKilled, onStatusChanged }: Wor
 
   /**
    * Handle kill session button click
+   * Kills all CLI tool sessions (Claude, Codex, Gemini) for this worktree
    */
   const handleKillSession = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
-    if (!confirm(`セッション「${name}」を終了しますか？`)) {
+    if (!confirm(`「${name}」の全てのセッション（Claude/Codex/Gemini）を終了しますか？\n\n※全てのメッセージ履歴が削除されます。ログファイルは保持されます。`)) {
       return;
     }
 
@@ -161,14 +162,6 @@ export function WorktreeCard({ worktree, onSessionKilled, onStatusChanged }: Wor
               </button>
               <span className="truncate">{name}</span>
               {isMain && <Badge variant="info">Main</Badge>}
-              <Badge
-                variant={
-                  cliToolId === 'codex' ? 'warning' : cliToolId === 'gemini' ? 'success' : 'info'
-                }
-                title={`CLI Tool: ${cliToolId === 'claude' ? 'Claude Code' : cliToolId === 'codex' ? 'Codex CLI' : 'Gemini CLI'}`}
-              >
-                {cliToolId === 'claude' ? 'Claude' : cliToolId === 'codex' ? 'Codex' : 'Gemini'}
-              </Badge>
               {isSessionRunning && isWaitingForResponse && (
                 <Badge variant="warning" dot>
                   レスポンス待ち
@@ -231,16 +224,30 @@ export function WorktreeCard({ worktree, onSessionKilled, onStatusChanged }: Wor
               </div>
             )}
 
-            {/* Last User Message */}
-            {lastUserMessage && (
+            {/* Last Messages per CLI Tool */}
+            {lastMessagesByCli && (lastMessagesByCli.claude || lastMessagesByCli.codex || lastMessagesByCli.gemini) && (
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-xs text-gray-500">Last Message</p>
-                  {lastMessageTime && (
-                    <p className="text-xs text-gray-400">{lastMessageTime}</p>
+                <p className="text-xs text-gray-500 mb-2">Last Messages</p>
+                <div className="space-y-1.5">
+                  {lastMessagesByCli.claude && (
+                    <div className="flex items-start gap-2">
+                      <Badge variant="info" className="flex-shrink-0 text-xs">Claude</Badge>
+                      <p className="text-sm text-gray-700 line-clamp-1 flex-1">{lastMessagesByCli.claude}</p>
+                    </div>
+                  )}
+                  {lastMessagesByCli.codex && (
+                    <div className="flex items-start gap-2">
+                      <Badge variant="warning" className="flex-shrink-0 text-xs">Codex</Badge>
+                      <p className="text-sm text-gray-700 line-clamp-1 flex-1">{lastMessagesByCli.codex}</p>
+                    </div>
+                  )}
+                  {lastMessagesByCli.gemini && (
+                    <div className="flex items-start gap-2">
+                      <Badge variant="success" className="flex-shrink-0 text-xs">Gemini</Badge>
+                      <p className="text-sm text-gray-700 line-clamp-1 flex-1">{lastMessagesByCli.gemini}</p>
+                    </div>
                   )}
                 </div>
-                <p className="text-sm text-gray-700 line-clamp-2">{lastUserMessage}</p>
               </div>
             )}
 

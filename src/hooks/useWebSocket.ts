@@ -6,13 +6,29 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import type { ChatMessage } from '@/types/models';
 
 export type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
+
+export interface SessionStatusPayload {
+  type: 'session_status_changed';
+  worktreeId: string;
+  isRunning: boolean;
+  messagesCleared?: boolean;
+}
+
+export interface ChatBroadcastPayload {
+  type: 'message' | 'message_updated';
+  worktreeId: string;
+  message: ChatMessage;
+}
+
+export type BroadcastPayload = SessionStatusPayload | ChatBroadcastPayload | Record<string, unknown>;
 
 export interface WebSocketMessage {
   type: 'subscribe' | 'unsubscribe' | 'message' | 'broadcast' | 'error';
   worktreeId?: string;
-  data?: any;
+  data?: BroadcastPayload;
   error?: string;
 }
 
@@ -100,7 +116,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
     ws.onmessage = (event) => {
       try {
-        const message: WebSocketMessage = JSON.parse(event.data);
+        const message = JSON.parse(event.data) as WebSocketMessage;
         onMessage?.(message);
       } catch (error) {
         console.error('Failed to parse WebSocket message:', error);
@@ -135,7 +151,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     }
 
     if (wsRef.current) {
-      wsRef.current.close();
+      // Close with proper status code (1000 = Normal Closure)
+      // This prevents invalid close code errors on the server
+      wsRef.current.close(1000, 'Client disconnect');
       wsRef.current = null;
     }
 

@@ -3,11 +3,7 @@
 MyCodeBranchDesk の tmux/Claude CLI 統合機能の詳細実装計画。
 
 ## 📋 目次
-
-1. [概要](#概要)
-2. [Phase 5: tmux セッション管理](#phase-5-tmux-セッション管理)
 3. [Phase 6: Claude CLI 統合](#phase-6-claude-cli-統合)
-4. [Phase 7: Stop フック処理](#phase-7-stop-フック処理)
 5. [統合テスト計画](#統合テスト計画)
 6. [リスクと対策](#リスクと対策)
 
@@ -15,18 +11,10 @@ MyCodeBranchDesk の tmux/Claude CLI 統合機能の詳細実装計画。
 
 ## 概要
 
-### 目的
-
 worktree ごとに独立した tmux + Claude CLI セッションを管理し、ブラウザ UI からのメッセージ送信と Claude からの応答取得を実現する。
 
-### アーキテクチャの前提
-
 - **1 worktree = 1 tmux session = 1 Claude CLI process**
-- **セッション名規則**: `cw_{worktreeId}`
-- **イベント駆動**: Stop フック（`CLAUDE_HOOKS_STOP`）を使用し、ポーリングを避ける
 - **差分抽出**: tmux の scrollback から `lastCapturedLine` 以降のみを取得
-
-### 現在の状態
 
 **実装済み:**
 - ✅ データベース（SQLite）

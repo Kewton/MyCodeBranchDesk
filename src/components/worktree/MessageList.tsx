@@ -11,10 +11,11 @@ import { Card } from '@/components/ui';
 import type { ChatMessage } from '@/types/models';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import { PromptMessage } from './PromptMessage';
+import AnsiToHtml from 'ansi-to-html';
 
 export interface MessageListProps {
   messages: ChatMessage[];
@@ -52,10 +53,26 @@ function MessageBubble({
     }
   };
 
+  // Check if content contains ANSI escape codes
+  const hasAnsiCodes = (text: string): boolean => {
+    return /\x1b\[[0-9;]*m|\[[0-9;]*m/.test(text);
+  };
+
+  // Convert ANSI codes to HTML
+  const convertAnsiToHtml = (text: string): string => {
+    const convert = new AnsiToHtml({
+      fg: '#d1d5db', // Default text color: gray-300
+      bg: '#1f2937', // Default background: gray-800
+      newline: true,
+      escapeXML: true,
+    });
+    return convert.toHtml(text);
+  };
+
   /**
    * Memoized markdown components to prevent re-renders
    */
-  const markdownComponents = useMemo(() => {
+  const markdownComponents = useMemo<Components>(() => {
     /**
      * Detect and linkify file paths in text
      * Matches patterns like: src/components/Foo.tsx, src/lib/bar.ts:123, etc.
@@ -124,14 +141,16 @@ function MessageBubble({
       return children;
     };
 
-    return {
-      p: ({ children, ...props }: any) => {
+    const components: Components = {
+      p: ({ children, ...props }) => {
         if (!isUser) {
           return <p {...props}>{processChildren(children)}</p>;
         }
         return <p {...props}>{children}</p>;
       }
     };
+
+    return components;
   }, [isUser, onFilePathClick]);
 
   return (
@@ -162,13 +181,20 @@ function MessageBubble({
               </div>
             )}
             <div className={`break-words overflow-wrap-anywhere ${isUser ? 'text-white' : 'text-gray-900'}`}>
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeHighlight]}
-                components={markdownComponents}
-              >
-                {message.content}
-              </ReactMarkdown>
+              {hasAnsiCodes(message.content) ? (
+                <pre
+                  className="whitespace-pre-wrap font-mono text-sm bg-gray-900 text-gray-100 p-4 rounded overflow-x-auto"
+                  dangerouslySetInnerHTML={{ __html: convertAnsiToHtml(message.content) }}
+                />
+              ) : (
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeHighlight]}
+                  components={markdownComponents}
+                >
+                  {message.content}
+                </ReactMarkdown>
+              )}
             </div>
           </div>
 
@@ -359,12 +385,24 @@ export function MessageList({
                         <span className="text-xs text-gray-400">{new Date().toLocaleTimeString('ja-JP')}</span>
                       </div>
                       <div className="prose prose-sm max-w-none break-words overflow-wrap-anywhere text-gray-900">
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          rehypePlugins={[rehypeHighlight]}
-                        >
-                          {generatingContent}
-                        </ReactMarkdown>
+                        {/\x1b\[[0-9;]*m|\[[0-9;]*m/.test(generatingContent) ? (
+                          <pre
+                            className="whitespace-pre-wrap font-mono text-sm bg-gray-900 text-gray-300 p-4 rounded overflow-x-auto"
+                            dangerouslySetInnerHTML={{ __html: new AnsiToHtml({
+                              fg: '#d1d5db', // Default text color: gray-300
+                              bg: '#1f2937', // Default background: gray-800
+                              newline: true,
+                              escapeXML: true,
+                            }).toHtml(generatingContent) }}
+                          />
+                        ) : (
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            rehypePlugins={[rehypeHighlight]}
+                          >
+                            {generatingContent}
+                          </ReactMarkdown>
+                        )}
                       </div>
                     </div>
                   </div>

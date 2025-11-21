@@ -6,8 +6,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbInstance } from '@/lib/db-instance';
-import { getWorktreeById, updateWorktreeMemo, updateWorktreeLink, updateFavorite, updateStatus } from '@/lib/db';
-import { isClaudeRunning } from '@/lib/claude-session';
+import { getWorktreeById, updateWorktreeMemo, updateWorktreeLink, updateFavorite, updateStatus, updateCliToolId } from '@/lib/db';
+import { CLIToolManager } from '@/lib/cli-tools/manager';
+import type { CLIToolType } from '@/lib/cli-tools/types';
 
 export async function GET(
   request: NextRequest,
@@ -24,8 +25,10 @@ export async function GET(
       );
     }
 
-    // Check session status
-    const isRunning = await isClaudeRunning(params.id);
+    const manager = CLIToolManager.getInstance();
+    const cliToolId = worktree.cliToolId || 'claude';
+    const cliTool = manager.getTool(cliToolId);
+    const isRunning = await cliTool.isRunning(params.id);
 
     return NextResponse.json(
       { ...worktree, isSessionRunning: isRunning },
@@ -82,9 +85,20 @@ export async function PATCH(
       }
     }
 
+    // Update CLI tool ID if provided
+    if ('cliToolId' in body) {
+      const validCliTools: CLIToolType[] = ['claude', 'codex', 'gemini'];
+      if (validCliTools.includes(body.cliToolId)) {
+        updateCliToolId(db, params.id, body.cliToolId);
+      }
+    }
+
     // Return updated worktree with session status
     const updatedWorktree = getWorktreeById(db, params.id);
-    const isRunning = await isClaudeRunning(params.id);
+    const manager = CLIToolManager.getInstance();
+    const cliToolId = updatedWorktree?.cliToolId || 'claude';
+    const cliTool = manager.getTool(cliToolId);
+    const isRunning = await cliTool.isRunning(params.id);
     return NextResponse.json(
       { ...updatedWorktree, isSessionRunning: isRunning },
       { status: 200 }

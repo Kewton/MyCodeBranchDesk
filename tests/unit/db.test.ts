@@ -415,7 +415,7 @@ describe('Database Operations', () => {
       });
 
       it('should return session state after creation', () => {
-        updateSessionState(testDb, 'main', 100);
+        updateSessionState(testDb, 'main', 'claude', 100);
 
         const state = getSessionState(testDb, 'main');
 
@@ -427,7 +427,7 @@ describe('Database Operations', () => {
 
     describe('updateSessionState', () => {
       it('should create new session state', () => {
-        updateSessionState(testDb, 'main', 50);
+        updateSessionState(testDb, 'main', 'claude', 50);
 
         const state = getSessionState(testDb, 'main');
 
@@ -435,8 +435,8 @@ describe('Database Operations', () => {
       });
 
       it('should update existing session state', () => {
-        updateSessionState(testDb, 'main', 50);
-        updateSessionState(testDb, 'main', 100);
+        updateSessionState(testDb, 'main', 'claude', 50);
+        updateSessionState(testDb, 'main', 'claude', 100);
 
         const state = getSessionState(testDb, 'main');
 
@@ -444,7 +444,7 @@ describe('Database Operations', () => {
       });
 
       it('should initialize with 0 if not specified', () => {
-        updateSessionState(testDb, 'main', 0);
+        updateSessionState(testDb, 'main', 'claude', 0);
 
         const state = getSessionState(testDb, 'main');
 

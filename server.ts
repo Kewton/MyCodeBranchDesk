@@ -26,9 +26,14 @@ const handle = app.getRequestHandler();
 
 // Handle uncaught WebSocket errors
 process.on('uncaughtException', (error: any) => {
-  // Log WebSocket UTF-8 errors but don't crash the server
-  if (error.code === 'WS_ERR_INVALID_UTF8' || error.code === 'WS_ERR_INVALID_CLOSE_CODE') {
-    console.error('WebSocket frame error (non-fatal):', error.message);
+  // Log WebSocket errors but don't crash the server
+  if (
+    error.code === 'WS_ERR_INVALID_UTF8' ||
+    error.code === 'WS_ERR_INVALID_CLOSE_CODE' ||
+    (error instanceof RangeError && error.message?.includes('Invalid WebSocket frame'))
+  ) {
+    // Silently ignore these non-fatal WebSocket frame errors
+    // They occur when browsers send malformed close frames
     return;
   }
   // For other uncaught exceptions, log and exit

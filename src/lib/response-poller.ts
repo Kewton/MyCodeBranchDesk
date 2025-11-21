@@ -440,7 +440,7 @@ async function checkForResponse(worktreeId: string, cliToolId: CLIToolType): Pro
     }
 
     // Get session state (last captured line count)
-    const sessionState = getSessionState(db, worktreeId);
+    const sessionState = getSessionState(db, worktreeId, cliToolId);
     const lastCapturedLine = sessionState?.lastCapturedLine || 0;
 
     // Capture current output
@@ -455,8 +455,7 @@ async function checkForResponse(worktreeId: string, cliToolId: CLIToolType): Pro
     }
 
     if (!result.isComplete) {
-      // Response not yet complete, update line count
-      updateSessionState(db, worktreeId, result.lineCount);
+      // Response not yet complete, keep waiting
       return false;
     }
 
@@ -478,7 +477,7 @@ async function checkForResponse(worktreeId: string, cliToolId: CLIToolType): Pro
       });
 
       // Update session state
-      updateSessionState(db, worktreeId, result.lineCount);
+      updateSessionState(db, worktreeId, cliToolId, result.lineCount);
 
       // Broadcast to WebSocket
       broadcastMessage('message', {
@@ -502,7 +501,7 @@ async function checkForResponse(worktreeId: string, cliToolId: CLIToolType): Pro
       console.warn(`⚠ Empty response detected for ${worktreeId}, continuing polling...`);
       // Update session state but don't save the message
       // Continue polling in case a prompt appears next
-      updateSessionState(db, worktreeId, result.lineCount);
+      updateSessionState(db, worktreeId, cliToolId, result.lineCount);
       return false;
     }
 
@@ -514,7 +513,7 @@ async function checkForResponse(worktreeId: string, cliToolId: CLIToolType): Pro
 
     // Create Markdown log file for the conversation pair
     if (cleanedResponse) {
-      await recordClaudeConversation(db, worktreeId, cleanedResponse);
+      await recordClaudeConversation(db, worktreeId, cleanedResponse, cliToolId);
     }
 
     // Create CLI tool message in database
@@ -528,7 +527,7 @@ async function checkForResponse(worktreeId: string, cliToolId: CLIToolType): Pro
     });
 
     // Update session state
-    updateSessionState(db, worktreeId, result.lineCount);
+    updateSessionState(db, worktreeId, cliToolId, result.lineCount);
 
     // Broadcast message to WebSocket clients
     broadcastMessage('message', {

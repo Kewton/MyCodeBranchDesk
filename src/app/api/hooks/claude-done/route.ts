@@ -55,23 +55,24 @@ export async function POST(request: NextRequest) {
     const parsed = parseClaudeOutput(output);
 
     // Create Markdown log file alongside latest user prompt
-    await recordClaudeConversation(db, body.worktreeId, parsed.content);
+    await recordClaudeConversation(db, body.worktreeId, parsed.content, 'claude');
 
     // Create Claude message in database
     const message = createMessage(db, {
       worktreeId: body.worktreeId,
-      role: 'claude',
+      role: 'assistant',
       content: parsed.content,
       summary: parsed.summary,
       timestamp: new Date(),
       logFileName: parsed.logFileName,
       requestId: parsed.requestId,
       messageType: 'normal',
+      cliToolId: 'claude',
     });
 
     // Update session state
     const lineCount = output.split('\n').length;
-    updateSessionState(db, body.worktreeId, lineCount);
+    updateSessionState(db, body.worktreeId, 'claude', lineCount);
 
     // Broadcast message to WebSocket clients
     broadcastMessage('message', {

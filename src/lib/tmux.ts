@@ -281,7 +281,7 @@ export async function capturePane(
 
   try {
     const { stdout } = await execAsync(
-      `tmux capture-pane -t "${sessionName}" -p -S ${startLine} -E ${endLine}`,
+      `tmux capture-pane -t "${sessionName}" -p -e -S ${startLine} -E ${endLine}`,
       {
         timeout: DEFAULT_TIMEOUT,
         maxBuffer: 10 * 1024 * 1024  // 10MB buffer for large Claude outputs

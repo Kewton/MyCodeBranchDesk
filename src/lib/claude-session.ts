@@ -155,8 +155,9 @@ export async function startClaudeSession(
     // Wait a moment for the export to complete
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    // Start Claude CLI in interactive mode
-    await sendKeys(sessionName, 'claude', true);
+    // Start Claude CLI in interactive mode using full path
+    // (using full path to avoid PATH issues in tmux sessions)
+    await sendKeys(sessionName, '/opt/homebrew/bin/claude', true);
 
     // Wait for Claude to initialize
     await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -194,14 +195,17 @@ export async function sendMessageToClaude(
   }
 
   try {
-    // Send message to Claude
-    await sendKeys(sessionName, message, true);
+    // Send message to Claude (without Enter)
+    await sendKeys(sessionName, message, false);
 
-    // Wait a moment for the message to be entered
+    // Wait a moment for the text to be typed
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    // Send another Enter to submit the message (Claude CLI uses multi-line input mode)
-    await sendKeys(sessionName, '', true);
+    // Send Enter key to submit (single Enter submits in Claude Code CLI)
+    await execAsync(`tmux send-keys -t "${sessionName}" C-m`);
+
+    // Wait a moment for the message to be processed
+    await new Promise((resolve) => setTimeout(resolve, 200));
 
     console.log(`✓ Sent message to Claude session: ${sessionName}`);
   } catch (error: any) {

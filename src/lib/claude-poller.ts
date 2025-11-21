@@ -198,7 +198,7 @@ async function checkForResponse(worktreeId: string): Promise<boolean> {
     }
 
     // Get session state (last captured line count)
-    const sessionState = getSessionState(db, worktreeId);
+    const sessionState = getSessionState(db, worktreeId, cliToolId);
     const lastCapturedLine = sessionState?.lastCapturedLine || 0;
 
     // Capture current output
@@ -212,11 +212,9 @@ async function checkForResponse(worktreeId: string): Promise<boolean> {
       return false;
     }
 
-    if (!result.isComplete) {
-      // Response not yet complete, update line count
-      updateSessionState(db, worktreeId, result.lineCount);
-      return false;
-    }
+      if (!result.isComplete) {
+        return false;
+      }
 
     // Response is complete! Check if it's a prompt
     const promptDetection = detectPrompt(result.response);
@@ -227,7 +225,7 @@ async function checkForResponse(worktreeId: string): Promise<boolean> {
 
       const message = createMessage(db, {
         worktreeId,
-        role: 'claude',
+        role: 'assistant',
         content: promptDetection.cleanContent,
         messageType: 'prompt',
         promptData: promptDetection.promptData,
@@ -236,7 +234,7 @@ async function checkForResponse(worktreeId: string): Promise<boolean> {
       });
 
       // Update session state
-      updateSessionState(db, worktreeId, result.lineCount);
+      updateSessionState(db, worktreeId, cliToolId, result.lineCount);
 
       // Broadcast to WebSocket
       broadcastMessage('message', {
@@ -260,19 +258,19 @@ async function checkForResponse(worktreeId: string): Promise<boolean> {
       console.warn(`⚠ Empty response detected for ${worktreeId}, continuing polling...`);
       // Update session state but don't save the message
       // Continue polling in case a prompt appears next
-      updateSessionState(db, worktreeId, result.lineCount);
+      updateSessionState(db, worktreeId, cliToolId, result.lineCount);
       return false;
     }
 
     // Create Markdown log file for the conversation pair
     if (result.response) {
-      await recordClaudeConversation(db, worktreeId, result.response);
+        await recordClaudeConversation(db, worktreeId, result.response, 'claude');
     }
 
     // Create Claude message in database
     const message = createMessage(db, {
       worktreeId,
-      role: 'claude',
+      role: 'assistant',
       content: result.response,
       messageType: 'normal',
       timestamp: new Date(),
@@ -280,7 +278,7 @@ async function checkForResponse(worktreeId: string): Promise<boolean> {
     });
 
     // Update session state
-    updateSessionState(db, worktreeId, result.lineCount);
+    updateSessionState(db, worktreeId, cliToolId, result.lineCount);
 
     // Broadcast message to WebSocket clients
     broadcastMessage('message', {

@@ -4,7 +4,8 @@
  */
 
 import type Database from 'better-sqlite3';
-import { getLastUserMessage, getWorktreeById } from './db';
+import { getLastUserMessage } from './db';
+import type { CLIToolType } from './cli-tools/types';
 import { createLog } from './log-manager';
 
 /**
@@ -14,17 +15,14 @@ import { createLog } from './log-manager';
 export async function recordClaudeConversation(
   db: Database.Database,
   worktreeId: string,
-  claudeResponse: string
+  claudeResponse: string,
+  cliToolId: CLIToolType = 'claude'
 ): Promise<void> {
   const lastUserMessage = getLastUserMessage(db, worktreeId);
 
   if (!lastUserMessage) {
     return;
   }
-
-  // Get worktree to determine CLI tool ID
-  const worktree = getWorktreeById(db, worktreeId);
-  const cliToolId = worktree?.cliToolId || 'claude';
 
   try {
     await createLog(worktreeId, lastUserMessage.content, claudeResponse, cliToolId);

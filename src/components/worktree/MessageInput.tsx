@@ -6,13 +6,13 @@
 'use client';
 
 import React, { useState, FormEvent, useRef, useEffect } from 'react';
-import { Button } from '@/components/ui';
 import { worktreeApi, handleApiError } from '@/lib/api-client';
+import type { CLIToolType } from '@/lib/cli-tools/types';
 
 export interface MessageInputProps {
   worktreeId: string;
-  onMessageSent?: () => void;
-  cliToolId?: 'claude' | 'codex' | 'gemini';
+  onMessageSent?: (cliToolId: CLIToolType) => void;
+  cliToolId?: CLIToolType;
 }
 
 /**
@@ -46,29 +46,28 @@ export function MessageInput({ worktreeId, onMessageSent, cliToolId }: MessageIn
   /**
    * Handle message submission
    */
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-
-    // Prevent submission if composing with IME
-    if (isComposing) {
-      return;
-    }
-
-    if (!message.trim() || sending) {
+  const submitMessage = async () => {
+    if (isComposing || !message.trim() || sending) {
       return;
     }
 
     try {
       setSending(true);
       setError(null);
-      await worktreeApi.sendMessage(worktreeId, message.trim(), cliToolId);
+      const effectiveCliTool: CLIToolType = cliToolId || 'claude';
+      await worktreeApi.sendMessage(worktreeId, message.trim(), effectiveCliTool);
       setMessage('');
-      onMessageSent?.();
+      onMessageSent?.(effectiveCliTool);
     } catch (err) {
       setError(handleApiError(err));
     } finally {
       setSending(false);
     }
+  };
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    await submitMessage();
   };
 
   /**
@@ -107,7 +106,7 @@ export function MessageInput({ worktreeId, onMessageSent, cliToolId }: MessageIn
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Check for IME composition using keyCode
     // keyCode 229 indicates IME composition in progress
-    const keyCode = (e.nativeEvent as any).keyCode;
+    const { keyCode } = e.nativeEvent;
     if (keyCode === 229) {
       return;
     }
@@ -122,7 +121,7 @@ export function MessageInput({ worktreeId, onMessageSent, cliToolId }: MessageIn
     // Shift+Enter allows line breaks
     if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
       e.preventDefault();
-      handleSubmit(e as any);
+      void submitMessage();
     }
   };
 
