@@ -155,7 +155,7 @@ function MessageBubble({
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
-      <div className={`max-w-[80%] ${isUser ? 'order-2' : 'order-1'}`}>
+      <div className={`${isUser ? 'max-w-[80%]' : 'w-full'} ${isUser ? 'order-2' : 'order-1'}`}>
         <div
           className={`rounded-lg px-4 py-3 ${
             isUser
@@ -343,7 +343,7 @@ export function MessageList({
         {/* Show "Waiting for response" indicator with generating content */}
         {waitingForResponse && (
           <div className="flex justify-start mb-4">
-            <div className="max-w-[80%] w-full">
+            <div className="w-full">
               <div className="rounded-lg px-4 py-3 bg-white border border-gray-200 shadow-sm">
                 {/* Header with generating indicator */}
                 <div className="flex items-center gap-2 mb-3">
