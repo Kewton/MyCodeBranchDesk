@@ -11,7 +11,7 @@ import { initDatabase } from './db';
  * Current schema version
  * Increment this when adding new migrations
  */
-export const CURRENT_SCHEMA_VERSION = 7;
+export const CURRENT_SCHEMA_VERSION = 9;
 
 /**
  * Migration definition
@@ -392,6 +392,24 @@ const migrations: Migration[] = [
       `);
 
       console.log('✓ Rolled back: Changed role constraint from "assistant" to "claude"');
+    }
+  },
+  {
+    version: 9,
+    name: 'add-in-progress-message-id-to-session-states',
+    up: (db) => {
+      // Add in_progress_message_id column to session_states table
+      // This column tracks the message ID being actively updated during polling
+      db.exec(`
+        ALTER TABLE session_states ADD COLUMN in_progress_message_id TEXT DEFAULT NULL;
+      `);
+
+      console.log('✓ Added in_progress_message_id column to session_states table');
+    },
+    down: (db) => {
+      // Note: SQLite doesn't support DROP COLUMN directly
+      // In production, you would need to recreate the table without in_progress_message_id
+      console.log('No full rollback for in_progress_message_id column (SQLite limitation)');
     }
   }
 ];

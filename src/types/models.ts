@@ -124,6 +124,8 @@ export interface MultipleChoiceOption {
   label: string;
   /** Whether this is the default option (indicated by ❯) */
   isDefault?: boolean;
+  /** Whether this option requires text input from the user */
+  requiresTextInput?: boolean;
 }
 
 /**
@@ -178,4 +180,6 @@ export interface WorktreeSessionState {
   cliToolId: CLIToolType;
   /** Last captured line number from tmux */
   lastCapturedLine: number;
+  /** ID of the message currently being updated (null when no message is in progress) */
+  inProgressMessageId?: string | null;
 }

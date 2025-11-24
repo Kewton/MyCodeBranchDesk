@@ -5,7 +5,16 @@
 
 import { captureSessionOutput, isSessionRunning } from './cli-session';
 import { getDbInstance } from './db-instance';
-import { createMessage, getSessionState, updateSessionState, getWorktreeById } from './db';
+import {
+  createMessage,
+  getSessionState,
+  updateSessionState,
+  getWorktreeById,
+  clearInProgressMessageId,
+  setInProgressMessageId,
+  updateMessageContent,
+  getMessageById
+} from './db';
 import { broadcastMessage } from './ws-server';
 import { detectPrompt } from './prompt-detector';
 import { recordClaudeConversation } from './conversation-logger';
@@ -39,6 +48,48 @@ function getPollerKey(worktreeId: string, cliToolId: CLIToolType): string {
 }
 
 /**
+ * Clean up Claude response by removing shell setup commands and environment exports
+ *
+ * @param response - Raw Claude response
+ * @returns Cleaned response
+ */
+function cleanClaudeResponse(response: string): string {
+  // Split response into lines
+  const lines = response.split('\n');
+  const cleanedLines: string[] = [];
+
+  // Patterns to remove (Claude-specific setup commands)
+  const skipPatterns = [
+    /CLAUDE_HOOKS_/,  // Any CLAUDE_HOOKS reference
+    /\/bin\/claude/,  // Claude binary path (any variant)
+    /^claude\s*$/,  // Just "claude" on a line
+    /@.*\s+%/,  // Shell prompt (any user@host followed by %)
+    /feature-issue-\d+/,  // Worktree indicator
+    /worktreeId/,  // Curl command JSON parts
+    /localhost/,  // Localhost references
+    /192\.168\./,  // IP address parts
+    /:3000/,  // Port references
+    /done'/,  // Any line containing done' (from claude-done')
+    /api\/hooks/,  // API hooks
+    /curl.*POST/,  // Curl commands
+    /Content-Type/,  // HTTP headers
+    /export\s+/,  // Export commands
+    /^\s*$/,  // Empty lines
+  ];
+
+  // Filter out all setup command lines
+  for (const line of lines) {
+    const shouldSkip = skipPatterns.some(pattern => pattern.test(line));
+    if (!shouldSkip && line.trim()) {
+      cleanedLines.push(line);
+    }
+  }
+
+  // Return cleaned content
+  return cleanedLines.join('\n').trim();
+}
+
+/**
  * Clean up Gemini response by removing shell prompts and error messages
  *
  * @param response - Raw Gemini response
@@ -59,7 +110,7 @@ function cleanGeminiResponse(response: string): string {
 
   // Find the ✦ marker (actual Gemini response start)
   let foundMarker = false;
-  let afterMarker: string[] = [];
+  const afterMarker: string[] = [];
 
   for (const line of lines) {
     if (line.includes('✦')) {
@@ -141,16 +192,6 @@ function extractResponse(
   const linesToCheck = lines.slice(startLine);
   const outputToCheck = linesToCheck.join('\n');
 
-  /**
-   * Strip ANSI escape codes from a string for pattern matching
-   * @param str - String with ANSI codes
-   * @returns Clean string without ANSI codes
-   */
-  const stripAnsi = (str: string): string => {
-    // Remove all ANSI escape sequences: \x1b[...m or [...m
-    return str.replace(/\x1b\[[0-9;]*m|\[[0-9;]*m/g, '');
-  };
-
   // Define tool-specific patterns
   let promptPattern: RegExp;
   let separatorPattern: RegExp;
@@ -162,14 +203,17 @@ function extractResponse(
       // Claude shows "> " or "─────" when waiting for input
       promptPattern = /^>\s*$/m;
       separatorPattern = /^─{50,}$/m;
-      // Claude shows various animations while thinking: ✻ Herding…, · Choreographing…, ∴ Thinking…, ✢ Doing…, ✳ Cascading…, etc.
-      thinkingPattern = /[✻✽⏺·∴✢✳]/m;
+      // Claude shows various animations while thinking: ✻ Herding…, · Choreographing…, ∴ Thinking…, ∴ Thought…, ✢ Doing…, ✳ Cascading…, ✽ Cultivating…, ✶ Recombobulating…, etc.
+      // Pattern must match at line start with activity verb to avoid false positives in response content
+      // Use a broader pattern that matches any combination of these symbols followed by any text ending with … (ellipsis)
+      thinkingPattern = /^[✻✽⏺·∴✢✳✶]\s+\w+…/m;
       skipPatterns = [
         /^─{50,}$/, // Separator lines
         /^>\s*$/, // Prompt line
-        /[✻✽⏺·∴✢✳]/, // Thinking indicators
+        /^[✻✽⏺·∴✢✳✶]\s+\w+…/, // Thinking indicators (any activity with ellipsis)
         /^\s*[⎿⏋]\s+Tip:/, // Tip lines
         /^\s*Tip:/, // Tip lines
+        /^\s*\?\s*for shortcuts/, // Shortcuts hint
       ];
       break;
 
@@ -215,6 +259,43 @@ function extractResponse(
       skipPatterns = [/^─{50,}$/, /^>\s*$/, /[✻✽⏺·∴✢✳]/];
   }
 
+  /**
+   * Strip ANSI escape codes from a string for pattern matching
+   * @param str - String with ANSI codes
+   * @returns Clean string without ANSI codes
+   */
+  const stripAnsi = (str: string): string => {
+    // Remove all ANSI escape sequences: \x1b[...m or [...m
+    return str.replace(/\x1b\[[0-9;]*m|\[[0-9;]*m/g, '');
+  };
+
+  // Early check for Claude permission prompts (before extraction logic)
+  // Permission prompts appear after normal responses and need special handling
+  if (cliToolId === 'claude') {
+    const fullOutput = lines.join('\n');
+    // Strip ANSI codes before prompt detection
+    const cleanFullOutput = stripAnsi(fullOutput);
+
+    console.log(`[Poller] Claude early check - lines: ${lines.length}, chars: ${fullOutput.length}`);
+    console.log(`[Poller] Claude early check - last 300 chars (clean):`, cleanFullOutput.substring(Math.max(0, cleanFullOutput.length - 300)));
+
+    const promptDetection = detectPrompt(cleanFullOutput);
+    console.log(`[Poller] Claude early check - detectPrompt returned isPrompt: ${promptDetection.isPrompt}`);
+
+    if (promptDetection.isPrompt) {
+      console.log(`[Poller] ✓ Early detection: Claude permission prompt found!`);
+      console.log(`[Poller] Prompt type: ${promptDetection.promptData?.type}, question: ${promptDetection.promptData?.question?.substring(0, 50)}`);
+
+      // Return the full output as a complete interactive prompt
+      // Use the cleaned output without ANSI codes
+      return {
+        response: cleanFullOutput,
+        isComplete: true,
+        lineCount: totalLines,
+      };
+    }
+  }
+
   // Strip ANSI codes before pattern matching
   const cleanOutputToCheck = stripAnsi(outputToCheck);
 
@@ -222,8 +303,8 @@ function extractResponse(
   const hasSeparator = separatorPattern.test(cleanOutputToCheck);
   const isThinking = thinkingPattern.test(cleanOutputToCheck);
 
-  // Debug logging for Gemini and Codex
-  if (cliToolId === 'gemini' || cliToolId === 'codex') {
+  // Debug logging for all CLI tools
+  if (cliToolId === 'gemini' || cliToolId === 'codex' || cliToolId === 'claude') {
     console.log(`[Poller] ${cliToolId} check - hasPrompt: ${hasPrompt}, hasSeparator: ${hasSeparator}, isThinking: ${isThinking}`);
     const lastLines = linesToCheck.slice(-5);
     lastLines.forEach((line, i) => {
@@ -339,6 +420,13 @@ function extractResponse(
 
     const response = responseLines.join('\n').trim();
 
+    // Debug: Log extracted response for Claude
+    if (cliToolId === 'claude') {
+      console.log(`[Poller] Claude extracted response (${response.length} chars):`);
+      console.log(`[Poller] First 300 chars: ${response.substring(0, 300)}`);
+      console.log(`[Poller] Last 300 chars: ${response.substring(Math.max(0, response.length - 300))}`);
+    }
+
     // Additional check: ensure response doesn't contain thinking indicators
     // This prevents saving intermediate states as final responses
     if (thinkingPattern.test(response)) {
@@ -403,9 +491,23 @@ function extractResponse(
 
   // Check if this is an interactive prompt (yes/no or multiple choice)
   // Interactive prompts don't have the ">" prompt and separator, so we need to detect them separately
+  if (cliToolId === 'claude') {
+    console.log(`[Poller] Claude interactive prompt check - isThinking: ${isThinking}`);
+  }
+
   if (!isThinking) {
     const fullOutput = lines.join('\n');
     const promptDetection = detectPrompt(fullOutput);
+
+    // Debug logging for Claude
+    if (cliToolId === 'claude') {
+      console.log(`[Poller] Claude prompt detection result: isPrompt=${promptDetection.isPrompt}`);
+      console.log(`[Poller] Claude fullOutput length: ${fullOutput.length} chars, ${lines.length} lines`);
+      console.log(`[Poller] Claude last 500 chars:`, fullOutput.substring(Math.max(0, fullOutput.length - 500)));
+      if (promptDetection.promptData) {
+        console.log(`[Poller] Prompt type: ${promptDetection.promptData.type}, question: ${promptDetection.promptData.question?.substring(0, 50)}`);
+      }
+    }
 
     if (promptDetection.isPrompt) {
       // This is an interactive prompt - consider it complete
@@ -415,9 +517,38 @@ function extractResponse(
         lineCount: totalLines,
       };
     }
+
+    // Not a prompt, but also not thinking - this means we have a partial response in progress
+    // Extract partial response content to show progress to the user
+    const responseLines: string[] = [];
+    const startIndex = Math.max(0, lastCapturedLine);
+    const endIndex = totalLines;
+
+    for (let i = startIndex; i < endIndex; i++) {
+      const line = lines[i];
+      const cleanLine = stripAnsi(line);
+
+      // Skip lines matching any skip pattern
+      const shouldSkip = skipPatterns.some(pattern => pattern.test(cleanLine));
+      if (shouldSkip) {
+        continue;
+      }
+
+      responseLines.push(line);
+    }
+
+    const partialResponse = responseLines.join('\n').trim();
+    if (partialResponse) {
+      console.log(`[Poller] Partial response detected (${partialResponse.length} chars), returning as in-progress`);
+      return {
+        response: partialResponse,
+        isComplete: false,
+        lineCount: endIndex,
+      };
+    }
   }
 
-  // Response not yet complete
+  // Response not yet complete (or is in thinking state)
   return {
     response: '',
     isComplete: false,
@@ -459,6 +590,10 @@ async function checkForResponse(worktreeId: string, cliToolId: CLIToolType): Pro
     // Get session state (last captured line count)
     const sessionState = getSessionState(db, worktreeId, cliToolId);
     const lastCapturedLine = sessionState?.lastCapturedLine || 0;
+    console.log(`[Poller] Session state for ${worktreeId} (${cliToolId}):`, {
+      lastCapturedLine,
+      inProgressMessageId: sessionState?.inProgressMessageId || 'null'
+    });
 
     // Capture current output
     const output = await captureSessionOutput(worktreeId, cliToolId, 10000);
@@ -468,20 +603,104 @@ async function checkForResponse(worktreeId: string, cliToolId: CLIToolType): Pro
 
     if (!result) {
       // No new output
+      console.log(`[Poller] No new output for ${worktreeId} (${cliToolId})`);
       return false;
     }
 
     if (!result.isComplete) {
-      // Response not yet complete, keep waiting
+      // Response not yet complete, but update in-progress message if we have partial content
+      console.log(`[Poller] Response incomplete for ${worktreeId} (${cliToolId}), lineCount: ${result.lineCount}`);
+
+      // If we have partial response content, update or create in-progress message
+      if (result.response && result.response.trim()) {
+        const inProgressMessageId = sessionState?.inProgressMessageId;
+
+        // Clean the partial response
+        let cleanedResponse = result.response;
+        if (cliToolId === 'gemini') {
+          cleanedResponse = cleanGeminiResponse(result.response);
+        } else if (cliToolId === 'claude') {
+          cleanedResponse = cleanClaudeResponse(result.response);
+        }
+
+        console.log(`[Poller] Cleaned partial response length: ${cleanedResponse.length} chars (original: ${result.response.length})`);
+
+        // Skip if cleaned response is empty
+        if (!cleanedResponse || cleanedResponse.trim() === '' || cleanedResponse === '[No content]') {
+          console.log(`[Poller] Cleaned partial response is empty, skipping in-progress message update`);
+          return false;
+        }
+
+        if (inProgressMessageId) {
+          // Update existing in-progress message
+          console.log(`[Poller] Updating in-progress message ${inProgressMessageId} with partial content (${cleanedResponse.length} chars)`);
+          updateMessageContent(db, inProgressMessageId, cleanedResponse);
+
+          // Update lastCapturedLine to prevent re-processing the same content
+          updateSessionState(db, worktreeId, cliToolId, result.lineCount);
+
+          const message = getMessageById(db, inProgressMessageId);
+          if (message) {
+            broadcastMessage('message_updated', {
+              worktreeId,
+              message,
+            });
+          }
+        } else {
+          // Create new in-progress message
+          const message = createMessage(db, {
+            worktreeId,
+            role: 'assistant',
+            content: cleanedResponse,
+            messageType: 'normal',
+            timestamp: new Date(),
+            cliToolId,
+          });
+
+          console.log(`[Poller] Created new in-progress message ${message.id}`);
+
+          // Set this message as in-progress
+          setInProgressMessageId(db, worktreeId, cliToolId, message.id);
+          updateSessionState(db, worktreeId, cliToolId, result.lineCount);
+
+          broadcastMessage('message', {
+            worktreeId,
+            message,
+          });
+        }
+      }
+
+      return false;
+    }
+
+    // Log complete response detection
+    console.log(`[Poller] Complete response detected for ${worktreeId} (${cliToolId}), lineCount: ${result.lineCount}, lastCapturedLine: ${lastCapturedLine}, inProgressMessageId: ${sessionState?.inProgressMessageId || 'null'}`);
+    console.log(`[Poller] Response preview (first 200 chars): ${result.response.substring(0, 200)}`);
+
+    // CRITICAL FIX: If lineCount == lastCapturedLine AND there's no in-progress message,
+    // this response has already been saved. Skip to prevent duplicates.
+    if (result.lineCount === lastCapturedLine && !sessionState?.inProgressMessageId) {
+      console.log(`[Poller] Response already saved (lineCount ${result.lineCount} == lastCapturedLine ${lastCapturedLine}), skipping duplicate`);
       return false;
     }
 
     // Response is complete! Check if it's a prompt
     const promptDetection = detectPrompt(result.response);
 
+    // Debug logging for all CLI tools
+    if (cliToolId === 'claude' || cliToolId === 'codex' || cliToolId === 'gemini') {
+      console.log(`[Poller] ${cliToolId} prompt detection - isPrompt: ${promptDetection.isPrompt}`);
+      if (result.response.length < 500) {
+        console.log(`[Poller] Response preview:`, result.response.substring(0, 200));
+      }
+    }
+
     if (promptDetection.isPrompt) {
       // This is a prompt - save as prompt message
       console.log(`✓ Detected prompt for ${worktreeId} (${cliToolId}):`, promptDetection.promptData?.question);
+
+      // Clear in-progress message ID (prompt completes the response)
+      clearInProgressMessageId(db, worktreeId, cliToolId);
 
       const message = createMessage(db, {
         worktreeId,
@@ -522,10 +741,21 @@ async function checkForResponse(worktreeId: string, cliToolId: CLIToolType): Pro
       return false;
     }
 
-    // Clean up Gemini response (remove shell prompts and errors)
+    // Clean up responses (remove shell prompts, setup commands, and errors)
     let cleanedResponse = result.response;
     if (cliToolId === 'gemini') {
       cleanedResponse = cleanGeminiResponse(result.response);
+    } else if (cliToolId === 'claude') {
+      cleanedResponse = cleanClaudeResponse(result.response);
+    }
+
+    // If cleaned response is empty or just "[No content]", skip saving
+    // This prevents creating messages for shell setup commands that get filtered out
+    if (!cleanedResponse || cleanedResponse.trim() === '' || cleanedResponse === '[No content]') {
+      console.log(`[Poller] Cleaned response is empty, updating session state and continuing polling...`);
+      updateSessionState(db, worktreeId, cliToolId, result.lineCount);
+      clearInProgressMessageId(db, worktreeId, cliToolId);
+      return false;
     }
 
     // Create Markdown log file for the conversation pair
@@ -533,29 +763,60 @@ async function checkForResponse(worktreeId: string, cliToolId: CLIToolType): Pro
       await recordClaudeConversation(db, worktreeId, cleanedResponse, cliToolId);
     }
 
-    // Create CLI tool message in database
-    const message = createMessage(db, {
-      worktreeId,
-      role: 'assistant',
-      content: cleanedResponse,
-      messageType: 'normal',
-      timestamp: new Date(),
-      cliToolId,
-    });
+    // Get in-progress message ID from session state (already fetched earlier)
+    const inProgressMessageId = sessionState?.inProgressMessageId;
 
-    // Update session state
+    let message;
+    if (inProgressMessageId) {
+      // Update existing in-progress message
+      console.log(`[Poller] Updating in-progress message ${inProgressMessageId}`);
+      updateMessageContent(db, inProgressMessageId, cleanedResponse);
+
+      // Get the updated message
+      message = getMessageById(db, inProgressMessageId);
+
+      if (message) {
+        // Broadcast message update to WebSocket clients
+        broadcastMessage('message_updated', {
+          worktreeId,
+          message,
+        });
+      }
+    } else {
+      // Create new CLI tool message in database
+      message = createMessage(db, {
+        worktreeId,
+        role: 'assistant',
+        content: cleanedResponse,
+        messageType: 'normal',
+        timestamp: new Date(),
+        cliToolId,
+      });
+
+      // Broadcast message to WebSocket clients
+      broadcastMessage('message', {
+        worktreeId,
+        message,
+      });
+
+      console.log(`[Poller] Created new message ${message.id}`);
+    }
+
+    // CRITICAL: Update session state FIRST, then clear inProgressMessageId
+    // This ensures the next poll cycle sees:
+    // - lastCapturedLine == result.lineCount (response already saved)
+    // - inProgressMessageId == null (no in-progress message)
+    // The check at line 671 will then skip re-saving
     updateSessionState(db, worktreeId, cliToolId, result.lineCount);
 
-    // Broadcast message to WebSocket clients
-    broadcastMessage('message', {
-      worktreeId,
-      message,
-    });
+    // Clear in-progress message ID - response is complete
+    clearInProgressMessageId(db, worktreeId, cliToolId);
 
-    console.log(`✓ Saved ${cliToolId} response for ${worktreeId}`);
+    console.log(`✓ Saved ${cliToolId} response for ${worktreeId}, updated lastCapturedLine to ${result.lineCount}`);
 
-    // Stop polling since we got the response
-    stopPolling(worktreeId, cliToolId);
+    // Don't stop polling - continue watching for potential prompts or new messages
+    // The duplicate check at line 671 will prevent re-saving this response
+    console.log(`[Poller] Continuing to watch for prompts after response...`);
 
     return true;
   } catch (error: any) {

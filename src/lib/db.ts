@@ -406,6 +406,23 @@ export function createMessage(
 }
 
 /**
+ * Update the content of an existing message
+ */
+export function updateMessageContent(
+  db: Database.Database,
+  messageId: string,
+  content: string
+): void {
+  const stmt = db.prepare(`
+    UPDATE chat_messages
+    SET content = ?
+    WHERE id = ?
+  `);
+
+  stmt.run(content, messageId);
+}
+
+/**
  * Get messages for a worktree, optionally filtered by CLI tool
  */
 export function getMessages(
@@ -506,7 +523,7 @@ export function getSessionState(
   cliToolId: CLIToolType = 'claude'
 ): WorktreeSessionState | null {
   const stmt = db.prepare(`
-    SELECT worktree_id, cli_tool_id, last_captured_line
+    SELECT worktree_id, cli_tool_id, last_captured_line, in_progress_message_id
     FROM session_states
     WHERE worktree_id = ? AND cli_tool_id = ?
   `);
@@ -515,6 +532,7 @@ export function getSessionState(
     worktree_id: string;
     cli_tool_id: string;
     last_captured_line: number;
+    in_progress_message_id: string | null;
   } | undefined;
 
   if (!row) {
@@ -525,6 +543,7 @@ export function getSessionState(
     worktreeId: row.worktree_id,
     cliToolId: row.cli_tool_id as CLIToolType,
     lastCapturedLine: row.last_captured_line,
+    inProgressMessageId: row.in_progress_message_id || null,
   };
 }
 
@@ -545,6 +564,35 @@ export function updateSessionState(
   `);
 
   stmt.run(worktreeId, cliToolId, lastCapturedLine);
+}
+
+/**
+ * Set the in-progress message ID for a session
+ */
+export function setInProgressMessageId(
+  db: Database.Database,
+  worktreeId: string,
+  cliToolId: CLIToolType,
+  messageId: string | null
+): void {
+  const stmt = db.prepare(`
+    UPDATE session_states
+    SET in_progress_message_id = ?
+    WHERE worktree_id = ? AND cli_tool_id = ?
+  `);
+
+  stmt.run(messageId, worktreeId, cliToolId);
+}
+
+/**
+ * Clear the in-progress message ID for a session
+ */
+export function clearInProgressMessageId(
+  db: Database.Database,
+  worktreeId: string,
+  cliToolId: CLIToolType
+): void {
+  setInProgressMessageId(db, worktreeId, cliToolId, null);
 }
 
 /**

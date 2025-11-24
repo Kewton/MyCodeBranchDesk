@@ -60,8 +60,10 @@ export function setupWebSocket(server: HTTPServer): void {
     });
 
     // Handle disconnection
-    ws.on('close', () => {
-      console.log('WebSocket client disconnected');
+    ws.on('close', (code, reason) => {
+      const clientInfo = clients.get(ws);
+      const subscribedWorktrees = clientInfo ? Array.from(clientInfo.worktreeIds) : [];
+      console.log(`[WS] Client disconnected - code: ${code}, reason: ${reason || 'none'}, subscribed to: ${subscribedWorktrees.join(', ') || 'none'}`);
       handleDisconnect(ws);
     });
 
@@ -101,7 +103,10 @@ function handleMessage(ws: WebSocket, message: WebSocketMessage): void {
  */
 function handleSubscribe(ws: WebSocket, worktreeId: string): void {
   const clientInfo = clients.get(ws);
-  if (!clientInfo) return;
+  if (!clientInfo) {
+    console.log(`[WS] handleSubscribe: clientInfo not found for worktreeId: ${worktreeId}`);
+    return;
+  }
 
   // Add worktreeId to client's subscriptions
   clientInfo.worktreeIds.add(worktreeId);
@@ -110,9 +115,10 @@ function handleSubscribe(ws: WebSocket, worktreeId: string): void {
   if (!rooms.has(worktreeId)) {
     rooms.set(worktreeId, new Set());
   }
-  rooms.get(worktreeId)!.add(ws);
+  const room = rooms.get(worktreeId)!;
+  room.add(ws);
 
-  console.log(`Client subscribed to worktree: ${worktreeId}`);
+  console.log(`Client subscribed to worktree: ${worktreeId}, room size: ${room.size}, ws readyState: ${ws.readyState}`);
 }
 
 /**
@@ -143,7 +149,15 @@ function handleUnsubscribe(ws: WebSocket, worktreeId: string): void {
  */
 function handleBroadcast(worktreeId: string, data: any): void {
   const room = rooms.get(worktreeId);
-  if (!room) return;
+  console.log(`[WS] handleBroadcast called for ${worktreeId}, room size: ${room?.size || 0}`);
+  if (!room) {
+    console.log(`[WS] No room found for ${worktreeId}`);
+    return;
+  }
+  if (room.size === 0) {
+    console.log(`[WS] Room for ${worktreeId} is empty`);
+    return;
+  }
 
   try {
     const message = JSON.stringify({

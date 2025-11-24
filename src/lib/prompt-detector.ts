@@ -174,8 +174,10 @@ function detectMultipleChoicePrompt(output: string): PromptDetectionResult {
   let firstOptionIndex = -1;
 
   // Scan from the end to find options
-  for (let i = lines.length - 1; i >= 0 && i >= lines.length - 20; i--) {
+  // Increased from 20 to 50 to handle multi-line wrapped options
+  for (let i = lines.length - 1; i >= 0 && i >= lines.length - 50; i--) {
     const line = lines[i].trim();
+    const rawLine = lines[i]; // Keep original indentation for checking
     const match = line.match(optionPattern);
 
     if (match) {
@@ -190,6 +192,15 @@ function detectMultipleChoicePrompt(output: string): PromptDetectionResult {
         firstOptionIndex = i;
       }
     } else if (options.length > 0 && line && !line.match(/^[-─]+$/)) {
+      // Check if this is a continuation line (indented line between options)
+      // Continuation lines typically start with spaces (like "  work/github...")
+      const isContinuationLine = rawLine.match(/^\s{2,}[^\d]/) && !rawLine.match(/^\s*\d+\./);
+
+      if (isContinuationLine) {
+        // Skip continuation lines and continue scanning for more options
+        continue;
+      }
+
       // Found a non-empty, non-separator line before options - likely the question
       questionEndIndex = i;
       break;
@@ -222,16 +233,37 @@ function detectMultipleChoicePrompt(output: string): PromptDetectionResult {
     question = 'Please select an option:';
   }
 
+  // Detect if any option requires text input
+  // Patterns that indicate text input is needed:
+  // - "Type here to tell Claude..."
+  // - "Tell me what to do differently"
+  // - "Enter custom..."
+  const textInputPatterns = [
+    /type\s+here/i,
+    /tell\s+(me|claude)/i,
+    /enter\s+/i,
+    /custom/i,
+    /differently/i,
+  ];
+
   return {
     isPrompt: true,
     promptData: {
       type: 'multiple_choice',
       question: question.trim(),
-      options: options.map(opt => ({
-        number: opt.number,
-        label: opt.label,
-        isDefault: opt.isDefault,
-      })),
+      options: options.map(opt => {
+        // Check if this option requires text input
+        const requiresTextInput = textInputPatterns.some(pattern =>
+          pattern.test(opt.label)
+        );
+
+        return {
+          number: opt.number,
+          label: opt.label,
+          isDefault: opt.isDefault,
+          requiresTextInput,
+        };
+      }),
       status: 'pending',
     },
     cleanContent: question.trim(),

@@ -196,7 +196,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     return () => {
       disconnect();
     };
-  }, [connect, disconnect]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount/unmount
 
   // Subscribe to initial worktree IDs
   useEffect(() => {
@@ -205,7 +206,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         subscribe(id);
       });
     }
-  }, [status, worktreeIds, subscribe]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, worktreeIds]); // Don't include subscribe to avoid re-subscription loops
 
   return {
     status,

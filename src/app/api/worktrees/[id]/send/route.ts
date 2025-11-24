@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbInstance } from '@/lib/db-instance';
-import { getWorktreeById, createMessage, updateLastUserMessage } from '@/lib/db';
+import { getWorktreeById, createMessage, updateLastUserMessage, updateSessionState, clearInProgressMessageId } from '@/lib/db';
 import { CLIToolManager } from '@/lib/cli-tools/manager';
 import type { CLIToolType } from '@/lib/cli-tools/types';
 import { startPolling } from '@/lib/response-poller';
@@ -107,6 +107,12 @@ export async function POST(
 
     // Update last user message for worktree
     updateLastUserMessage(db, params.id, body.content, timestamp);
+
+    // Reset session state for the new conversation
+    // This ensures the poller starts fresh and doesn't skip the new response
+    updateSessionState(db, params.id, cliToolId, 0);
+    clearInProgressMessageId(db, params.id, cliToolId);
+    console.log(`✓ Reset session state for ${params.id} (${cliToolId})`);
 
     // Start polling for CLI tool's response
     startPolling(params.id, cliToolId);

@@ -77,22 +77,35 @@ export async function POST(
 
     // Validate answer based on prompt type
     let input: string;
-    try {
-      input = getAnswerInput(answer, message.promptData.type);
-    } catch (error: any) {
-      return NextResponse.json(
-        { error: `Invalid answer: ${error.message}` },
-        { status: 400 }
-      );
-    }
 
-    // For multiple choice, validate the answer is one of the available options
+    // For multiple choice, check if answer is an option number or custom text
     if (message.promptData.type === 'multiple_choice') {
       const answerNum = parseInt(answer, 10);
-      const validNumbers = message.promptData.options.map(opt => opt.number);
-      if (!validNumbers.includes(answerNum)) {
+
+      // If answer is a number, validate it's one of the available options
+      if (!isNaN(answerNum)) {
+        const validNumbers = message.promptData.options.map(opt => opt.number);
+        if (!validNumbers.includes(answerNum)) {
+          return NextResponse.json(
+            { error: `Invalid choice: ${answer}. Valid options are: ${validNumbers.join(', ')}` },
+            { status: 400 }
+          );
+        }
+
+        // Use the number as input
+        input = answerNum.toString();
+      } else {
+        // If answer is not a number, it's custom text input
+        // Use it as-is (no validation needed)
+        input = answer;
+      }
+    } else {
+      // For yes/no prompts, use the standard validation
+      try {
+        input = getAnswerInput(answer, message.promptData.type);
+      } catch (error: any) {
         return NextResponse.json(
-          { error: `Invalid choice: ${answer}. Valid options are: ${validNumbers.join(', ')}` },
+          { error: `Invalid answer: ${error.message}` },
           { status: 400 }
         );
       }
@@ -108,7 +121,7 @@ export async function POST(
 
     updatePromptData(db, messageId, updatedPromptData);
 
-    // Get worktree to determine CLI tool
+    // Get worktree to verify it exists
     const worktree = getWorktreeById(db, params.id);
     if (!worktree) {
       return NextResponse.json(
@@ -117,8 +130,8 @@ export async function POST(
       );
     }
 
-    // Determine which CLI tool to use
-    const cliToolId = worktree.cliToolId || 'claude';
+    // Use the CLI tool ID from the message (the tool that asked the prompt)
+    const cliToolId = message.cliToolId || worktree.cliToolId || 'claude';
 
     // Get CLI tool instance from manager
     const manager = CLIToolManager.getInstance();
@@ -128,9 +141,19 @@ export async function POST(
     const sessionName = cliTool.getSessionName(params.id);
 
     // Send answer to tmux
+    // For Claude prompts, send the answer and then Enter separately
+    // This is because Claude's interactive menu responds immediately to the key press
     try {
-      await sendKeys(sessionName, input, true);
+      // Send the answer (number or y/n)
+      await sendKeys(sessionName, input, false);
       console.log(`✓ Sent answer '${input}' to ${sessionName} (${cliTool.name})`);
+
+      // Wait a moment for the input to be processed
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Send Enter
+      await sendKeys(sessionName, '', true);
+      console.log(`✓ Sent Enter to ${sessionName}`);
     } catch (error: any) {
       return NextResponse.json(
         { error: `Failed to send answer to tmux: ${error.message}` },

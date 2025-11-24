@@ -459,6 +459,11 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
             <Button variant="secondary" size="sm" onClick={() => fetchMessages()}>
               Refresh
             </Button>
+            <Link href={`/worktrees/${worktreeId}/simple-terminal`}>
+              <Button variant="primary" size="sm">
+                🖥️ Terminal
+              </Button>
+            </Link>
           </div>
         </div>
       </div>
@@ -480,6 +485,11 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
           <Button variant="secondary" size="sm" onClick={() => fetchMessages()}>
             Refresh
           </Button>
+          <Link href={`/worktrees/${worktreeId}/simple-terminal`}>
+            <Button variant="primary" size="sm">
+              🖥️
+            </Button>
+          </Link>
         </div>
       </div>
 

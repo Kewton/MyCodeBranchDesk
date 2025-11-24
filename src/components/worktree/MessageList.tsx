@@ -31,13 +31,19 @@ export interface MessageListProps {
  */
 function MessageBubble({
   message,
-  onFilePathClick
+  onFilePathClick,
+  onPromptRespond
 }: {
   message: ChatMessage;
   onFilePathClick: (path: string) => void;
+  onPromptRespond?: (messageId: string, answer: string) => void;
 }) {
   const isUser = message.role === 'user';
   const timestamp = format(new Date(message.timestamp), 'PPp', { locale: ja });
+
+  // State for handling text input options
+  const [selectedTextInputOption, setSelectedTextInputOption] = React.useState<number | null>(null);
+  const [textInputValue, setTextInputValue] = React.useState('');
 
   // Get CLI tool display name
   const getToolName = (cliToolId?: string) => {
@@ -211,6 +217,131 @@ function MessageBubble({
               </a>
             </div>
           )}
+
+          {/* Prompt choice buttons for assistant messages */}
+          {!isUser && message.promptData && onPromptRespond && (
+            <div className="mt-3 pt-3 border-t border-gray-200">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                  選択待ち
+                </span>
+                <div className="text-sm text-gray-700 font-medium">
+                  {message.promptData.question}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {message.promptData.type === 'yes_no' ? (
+                  <>
+                    <button
+                      onClick={() => onPromptRespond(message.id, 'yes')}
+                      disabled={message.promptData.status === 'answered'}
+                      className="px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium text-sm shadow-sm hover:shadow-md flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      はい / Yes
+                    </button>
+                    <button
+                      onClick={() => onPromptRespond(message.id, 'no')}
+                      disabled={message.promptData.status === 'answered'}
+                      className="px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium text-sm shadow-sm hover:shadow-md flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                      いいえ / No
+                    </button>
+                  </>
+                ) : message.promptData.type === 'multiple_choice' ? (
+                  <>
+                    {message.promptData.options.map((option) => (
+                      <button
+                        key={option.number}
+                        onClick={() => {
+                          if (option.requiresTextInput) {
+                            // For text input options, select the option (don't send immediately)
+                            setSelectedTextInputOption(option.number);
+                            setTextInputValue('');
+                          } else {
+                            // For regular options, send immediately
+                            onPromptRespond(message.id, option.number.toString());
+                          }
+                        }}
+                        disabled={message.promptData.status === 'answered'}
+                        className={`px-5 py-2.5 rounded-lg transition-all font-medium text-sm shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed ${
+                          selectedTextInputOption === option.number
+                            ? 'bg-purple-600 text-white hover:bg-purple-700 ring-2 ring-purple-400 ring-opacity-50'
+                            : option.isDefault
+                            ? 'bg-blue-600 text-white hover:bg-blue-700 ring-2 ring-blue-400 ring-opacity-50'
+                            : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+                        }`}
+                      >
+                        <span className="inline-flex items-center gap-2">
+                          <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+                            selectedTextInputOption === option.number
+                              ? 'bg-purple-500'
+                              : option.isDefault ? 'bg-blue-500' : 'bg-gray-200 text-gray-600'
+                          }`}>
+                            {option.number}
+                          </span>
+                          {option.label}
+                        </span>
+                      </button>
+                    ))}
+
+                    {/* Text input field for selected text input option */}
+                    {selectedTextInputOption !== null && message.promptData.status === 'pending' && (
+                      <div className="w-full mt-3 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          カスタムメッセージを入力してください:
+                        </label>
+                        <textarea
+                          value={textInputValue}
+                          onChange={(e) => setTextInputValue(e.target.value)}
+                          placeholder="ここにメッセージを入力..."
+                          rows={3}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 text-sm"
+                        />
+                        <div className="flex gap-2 mt-3">
+                          <button
+                            onClick={() => {
+                              if (textInputValue.trim()) {
+                                onPromptRespond(message.id, textInputValue.trim());
+                                setSelectedTextInputOption(null);
+                                setTextInputValue('');
+                              }
+                            }}
+                            disabled={!textInputValue.trim()}
+                            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium text-sm shadow-sm hover:shadow-md"
+                          >
+                            送信
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedTextInputOption(null);
+                              setTextInputValue('');
+                            }}
+                            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all font-medium text-sm"
+                          >
+                            キャンセル
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : null}
+              </div>
+              {message.promptData.status === 'answered' && message.promptData.answer && (
+                <div className="mt-3 flex items-center gap-2 text-sm text-green-600 bg-green-50 px-3 py-2 rounded-lg">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  回答済み: {message.promptData.answer}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -336,6 +467,7 @@ export function MessageList({
               key={message.id}
               message={message}
               onFilePathClick={handleFilePathClick}
+              onPromptRespond={handlePromptResponse}
             />
           );
         })}
