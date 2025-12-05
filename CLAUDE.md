@@ -167,6 +167,43 @@ npm run db:reset      # DBリセット
 
 ---
 
+## Claude Code コマンド・エージェント
+
+本プロジェクトではClaude Code用のスラッシュコマンドとサブエージェントを整備しています。
+
+### 利用可能なコマンド
+
+| コマンド | 説明 |
+|---------|------|
+| `/work-plan` | Issue単位の作業計画立案 |
+| `/create-pr` | PR自動作成 |
+| `/progress-report` | 進捗報告書作成 |
+| `/tdd-impl` | TDD実装 |
+| `/pm-auto-dev` | 自動開発フロー |
+| `/bug-fix` | バグ修正ワークフロー |
+| `/refactoring` | リファクタリング実行 |
+| `/acceptance-test` | 受け入れテスト |
+| `/issue-create` | Issue一括作成 |
+| `/issue-split` | Issue分割計画 |
+| `/architecture-review` | アーキテクチャレビュー |
+| `/design-policy` | 設計方針策定 |
+
+### 利用可能なエージェント
+
+| エージェント | 説明 |
+|-------------|------|
+| `tdd-impl-agent` | TDD実装専門 |
+| `progress-report-agent` | 進捗報告生成 |
+| `investigation-agent` | バグ調査専門 |
+| `acceptance-test-agent` | 受入テスト |
+| `refactoring-agent` | リファクタリング |
+
+---
+
 ## 関連ドキュメント
 
 - [README.md](./README.md) - プロジェクト概要
+- [クイックスタートガイド](./docs/user-guide/quick-start.md) - 5分で始める開発フロー
+- [コマンド利用ガイド](./docs/user-guide/commands-guide.md) - コマンドの詳細
+- [エージェント利用ガイド](./docs/user-guide/agents-guide.md) - エージェントの詳細
+- [ワークフロー例](./docs/user-guide/workflow-examples.md) - 実践的な使用例
