@@ -720,8 +720,9 @@ async function checkForResponse(worktreeId: string, cliToolId: CLIToolType): Pro
     console.log(`[Poller] Continuing to watch for prompts after response...`);
 
     return true;
-  } catch (error: any) {
-    console.error(`Error checking for response (${worktreeId}):`, error.message);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`Error checking for response (${worktreeId}):`, errorMessage);
     return false;
   }
 }
@@ -763,7 +764,7 @@ export function startPolling(worktreeId: string, cliToolId: CLIToolType): void {
     // Check for response
     try {
       await checkForResponse(worktreeId, cliToolId);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`[Poller] Error in checkForResponse:`, error);
     }
   }, POLLING_INTERVAL);

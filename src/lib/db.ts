@@ -32,7 +32,7 @@ function mapChatMessage(row: ChatMessageRow): ChatMessage {
     timestamp: new Date(row.timestamp),
     logFileName: row.log_file_name || undefined,
     requestId: row.request_id || undefined,
-    messageType: (row.message_type as any) || 'normal',
+    messageType: (row.message_type as 'normal' | 'prompt') || 'normal',
     promptData: row.prompt_data ? JSON.parse(row.prompt_data) : undefined,
     cliToolId: (row.cli_tool_id as CLIToolType | null) ?? 'claude',
   };
@@ -186,7 +186,7 @@ export function getWorktrees(
     FROM worktrees
   `;
 
-  const params: any[] = [];
+  const params: string[] = [];
 
   if (repositoryPath) {
     query += ` WHERE repository_path = ?`;
@@ -498,7 +498,7 @@ export function getMessages(
     WHERE worktree_id = ? AND (? IS NULL OR timestamp < ?)
   `;
 
-  const params: any[] = [worktreeId, before?.getTime() || null, before?.getTime() || null];
+  const params: (string | number | null)[] = [worktreeId, before?.getTime() || null, before?.getTime() || null];
 
   // Add CLI tool filter if specified
   if (cliToolId) {
@@ -747,7 +747,7 @@ export function getMessageById(
 export function updatePromptData(
   db: Database.Database,
   messageId: string,
-  promptData: any
+  promptData: Record<string, unknown>
 ): void {
   const stmt = db.prepare(`
     UPDATE chat_messages

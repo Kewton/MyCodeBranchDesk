@@ -104,7 +104,7 @@ export async function isClaudeInstalled(): Promise<boolean> {
   try {
     await execAsync('which claude', { timeout: 5000 });
     return true;
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -218,8 +218,9 @@ export async function startClaudeSession(
     }
 
     console.log(`✓ Started Claude session: ${sessionName}`);
-  } catch (error: any) {
-    throw new Error(`Failed to start Claude session: ${error.message}`);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to start Claude session: ${errorMessage}`);
   }
 }
 
@@ -263,8 +264,9 @@ export async function sendMessageToClaude(
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     console.log(`✓ Sent message to Claude session: ${sessionName}`);
-  } catch (error: any) {
-    throw new Error(`Failed to send message to Claude: ${error.message}`);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to send message to Claude: ${errorMessage}`);
   }
 }
 
@@ -295,8 +297,9 @@ export async function captureClaudeOutput(
 
   try {
     return await capturePane(sessionName, { startLine: -lines });
-  } catch (error: any) {
-    throw new Error(`Failed to capture Claude output: ${error.message}`);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to capture Claude output: ${errorMessage}`);
   }
 }
 
@@ -334,8 +337,9 @@ export async function stopClaudeSession(worktreeId: string): Promise<boolean> {
     }
 
     return killed;
-  } catch (error: any) {
-    console.error(`Error stopping Claude session: ${error.message}`);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`Error stopping Claude session: ${errorMessage}`);
     return false;
   }
 }
