@@ -113,32 +113,74 @@ export function initDatabase(db: Database.Database): void {
 }
 
 /**
- * Get latest user message per CLI tool for a worktree
+ * Get latest user message per CLI tool for multiple worktrees (batch query)
+ * Optimized to avoid N+1 query problem
+ */
+function getLastMessagesByCliBatch(
+  db: Database.Database,
+  worktreeIds: string[]
+): Map<string, { claude?: string; codex?: string; gemini?: string }> {
+  if (worktreeIds.length === 0) {
+    return new Map();
+  }
+
+  // Single query to get latest user message for each worktree/cli_tool combination
+  // Uses window function to rank messages and filter to only the latest per group
+  const placeholders = worktreeIds.map(() => '?').join(',');
+  const stmt = db.prepare(`
+    WITH ranked_messages AS (
+      SELECT
+        worktree_id,
+        cli_tool_id,
+        content,
+        ROW_NUMBER() OVER (
+          PARTITION BY worktree_id, cli_tool_id
+          ORDER BY timestamp DESC
+        ) as rn
+      FROM chat_messages
+      WHERE worktree_id IN (${placeholders})
+        AND role = 'user'
+        AND cli_tool_id IN ('claude', 'codex', 'gemini')
+    )
+    SELECT worktree_id, cli_tool_id, content
+    FROM ranked_messages
+    WHERE rn = 1
+  `);
+
+  const rows = stmt.all(...worktreeIds) as Array<{
+    worktree_id: string;
+    cli_tool_id: string;
+    content: string;
+  }>;
+
+  // Build result map
+  const result = new Map<string, { claude?: string; codex?: string; gemini?: string }>();
+
+  // Initialize all worktree IDs with empty objects
+  for (const id of worktreeIds) {
+    result.set(id, {});
+  }
+
+  // Populate with query results
+  for (const row of rows) {
+    const existing = result.get(row.worktree_id) || {};
+    existing[row.cli_tool_id as CLIToolType] = row.content.substring(0, 50);
+    result.set(row.worktree_id, existing);
+  }
+
+  return result;
+}
+
+/**
+ * Get latest user message per CLI tool for a worktree (single worktree version)
+ * Uses optimized single query instead of 3 separate queries
  */
 function getLastMessagesByCli(
   db: Database.Database,
   worktreeId: string
 ): { claude?: string; codex?: string; gemini?: string } {
-  const cliTools: CLIToolType[] = ['claude', 'codex', 'gemini'];
-  const result: { claude?: string; codex?: string; gemini?: string } = {};
-
-  for (const cliToolId of cliTools) {
-    const stmt = db.prepare(`
-      SELECT content
-      FROM chat_messages
-      WHERE worktree_id = ? AND cli_tool_id = ? AND role = 'user'
-      ORDER BY timestamp DESC
-      LIMIT 1
-    `);
-
-    const row = stmt.get(worktreeId, cliToolId) as { content: string } | undefined;
-    if (row) {
-      // Truncate to 50 characters
-      result[cliToolId] = row.content.substring(0, 50);
-    }
-  }
-
-  return result;
+  const batchResult = getLastMessagesByCliBatch(db, [worktreeId]);
+  return batchResult.get(worktreeId) || {};
 }
 
 /**
@@ -182,8 +224,12 @@ export function getWorktrees(
     cli_tool_id: string | null;
   }>;
 
+  // Batch fetch last messages for all worktrees (N+1 optimization)
+  const worktreeIds = rows.map(row => row.id);
+  const lastMessagesByCliMap = getLastMessagesByCliBatch(db, worktreeIds);
+
   return rows.map((row) => {
-    const lastMessagesByCli = getLastMessagesByCli(db, row.id);
+    const lastMessagesByCli = lastMessagesByCliMap.get(row.id) || {};
 
     return {
       id: row.id,

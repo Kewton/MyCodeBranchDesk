@@ -16,6 +16,54 @@ import { promisify } from 'util';
 const execAsync = promisify(exec);
 
 /**
+ * Cached Claude CLI path
+ */
+let cachedClaudePath: string | null = null;
+
+/**
+ * Get Claude CLI path dynamically
+ * Uses CLAUDE_PATH environment variable if set, otherwise finds via 'which'
+ */
+async function getClaudePath(): Promise<string> {
+  // Return cached path if available
+  if (cachedClaudePath) {
+    return cachedClaudePath;
+  }
+
+  // Check environment variable first
+  if (process.env.CLAUDE_PATH) {
+    cachedClaudePath = process.env.CLAUDE_PATH;
+    return cachedClaudePath;
+  }
+
+  // Find claude via 'which' command
+  try {
+    const { stdout } = await execAsync('which claude', { timeout: 5000 });
+    cachedClaudePath = stdout.trim();
+    return cachedClaudePath;
+  } catch {
+    // Fallback to common paths
+    const fallbackPaths = [
+      '/opt/homebrew/bin/claude',  // macOS Homebrew (Apple Silicon)
+      '/usr/local/bin/claude',     // macOS Homebrew (Intel) / Linux
+      '/usr/bin/claude',           // Linux system install
+    ];
+
+    for (const path of fallbackPaths) {
+      try {
+        await execAsync(`test -x "${path}"`, { timeout: 1000 });
+        cachedClaudePath = path;
+        return cachedClaudePath;
+      } catch {
+        // Path not found, try next
+      }
+    }
+
+    throw new Error('Claude CLI not found. Set CLAUDE_PATH environment variable or install Claude CLI.');
+  }
+}
+
+/**
  * Options for starting a Claude session
  */
 export interface ClaudeSessionOptions {
@@ -142,12 +190,32 @@ export async function startClaudeSession(
       historyLimit: 50000,
     });
 
-    // Start Claude CLI in interactive mode using full path
-    // (using full path to avoid PATH issues in tmux sessions)
-    await sendKeys(sessionName, '/opt/homebrew/bin/claude', true);
+    // Get Claude CLI path dynamically
+    const claudePath = await getClaudePath();
 
-    // Wait for Claude to initialize
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    // Start Claude CLI in interactive mode using dynamically resolved path
+    await sendKeys(sessionName, claudePath, true);
+
+    // Wait for Claude to initialize with dynamic detection
+    // Check for Claude prompt instead of fixed delay
+    const maxWaitTime = 10000; // 10 seconds max
+    const pollInterval = 500;  // Check every 500ms
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < maxWaitTime) {
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+
+      try {
+        const output = await capturePane(sessionName, { startLine: -50 });
+        // Claude is ready when we see the prompt (> ) or separator line
+        if (/^>\s*$/m.test(output) || /^─{10,}$/m.test(output)) {
+          console.log(`✓ Claude initialized in ${Date.now() - startTime}ms`);
+          break;
+        }
+      } catch {
+        // Ignore capture errors during initialization
+      }
+    }
 
     console.log(`✓ Started Claude session: ${sessionName}`);
   } catch (error: any) {
