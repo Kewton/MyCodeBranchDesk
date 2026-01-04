@@ -332,6 +332,10 @@ export function upsertWorktree(
   db: Database.Database,
   worktree: Worktree
 ): void {
+  // First, remove any existing worktree with the same path but different ID
+  // This handles cases where the ID generation scheme has changed
+  db.prepare('DELETE FROM worktrees WHERE path = ? AND id != ?').run(worktree.path, worktree.id);
+
   const stmt = db.prepare(`
     INSERT INTO worktrees (
       id, name, path, repository_path, repository_name, memo,

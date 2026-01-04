@@ -22,28 +22,39 @@ interface ParsedWorktree {
 }
 
 /**
- * Generate URL-safe ID from branch name
+ * Generate URL-safe ID from repository name and branch name
  *
  * @param branchName - Git branch name (e.g., "feature/foo", "main")
- * @returns URL-safe ID (e.g., "feature-foo", "main")
+ * @param repositoryName - Repository name (e.g., "MyRepo")
+ * @returns URL-safe ID (e.g., "myrepo-feature-foo", "myrepo-main")
  *
  * @example
  * ```typescript
- * generateWorktreeId('feature/foo') // => 'feature-foo'
- * generateWorktreeId('main') // => 'main'
- * generateWorktreeId('Feature/Foo') // => 'feature-foo'
+ * generateWorktreeId('feature/foo', 'MyRepo') // => 'myrepo-feature-foo'
+ * generateWorktreeId('main', 'MyRepo') // => 'myrepo-main'
+ * generateWorktreeId('Feature/Foo', 'Repo') // => 'repo-feature-foo'
  * ```
  */
-export function generateWorktreeId(branchName: string): string {
+export function generateWorktreeId(branchName: string, repositoryName?: string): string {
   if (!branchName) {
     return '';
   }
 
-  return branchName
-    .toLowerCase()
-    .replace(/[^a-z0-9-]/g, '-') // Replace non-alphanumeric (except hyphen) with hyphen
-    .replace(/-+/g, '-') // Replace consecutive hyphens with single hyphen
-    .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+  const sanitize = (str: string) =>
+    str
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '-') // Replace non-alphanumeric (except hyphen) with hyphen
+      .replace(/-+/g, '-') // Replace consecutive hyphens with single hyphen
+      .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+
+  const sanitizedBranch = sanitize(branchName);
+
+  if (repositoryName) {
+    const sanitizedRepo = sanitize(repositoryName);
+    return `${sanitizedRepo}-${sanitizedBranch}`;
+  }
+
+  return sanitizedBranch;
 }
 
 /**
@@ -159,7 +170,7 @@ export async function scanWorktrees(rootDir: string): Promise<Worktree[]> {
     // Filter and validate worktree paths
     return parsed
       .map((wt) => ({
-        id: generateWorktreeId(wt.branch),
+        id: generateWorktreeId(wt.branch, repositoryName),
         name: wt.branch,
         path: path.resolve(wt.path),
         repositoryPath,

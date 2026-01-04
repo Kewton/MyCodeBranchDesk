@@ -66,6 +66,24 @@ describe('Worktree Management', () => {
     it('should handle branch name with dots', () => {
       expect(generateWorktreeId('release/v1.0.0')).toBe('release-v1-0-0');
     });
+
+    it('should include repository name in ID when provided', () => {
+      expect(generateWorktreeId('main', 'MyRepo')).toBe('myrepo-main');
+      expect(generateWorktreeId('feature/foo', 'MyRepo')).toBe('myrepo-feature-foo');
+    });
+
+    it('should handle repository name with special characters', () => {
+      expect(generateWorktreeId('main', 'My-Repo')).toBe('my-repo-main');
+      expect(generateWorktreeId('main', 'MyRepo.js')).toBe('myrepo-js-main');
+    });
+
+    it('should create unique IDs for same branch in different repos', () => {
+      const id1 = generateWorktreeId('main', 'RepoA');
+      const id2 = generateWorktreeId('main', 'RepoB');
+      expect(id1).not.toBe(id2);
+      expect(id1).toBe('repoa-main');
+      expect(id2).toBe('repob-main');
+    });
   });
 
   describe('parseWorktreeOutput', () => {

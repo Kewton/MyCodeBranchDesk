@@ -109,7 +109,7 @@ describe('Database Operations', () => {
         expect(result[0].lastMessageSummary).toBe('Updated summary');
       });
 
-      it('should maintain unique path constraint', () => {
+      it('should replace worktree when path is same but ID is different', () => {
         const worktree1: Worktree = {
           id: 'main',
           name: 'main',
@@ -119,18 +119,21 @@ describe('Database Operations', () => {
         };
 
         const worktree2: Worktree = {
-          id: 'feature-foo',
-          name: 'feature/foo',
+          id: 'repo-main', // New ID scheme with repository prefix
+          name: 'main',
           path: '/path/to/main', // Same path
           repositoryPath: '/path/to/repo',
           repositoryName: 'repo',
         };
 
         upsertWorktree(testDb, worktree1);
+        upsertWorktree(testDb, worktree2);
 
-        expect(() => {
-          upsertWorktree(testDb, worktree2);
-        }).toThrow();
+        // Should have only one worktree with the new ID
+        const result = getWorktrees(testDb);
+        expect(result).toHaveLength(1);
+        expect(result[0].id).toBe('repo-main');
+        expect(result[0].path).toBe('/path/to/main');
       });
     });
 
