@@ -17,7 +17,7 @@ import { detectPrompt } from './prompt-detector';
 import { recordClaudeConversation } from './conversation-logger';
 import type { CLIToolType } from './cli-tools/types';
 import { parseClaudeOutput } from './claude-output';
-import { getCliToolPatterns, stripAnsi, detectThinking } from './cli-patterns';
+import { getCliToolPatterns, stripAnsi } from './cli-patterns';
 
 /**
  * Polling interval in milliseconds (default: 2 seconds)

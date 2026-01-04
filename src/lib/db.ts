@@ -171,17 +171,6 @@ function getLastMessagesByCliBatch(
   return result;
 }
 
-/**
- * Get latest user message per CLI tool for a worktree (single worktree version)
- * Uses optimized single query instead of 3 separate queries
- */
-function getLastMessagesByCli(
-  db: Database.Database,
-  worktreeId: string
-): { claude?: string; codex?: string; gemini?: string } {
-  const batchResult = getLastMessagesByCliBatch(db, [worktreeId]);
-  return batchResult.get(worktreeId) || {};
-}
 
 /**
  * Get all worktrees sorted by updated_at (desc)
