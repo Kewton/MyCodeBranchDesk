@@ -1,14 +1,18 @@
 /**
  * HistoryPane Component
  *
- * Displays message history with independent scrolling
- * Supports file path detection and click handling
+ * Displays message history with independent scrolling.
+ * Supports file path detection and click handling.
  */
 
 'use client';
 
-import React, { useMemo, memo } from 'react';
+import React, { useMemo, useCallback, memo } from 'react';
 import type { ChatMessage } from '@/types/models';
+
+// ============================================================================
+// Types
+// ============================================================================
 
 /**
  * Props for HistoryPane component
@@ -16,7 +20,7 @@ import type { ChatMessage } from '@/types/models';
 export interface HistoryPaneProps {
   /** Array of chat messages to display */
   messages: ChatMessage[];
-  /** Associated worktree ID */
+  /** Associated worktree ID (reserved for future filtering/fetching) */
   worktreeId: string;
   /** Callback when a file path is clicked */
   onFilePathClick: (path: string) => void;
@@ -26,48 +30,80 @@ export interface HistoryPaneProps {
   className?: string;
 }
 
+/** Parsed content part type */
+interface ContentPart {
+  type: 'text' | 'path';
+  content: string;
+}
+
+/** Props for internal MessageContent component */
+interface MessageContentProps {
+  content: string;
+  onFilePathClick: (path: string) => void;
+}
+
+/** Props for internal MessageItem component */
+interface MessageItemProps {
+  message: ChatMessage;
+  onFilePathClick: (path: string) => void;
+}
+
+// ============================================================================
+// Constants
+// ============================================================================
+
 /**
- * Regular expression to match file paths
+ * Regular expression to match file paths.
  * Matches paths like /path/to/file.ts, ./relative/path.js, etc.
  */
 const FILE_PATH_REGEX = /(\/[^\s\n<>"']+\.[a-zA-Z0-9]+)/g;
 
+// ============================================================================
+// Sub-components
+// ============================================================================
+
 /**
- * Renders message content with clickable file paths
+ * Parses content string into text and file path parts
  */
-function MessageContent({
+function parseContentParts(content: string): ContentPart[] {
+  const matches = content.match(FILE_PATH_REGEX);
+  if (!matches || matches.length === 0) {
+    return [{ type: 'text', content }];
+  }
+
+  const result: ContentPart[] = [];
+  let lastIndex = 0;
+
+  matches.forEach((match) => {
+    const index = content.indexOf(match, lastIndex);
+    if (index > lastIndex) {
+      result.push({ type: 'text', content: content.slice(lastIndex, index) });
+    }
+    result.push({ type: 'path', content: match });
+    lastIndex = index + match.length;
+  });
+
+  if (lastIndex < content.length) {
+    result.push({ type: 'text', content: content.slice(lastIndex) });
+  }
+
+  return result;
+}
+
+/**
+ * Renders message content with clickable file paths.
+ * Memoized to prevent unnecessary re-renders.
+ */
+const MessageContent = memo(function MessageContent({
   content,
   onFilePathClick,
-}: {
-  content: string;
-  onFilePathClick: (path: string) => void;
-}) {
-  // Split content by file paths and render with clickable links
-  const parts = useMemo(() => {
-    const matches = content.match(FILE_PATH_REGEX);
-    if (!matches || matches.length === 0) {
-      // No file paths, return escaped content
-      return [{ type: 'text' as const, content }];
-    }
+}: MessageContentProps) {
+  const parts = useMemo(() => parseContentParts(content), [content]);
 
-    const result: Array<{ type: 'text' | 'path'; content: string }> = [];
-    let lastIndex = 0;
-
-    matches.forEach((match) => {
-      const index = content.indexOf(match, lastIndex);
-      if (index > lastIndex) {
-        result.push({ type: 'text', content: content.slice(lastIndex, index) });
-      }
-      result.push({ type: 'path', content: match });
-      lastIndex = index + match.length;
-    });
-
-    if (lastIndex < content.length) {
-      result.push({ type: 'text', content: content.slice(lastIndex) });
-    }
-
-    return result;
-  }, [content]);
+  const handlePathClick = useCallback(
+    (path: string) => () => onFilePathClick(path),
+    [onFilePathClick]
+  );
 
   return (
     <span>
@@ -75,9 +111,10 @@ function MessageContent({
         part.type === 'path' ? (
           <button
             key={index}
-            onClick={() => onFilePathClick(part.content)}
+            type="button"
+            onClick={handlePathClick(part.content)}
             className="text-blue-400 hover:text-blue-300 hover:underline cursor-pointer font-mono text-sm"
-            aria-label={part.content}
+            aria-label={`Open file: ${part.content}`}
           >
             {part.content}
           </button>
@@ -87,58 +124,66 @@ function MessageContent({
       )}
     </span>
   );
-}
+});
 
 /**
- * Single message display component
+ * Single message display component.
+ * Memoized to prevent unnecessary re-renders when other messages update.
  */
-function MessageItem({
+const MessageItem = memo(function MessageItem({
   message,
   onFilePathClick,
-}: {
-  message: ChatMessage;
-  onFilePathClick: (path: string) => void;
-}) {
+}: MessageItemProps) {
   const isUser = message.role === 'user';
 
-  return (
-    <div
-      data-testid={`message-${message.role}`}
-      className={`p-3 rounded-lg mb-2 ${
+  const containerClassName = useMemo(
+    () =>
+      `p-3 rounded-lg mb-2 ${
         isUser
           ? 'bg-blue-900/30 border-l-4 border-blue-500 ml-4 user'
           : 'bg-gray-800/50 border-l-4 border-gray-600 mr-4 assistant'
-      }`}
-    >
+      }`,
+    [isUser]
+  );
+
+  const labelClassName = useMemo(
+    () => `text-xs font-medium ${isUser ? 'text-blue-400' : 'text-gray-400'}`,
+    [isUser]
+  );
+
+  const formattedTime = useMemo(
+    () => message.timestamp.toLocaleTimeString(),
+    [message.timestamp]
+  );
+
+  return (
+    <div data-testid={`message-${message.role}`} className={containerClassName}>
       <div className="flex items-center gap-2 mb-1">
-        <span
-          className={`text-xs font-medium ${
-            isUser ? 'text-blue-400' : 'text-gray-400'
-          }`}
-        >
+        <span className={labelClassName}>
           {isUser ? 'You' : 'Assistant'}
         </span>
-        <span className="text-xs text-gray-500">
-          {message.timestamp.toLocaleTimeString()}
-        </span>
+        <span className="text-xs text-gray-500">{formattedTime}</span>
       </div>
       <div className="text-sm text-gray-200 whitespace-pre-wrap break-words">
         <MessageContent content={message.content} onFilePathClick={onFilePathClick} />
       </div>
     </div>
   );
-}
+});
 
 /**
- * Loading indicator component
+ * Loading indicator component.
+ * Displays animated dots while content is loading.
  */
 function LoadingIndicator() {
   return (
     <div
       data-testid="loading-indicator"
       className="flex items-center justify-center py-4"
+      role="status"
+      aria-label="Loading messages"
     >
-      <div className="flex gap-1">
+      <div className="flex gap-1" aria-hidden="true">
         <span className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" />
         <span className="w-2 h-2 bg-gray-400 rounded-full animate-pulse delay-100" />
         <span className="w-2 h-2 bg-gray-400 rounded-full animate-pulse delay-200" />
@@ -149,7 +194,8 @@ function LoadingIndicator() {
 }
 
 /**
- * Empty state component
+ * Empty state component.
+ * Displays a friendly message when there are no messages.
  */
 function EmptyState() {
   return (
@@ -159,6 +205,7 @@ function EmptyState() {
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
+        aria-hidden="true"
       >
         <path
           strokeLinecap="round"
@@ -172,8 +219,31 @@ function EmptyState() {
   );
 }
 
+// ============================================================================
+// Main Component
+// ============================================================================
+
+/** Base container classes for the history pane */
+const BASE_CONTAINER_CLASSES = [
+  'h-full',
+  'flex',
+  'flex-col',
+  'overflow-y-auto',
+  'overflow-x-hidden',
+  'bg-gray-900',
+  'rounded-lg',
+  'border',
+  'border-gray-700',
+] as const;
+
 /**
- * HistoryPane component for displaying message history
+ * HistoryPane component for displaying message history.
+ *
+ * Features:
+ * - Independent scrolling
+ * - Clickable file paths
+ * - Loading and empty states
+ * - Accessibility support
  *
  * @example
  * ```tsx
@@ -193,8 +263,10 @@ export const HistoryPane = memo(function HistoryPane({
   className = '',
 }: HistoryPaneProps) {
   // worktreeId is kept in props for future use (e.g., filtering, fetching)
+  // Using underscore prefix to indicate intentionally unused parameter
   void _worktreeId;
-  // Sort messages by timestamp
+
+  // Sort messages by timestamp (oldest first)
   const sortedMessages = useMemo(
     () =>
       [...messages].sort(
@@ -203,24 +275,34 @@ export const HistoryPane = memo(function HistoryPane({
     [messages]
   );
 
+  // Build container class string
   const containerClasses = useMemo(
-    () =>
-      [
-        'h-full',
-        'flex',
-        'flex-col',
-        'overflow-y-auto',
-        'overflow-x-hidden',
-        'bg-gray-900',
-        'rounded-lg',
-        'border',
-        'border-gray-700',
-        className,
-      ]
-        .filter(Boolean)
-        .join(' '),
+    () => [...BASE_CONTAINER_CLASSES, className].filter(Boolean).join(' '),
     [className]
   );
+
+  // Memoize the file path click handler to prevent unnecessary re-renders
+  const handleFilePathClick = useCallback(
+    (path: string) => onFilePathClick(path),
+    [onFilePathClick]
+  );
+
+  // Render content based on state
+  const renderContent = () => {
+    if (isLoading) {
+      return <LoadingIndicator />;
+    }
+    if (messages.length === 0) {
+      return <EmptyState />;
+    }
+    return sortedMessages.map((message) => (
+      <MessageItem
+        key={message.id}
+        message={message}
+        onFilePathClick={handleFilePathClick}
+      />
+    ));
+  };
 
   return (
     <div
@@ -234,21 +316,7 @@ export const HistoryPane = memo(function HistoryPane({
       </div>
 
       {/* Content */}
-      <div className="flex-1 p-4 min-h-0">
-        {isLoading ? (
-          <LoadingIndicator />
-        ) : messages.length === 0 ? (
-          <EmptyState />
-        ) : (
-          sortedMessages.map((message) => (
-            <MessageItem
-              key={message.id}
-              message={message}
-              onFilePathClick={onFilePathClick}
-            />
-          ))
-        )}
-      </div>
+      <div className="flex-1 p-4 min-h-0">{renderContent()}</div>
     </div>
   );
 });
