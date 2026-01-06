@@ -38,19 +38,33 @@ const rooms = new Map<string, Set<WebSocket>>();
 export function setupWebSocket(server: HTTPServer): void {
   wss = new WebSocketServer({ server });
 
-  // Handle server-level errors (e.g., invalid WebSocket frames from clients)
+  // Handle WebSocket server errors (e.g., invalid frames from clients)
   wss.on('error', (error) => {
-    console.error('[WS Server] Error:', error.message || error);
+    console.error('[WS Server] Error:', error.message);
   });
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
+    console.log('WebSocket client connected');
+
     // Initialize client info
     const clientInfo: ClientInfo = {
       ws,
       worktreeIds: new Set(),
     };
     clients.set(ws, clientInfo);
+
+    // Handle underlying socket errors (catches invalid frame errors earlier)
+    const socket = (ws as unknown as { _socket?: NodeJS.Socket })._socket;
+    if (socket) {
+      socket.on('error', (err: Error & { code?: string }) => {
+        if (err.code === 'WS_ERR_INVALID_CLOSE_CODE' || err.message?.includes('Invalid WebSocket frame')) {
+          // Silently handle mobile browser disconnect issues
+        } else {
+          console.error('[WS Socket] Error:', err.message);
+        }
+      });
+    }
 
     // Handle messages
     ws.on('message', (data: Buffer) => {
@@ -64,16 +78,30 @@ export function setupWebSocket(server: HTTPServer): void {
     });
 
     // Handle disconnection
-    ws.on('close', () => {
+    ws.on('close', (code, reason) => {
+      const clientInfo = clients.get(ws);
+      const subscribedWorktrees = clientInfo ? Array.from(clientInfo.worktreeIds) : [];
+      // Sanitize reason to avoid logging garbled data from malformed frames
+      let safeReason = 'none';
+      if (reason) {
+        const reasonStr = Buffer.isBuffer(reason) ? reason.toString('utf8') : String(reason);
+        if (reasonStr && /^[\x20-\x7E]*$/.test(reasonStr)) {
+          safeReason = reasonStr;
+        }
+      }
+      console.log(`[WS] Client disconnected - code: ${code}, reason: ${safeReason}, subscribed to: ${subscribedWorktrees.join(', ') || 'none'}`);
       handleDisconnect(ws);
     });
 
-    // Handle errors - this catches invalid frame errors from individual clients
+    // Handle errors (including invalid close codes from mobile browsers)
     ws.on('error', (error: Error & { code?: string }) => {
-      // Silently handle common mobile browser disconnect errors
-      if (error.code !== 'WS_ERR_INVALID_CLOSE_CODE') {
-        console.error('[WS] WebSocket error:', error.message || error);
+      // Suppress noisy errors from mobile browser disconnects
+      if (error.code === 'WS_ERR_INVALID_CLOSE_CODE') {
+        console.log('[WS] Client sent invalid close code (likely mobile browser disconnect)');
+      } else {
+        console.error('[WS] WebSocket error:', error.message);
       }
+      // Clean up the connection
       handleDisconnect(ws);
     });
   });
@@ -108,7 +136,10 @@ function handleMessage(ws: WebSocket, message: WebSocketMessage): void {
  */
 function handleSubscribe(ws: WebSocket, worktreeId: string): void {
   const clientInfo = clients.get(ws);
-  if (!clientInfo) return;
+  if (!clientInfo) {
+    console.log(`[WS] handleSubscribe: clientInfo not found for worktreeId: ${worktreeId}`);
+    return;
+  }
 
   // Add worktreeId to client's subscriptions
   clientInfo.worktreeIds.add(worktreeId);
@@ -117,7 +148,10 @@ function handleSubscribe(ws: WebSocket, worktreeId: string): void {
   if (!rooms.has(worktreeId)) {
     rooms.set(worktreeId, new Set());
   }
-  rooms.get(worktreeId)!.add(ws);
+  const room = rooms.get(worktreeId)!;
+  room.add(ws);
+
+  console.log(`Client subscribed to worktree: ${worktreeId}, room size: ${room.size}, ws readyState: ${ws.readyState}`);
 }
 
 /**
@@ -139,6 +173,8 @@ function handleUnsubscribe(ws: WebSocket, worktreeId: string): void {
       rooms.delete(worktreeId);
     }
   }
+
+  console.log(`Client unsubscribed from worktree: ${worktreeId}`);
 }
 
 /**
@@ -146,7 +182,15 @@ function handleUnsubscribe(ws: WebSocket, worktreeId: string): void {
  */
 function handleBroadcast(worktreeId: string, data: unknown): void {
   const room = rooms.get(worktreeId);
-  if (!room || room.size === 0) return;
+  console.log(`[WS] handleBroadcast called for ${worktreeId}, room size: ${room?.size || 0}`);
+  if (!room) {
+    console.log(`[WS] No room found for ${worktreeId}`);
+    return;
+  }
+  if (room.size === 0) {
+    console.log(`[WS] Room for ${worktreeId} is empty`);
+    return;
+  }
 
   try {
     const message = JSON.stringify({
@@ -155,17 +199,43 @@ function handleBroadcast(worktreeId: string, data: unknown): void {
       data,
     });
 
+    let successCount = 0;
+    let errorCount = 0;
+
     room.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
         try {
           client.send(message);
-        } catch {
-          // Silent fail for individual client errors
+          successCount++;
+        } catch (sendError) {
+          errorCount++;
+          console.error(`Error sending WebSocket message to client:`, sendError);
         }
       }
     });
+
+    console.log(`Broadcast to worktree ${worktreeId}: ${successCount}/${room.size} clients (${errorCount} errors)`);
   } catch (broadcastError) {
-    console.error(`[WS] Broadcast error for ${worktreeId}:`, broadcastError);
+    console.error(`Error broadcasting to worktree ${worktreeId}:`, broadcastError);
+    // Try to broadcast with sanitized data
+    try {
+      const sanitizedMessage = JSON.stringify({
+        type: 'broadcast',
+        worktreeId,
+        data: { error: 'Message encoding error' },
+      });
+      room.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          try {
+            client.send(sanitizedMessage);
+          } catch {
+            // Silent fail for fallback
+          }
+        }
+      });
+    } catch (fallbackError) {
+      console.error('Failed to send fallback message:', fallbackError);
+    }
   }
 }
 
