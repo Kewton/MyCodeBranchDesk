@@ -7,7 +7,17 @@
 
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+
+/** Default animation duration in milliseconds */
+const DEFAULT_ANIMATION_DURATION = 200;
+
+/** CSS class names for animation states */
+const ANIMATION_CLASSES = {
+  fadeIn: 'animate-fade-in',
+  fadeOut: 'animate-fade-out',
+  none: '',
+} as const;
 
 /**
  * Options for usePromptAnimation hook
@@ -15,7 +25,7 @@ import { useState, useEffect, useRef } from 'react';
 export interface UsePromptAnimationOptions {
   /** Whether the component should be visible */
   visible: boolean;
-  /** Animation duration in milliseconds (default: 200ms) */
+  /** Animation duration in milliseconds */
   duration?: number;
 }
 
@@ -63,7 +73,7 @@ type AnimationState = 'hidden' | 'fade-in' | 'visible' | 'fade-out';
  */
 export function usePromptAnimation({
   visible,
-  duration = 200,
+  duration = DEFAULT_ANIMATION_DURATION,
 }: UsePromptAnimationOptions): UsePromptAnimationReturn {
   const [animationState, setAnimationState] = useState<AnimationState>(
     visible ? 'visible' : 'hidden'
@@ -91,42 +101,36 @@ export function usePromptAnimation({
       timeoutRef.current = null;
     }
 
+    // Helper to schedule animation completion
+    const scheduleAnimationEnd = (targetState: AnimationState) => {
+      timeoutRef.current = setTimeout(() => {
+        setAnimationState(targetState);
+        timeoutRef.current = null;
+      }, duration);
+    };
+
     if (visible && !prevVisible) {
       // Showing: start fade-in animation
       setAnimationState('fade-in');
-      timeoutRef.current = setTimeout(() => {
-        setAnimationState('visible');
-        timeoutRef.current = null;
-      }, duration);
+      scheduleAnimationEnd('visible');
     } else if (!visible && prevVisible) {
       // Hiding: start fade-out animation
       setAnimationState('fade-out');
-      timeoutRef.current = setTimeout(() => {
-        setAnimationState('hidden');
-        timeoutRef.current = null;
-      }, duration);
+      scheduleAnimationEnd('hidden');
     } else if (visible) {
-      // Handle case where visibility changed back during animation
+      // Handle interruption during fade-out
       setAnimationState((current) => {
         if (current === 'fade-out') {
-          // Schedule completion
-          timeoutRef.current = setTimeout(() => {
-            setAnimationState('visible');
-            timeoutRef.current = null;
-          }, duration);
+          scheduleAnimationEnd('visible');
           return 'fade-in';
         }
         return current;
       });
-    } else if (!visible) {
-      // Handle case where visibility changed back during animation
+    } else {
+      // Handle interruption during fade-in
       setAnimationState((current) => {
         if (current === 'fade-in') {
-          // Schedule completion
-          timeoutRef.current = setTimeout(() => {
-            setAnimationState('hidden');
-            timeoutRef.current = null;
-          }, duration);
+          scheduleAnimationEnd('hidden');
           return 'fade-out';
         }
         return current;
@@ -134,22 +138,20 @@ export function usePromptAnimation({
     }
   }, [visible, duration]);
 
-  // Compute derived values
+  // Compute derived values with memoization
   const shouldRender = animationState !== 'hidden';
   const isAnimating = animationState === 'fade-in' || animationState === 'fade-out';
 
-  const animationClass = (() => {
+  const animationClass = useMemo(() => {
     switch (animationState) {
       case 'fade-in':
-        return 'animate-fade-in';
+        return ANIMATION_CLASSES.fadeIn;
       case 'fade-out':
-        return 'animate-fade-out';
-      case 'visible':
-      case 'hidden':
+        return ANIMATION_CLASSES.fadeOut;
       default:
-        return '';
+        return ANIMATION_CLASSES.none;
     }
-  })();
+  }, [animationState]);
 
   return {
     shouldRender,
