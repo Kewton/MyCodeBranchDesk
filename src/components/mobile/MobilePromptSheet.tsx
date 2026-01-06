@@ -131,11 +131,12 @@ export function MobilePromptSheet({
   }
 
   // Compute animation styles
-  const isAnimatingIn = animationClass === 'animate-fade-in';
+  // Sheet should be visible when NOT animating out (i.e., during fade-in OR when fully visible)
+  const isAnimatingOut = animationClass === 'animate-fade-out';
   const sheetTransform = translateY > 0 ? `translateY(${translateY}px)` : undefined;
-  const overlayOpacity = isAnimatingIn ? 'opacity-100' : 'opacity-0';
-  const overlayPointerEvents = isAnimatingIn ? '' : 'pointer-events-none';
-  const sheetAnimation = isAnimatingIn ? 'translate-y-0' : 'translate-y-full';
+  const overlayOpacity = isAnimatingOut ? 'opacity-0' : 'opacity-100';
+  const overlayPointerEvents = isAnimatingOut ? 'pointer-events-none' : '';
+  const sheetAnimation = isAnimatingOut ? 'translate-y-full' : 'translate-y-0';
 
   return (
     <ErrorBoundary componentName="MobilePromptSheet">
