@@ -106,26 +106,38 @@ app.prepare().then(() => {
     await initializeWorktrees();
   });
 
-  // Graceful shutdown
-  process.on('SIGTERM', () => {
-    console.log('SIGTERM signal received: closing HTTP server');
-    stopAllPolling();
-    server.close(() => {
-      console.log('HTTP server closed');
-      closeWebSocket();
-      console.log('WebSocket server closed');
-      process.exit(0);
-    });
-  });
+  // Graceful shutdown with timeout
+  let isShuttingDown = false;
 
-  process.on('SIGINT', () => {
-    console.log('SIGINT signal received: closing HTTP server');
+  function gracefulShutdown(signal: string) {
+    if (isShuttingDown) {
+      console.log('Shutdown already in progress, forcing exit...');
+      process.exit(1);
+    }
+    isShuttingDown = true;
+
+    console.log(`${signal} received: shutting down...`);
+
+    // Stop polling first
     stopAllPolling();
+
+    // Close WebSocket connections immediately (don't wait)
+    closeWebSocket();
+
+    // Force exit after 3 seconds if graceful shutdown fails
+    const forceExitTimeout = setTimeout(() => {
+      console.log('Graceful shutdown timeout, forcing exit...');
+      process.exit(1);
+    }, 3000);
+
+    // Try graceful HTTP server close
     server.close(() => {
-      console.log('HTTP server closed');
-      closeWebSocket();
-      console.log('WebSocket server closed');
+      clearTimeout(forceExitTimeout);
+      console.log('Server closed gracefully');
       process.exit(0);
     });
-  });
+  }
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 });
