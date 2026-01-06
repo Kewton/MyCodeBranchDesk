@@ -52,6 +52,11 @@ export interface PromptState {
 }
 
 /**
+ * Mobile tab type for navigation
+ */
+export type MobileActivePane = 'history' | 'terminal' | 'logs' | 'info';
+
+/**
  * Layout State
  * Manages responsive layout settings
  */
@@ -59,7 +64,7 @@ export interface LayoutState {
   /** Layout mode: split (desktop) or tabs (mobile) */
   mode: 'split' | 'tabs';
   /** Active pane in mobile tab view */
-  mobileActivePane: 'history' | 'terminal';
+  mobileActivePane: MobileActivePane;
   /** Split ratio for desktop view (0.0 - 1.0) */
   splitRatio: number;
 }

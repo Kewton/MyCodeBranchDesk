@@ -8,7 +8,7 @@
 'use client';
 
 import { useReducer, useMemo } from 'react';
-import type { WorktreeUIState, UIPhase, ErrorState } from '@/types/ui-state';
+import type { WorktreeUIState, UIPhase, ErrorState, MobileActivePane } from '@/types/ui-state';
 import type { WorktreeUIAction } from '@/types/ui-actions';
 import type { ChatMessage, PromptData } from '@/types/models';
 import type { CLIToolType } from '@/lib/cli-tools/types';
@@ -200,7 +200,7 @@ export interface WorktreeUIActions {
   responseReceived: (message: ChatMessage) => void;
   sessionEnded: () => void;
   setAutoScroll: (enabled: boolean) => void;
-  setMobileActivePane: (pane: 'history' | 'terminal') => void;
+  setMobileActivePane: (pane: MobileActivePane) => void;
   setLayoutMode: (mode: 'split' | 'tabs') => void;
   setSplitRatio: (ratio: number) => void;
   setWsConnected: (connected: boolean) => void;
@@ -284,7 +284,7 @@ export function useWorktreeUIState(): {
       setAutoScroll: (enabled: boolean) =>
         dispatch({ type: 'SET_AUTO_SCROLL', enabled }),
 
-      setMobileActivePane: (pane: 'history' | 'terminal') =>
+      setMobileActivePane: (pane: MobileActivePane) =>
         dispatch({ type: 'SET_MOBILE_ACTIVE_PANE', pane }),
 
       setLayoutMode: (mode: 'split' | 'tabs') =>

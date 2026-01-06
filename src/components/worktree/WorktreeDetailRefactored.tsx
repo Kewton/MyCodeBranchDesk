@@ -82,16 +82,6 @@ function deriveWorktreeStatus(
   return 'idle';
 }
 
-/** Convert mobile active pane to MobileTab type */
-function toMobileTab(pane: 'history' | 'terminal'): MobileTab {
-  return pane;
-}
-
-/** Convert MobileTab to mobile active pane type */
-function toActivePane(tab: MobileTab): 'history' | 'terminal' {
-  return tab === 'history' ? 'history' : 'terminal';
-}
-
 /** Parse message timestamps from API response */
 function parseMessageTimestamps(messages: ChatMessage[]): ChatMessage[] {
   return messages.map((msg) => ({
@@ -367,7 +357,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
   /** Handle mobile tab navigation */
   const handleMobileTabChange = useCallback(
     (tab: MobileTab) => {
-      actions.setMobileActivePane(toActivePane(tab));
+      actions.setMobileActivePane(tab);
     },
     [actions]
   );
@@ -463,9 +453,9 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
     [state.terminal.isActive, state.phase, state.prompt.visible, state.error.type]
   );
 
-  /** Convert layout pane to mobile tab */
+  /** Current active tab for mobile view */
   const activeTab = useMemo<MobileTab>(
-    () => toMobileTab(state.layout.mobileActivePane),
+    () => state.layout.mobileActivePane,
     [state.layout.mobileActivePane]
   );
 
