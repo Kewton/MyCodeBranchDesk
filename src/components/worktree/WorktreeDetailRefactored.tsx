@@ -17,6 +17,7 @@
 'use client';
 
 import React, { useEffect, useCallback, useMemo, useState, memo } from 'react';
+import { useRouter } from 'next/navigation';
 import { useWorktreeUIState } from '@/hooks/useWorktreeUIState';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { WorktreeDesktopLayout } from '@/components/worktree/WorktreeDesktopLayout';
@@ -169,6 +170,7 @@ const ErrorDisplay = memo(function ErrorDisplay({
 interface MobileContentProps {
   activeTab: MobileTab;
   worktreeId: string;
+  worktree: Worktree | null;
   messages: ChatMessage[];
   terminalOutput: string;
   isTerminalActive: boolean;
@@ -180,6 +182,7 @@ interface MobileContentProps {
 const MobileContent = memo(function MobileContent({
   activeTab,
   worktreeId,
+  worktree,
   messages,
   terminalOutput,
   isTerminalActive,
@@ -217,8 +220,80 @@ const MobileContent = memo(function MobileContent({
       );
     case 'info':
       return (
-        <div className="p-4 text-gray-500 text-center" role="status">
-          Info view coming soon
+        <div className="p-4 space-y-4 overflow-y-auto h-full">
+          {worktree ? (
+            <>
+              {/* Worktree Name */}
+              <div className="bg-white rounded-lg border border-gray-200 p-4">
+                <h2 className="text-sm font-medium text-gray-500 mb-1">Worktree</h2>
+                <p className="text-lg font-semibold text-gray-900">{worktree.name}</p>
+              </div>
+
+              {/* Repository Info */}
+              <div className="bg-white rounded-lg border border-gray-200 p-4">
+                <h2 className="text-sm font-medium text-gray-500 mb-1">Repository</h2>
+                <p className="text-base text-gray-900">{worktree.repositoryName}</p>
+                <p className="text-xs text-gray-500 mt-1 break-all">{worktree.repositoryPath}</p>
+              </div>
+
+              {/* Path */}
+              <div className="bg-white rounded-lg border border-gray-200 p-4">
+                <h2 className="text-sm font-medium text-gray-500 mb-1">Path</h2>
+                <p className="text-sm text-gray-700 break-all font-mono">{worktree.path}</p>
+              </div>
+
+              {/* Status */}
+              {worktree.status && (
+                <div className="bg-white rounded-lg border border-gray-200 p-4">
+                  <h2 className="text-sm font-medium text-gray-500 mb-1">Status</h2>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    worktree.status === 'done' ? 'bg-green-100 text-green-800' :
+                    worktree.status === 'doing' ? 'bg-blue-100 text-blue-800' :
+                    'bg-gray-100 text-gray-800'
+                  }`}>
+                    {worktree.status.toUpperCase()}
+                  </span>
+                </div>
+              )}
+
+              {/* Memo */}
+              {worktree.memo && (
+                <div className="bg-white rounded-lg border border-gray-200 p-4">
+                  <h2 className="text-sm font-medium text-gray-500 mb-1">Memo</h2>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{worktree.memo}</p>
+                </div>
+              )}
+
+              {/* Link */}
+              {worktree.link && (
+                <div className="bg-white rounded-lg border border-gray-200 p-4">
+                  <h2 className="text-sm font-medium text-gray-500 mb-1">Link</h2>
+                  <a
+                    href={worktree.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-600 hover:underline break-all"
+                  >
+                    {worktree.link}
+                  </a>
+                </div>
+              )}
+
+              {/* Last Updated */}
+              {worktree.updatedAt && (
+                <div className="bg-white rounded-lg border border-gray-200 p-4">
+                  <h2 className="text-sm font-medium text-gray-500 mb-1">Last Updated</h2>
+                  <p className="text-sm text-gray-700">
+                    {new Date(worktree.updatedAt).toLocaleString()}
+                  </p>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-gray-500 text-center py-8">
+              Loading worktree info...
+            </div>
+          )}
         </div>
       );
     default:
@@ -241,6 +316,7 @@ const MobileContent = memo(function MobileContent({
 export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
   worktreeId,
 }: WorktreeDetailRefactoredProps) {
+  const router = useRouter();
   const isMobile = useIsMobile();
   const { state, actions } = useWorktreeUIState();
 
@@ -325,6 +401,11 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
   const handleFilePathClick = useCallback((path: string) => {
     console.log('[WorktreeDetailRefactored] File path clicked:', path);
   }, []);
+
+  /** Handle back button click - navigate to portal */
+  const handleBackClick = useCallback(() => {
+    router.push('/');
+  }, [router]);
 
   /** Handle prompt response submission */
   const handlePromptRespond = useCallback(
@@ -528,12 +609,17 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
   return (
     <ErrorBoundary componentName="WorktreeDetailRefactored">
       <div className="h-full flex flex-col">
-        <MobileHeader worktreeName={worktreeName} status={worktreeStatus} />
+        <MobileHeader
+          worktreeName={worktreeName}
+          status={worktreeStatus}
+          onBackClick={handleBackClick}
+        />
 
         <main className="flex-1 pt-14 pb-32 overflow-hidden">
           <MobileContent
             activeTab={activeTab}
             worktreeId={worktreeId}
+            worktree={worktree}
             messages={state.messages}
             terminalOutput={state.terminal.output}
             isTerminalActive={state.terminal.isActive}
