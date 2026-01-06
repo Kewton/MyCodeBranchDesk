@@ -1,24 +1,22 @@
 /**
  * WorktreeDetailRefactored Component
  *
- * A refactored worktree detail component that integrates all Phase 1-4 components:
- * - useWorktreeUIState (state management via useReducer)
- * - useIsMobile (responsive detection)
- * - WorktreeDesktopLayout (desktop 2-column layout)
- * - TerminalDisplay (terminal output)
- * - HistoryPane (message history)
- * - PromptPanel (desktop prompt response)
- * - MobileHeader (mobile header)
- * - MobileTabBar (mobile navigation)
- * - MobilePromptSheet (mobile prompt response)
- * - ErrorBoundary (error handling)
+ * Integrates worktree UI components with responsive layout support:
+ * - Desktop: 2-column split layout (History | Terminal) with resizable panes
+ * - Mobile: Tab-based navigation with header and bottom tab bar
+ *
+ * Features:
+ * - Real-time terminal output polling
+ * - Prompt detection and response handling
+ * - Error boundary protection
+ * - useReducer-based state management
  *
  * Based on Issue #13 UX Improvement design specification
  */
 
 'use client';
 
-import React, { useEffect, useCallback, useMemo, memo } from 'react';
+import React, { useEffect, useCallback, useMemo, useState, memo } from 'react';
 import { useWorktreeUIState } from '@/hooks/useWorktreeUIState';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { WorktreeDesktopLayout } from '@/components/worktree/WorktreeDesktopLayout';
@@ -35,17 +33,13 @@ import type { Worktree, ChatMessage, PromptData } from '@/types/models';
 // Types
 // ============================================================================
 
-/**
- * Props for WorktreeDetailRefactored component
- */
+/** Props for WorktreeDetailRefactored component */
 export interface WorktreeDetailRefactoredProps {
   /** Worktree ID to display */
   worktreeId: string;
 }
 
-/**
- * API response for current output
- */
+/** API response shape for current output endpoint */
 interface CurrentOutputResponse {
   isRunning: boolean;
   isGenerating?: boolean;
@@ -60,55 +54,62 @@ interface CurrentOutputResponse {
 // Constants
 // ============================================================================
 
-/** Polling interval for current output (ms) */
-const POLLING_INTERVAL_MS = 2000;
+/** Polling interval when terminal is active (ms) */
+const ACTIVE_POLLING_INTERVAL_MS = 2000;
 
-/** Polling interval when idle (ms) */
+/** Polling interval when terminal is idle (ms) */
 const IDLE_POLLING_INTERVAL_MS = 5000;
+
+/** Default worktree name when not loaded */
+const DEFAULT_WORKTREE_NAME = 'Unknown';
 
 // ============================================================================
 // Helper Functions
 // ============================================================================
 
-/**
- * Convert UI phase to WorktreeStatus for MobileHeader
- */
-function getWorktreeStatus(
-  isRunning: boolean,
-  isGenerating: boolean,
-  isPromptWaiting: boolean,
+/** Convert UI state to WorktreeStatus for MobileHeader display */
+function deriveWorktreeStatus(
+  isTerminalActive: boolean,
+  isReceiving: boolean,
+  isPromptVisible: boolean,
   hasError: boolean
 ): WorktreeStatus {
   if (hasError) return 'error';
-  if (isPromptWaiting) return 'waiting';
-  if (isGenerating || isRunning) return 'running';
+  if (isPromptVisible) return 'waiting';
+  if (isReceiving || isTerminalActive) return 'running';
   return 'idle';
 }
 
-/**
- * Map mobile active pane to MobileTab
- */
-function mobileActivePaneToTab(pane: 'history' | 'terminal'): MobileTab {
-  return pane === 'history' ? 'history' : 'terminal';
+/** Convert mobile active pane to MobileTab type */
+function toMobileTab(pane: 'history' | 'terminal'): MobileTab {
+  return pane;
 }
 
-/**
- * Map MobileTab to mobile active pane
- */
-function mobileTabToActivePane(tab: MobileTab): 'history' | 'terminal' {
+/** Convert MobileTab to mobile active pane type */
+function toActivePane(tab: MobileTab): 'history' | 'terminal' {
   return tab === 'history' ? 'history' : 'terminal';
+}
+
+/** Parse message timestamps from API response */
+function parseMessageTimestamps(messages: ChatMessage[]): ChatMessage[] {
+  return messages.map((msg) => ({
+    ...msg,
+    timestamp: new Date(msg.timestamp),
+  }));
 }
 
 // ============================================================================
 // Sub-components
 // ============================================================================
 
-/**
- * Loading indicator component
- */
+/** Loading indicator with spinner and text */
 const LoadingIndicator = memo(function LoadingIndicator() {
   return (
-    <div className="flex items-center justify-center h-full min-h-[200px]">
+    <div
+      className="flex items-center justify-center h-full min-h-[200px]"
+      role="status"
+      aria-live="polite"
+    >
       <div className="flex flex-col items-center gap-3">
         <div
           className="animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-blue-600"
@@ -120,18 +121,23 @@ const LoadingIndicator = memo(function LoadingIndicator() {
   );
 });
 
-/**
- * Error display component
- */
+/** Props for ErrorDisplay component */
+interface ErrorDisplayProps {
+  message: string;
+  onRetry?: () => void;
+}
+
+/** Error display with optional retry button */
 const ErrorDisplay = memo(function ErrorDisplay({
   message,
   onRetry,
-}: {
-  message: string;
-  onRetry?: () => void;
-}) {
+}: ErrorDisplayProps) {
   return (
-    <div className="flex items-center justify-center h-full min-h-[200px]">
+    <div
+      className="flex items-center justify-center h-full min-h-[200px]"
+      role="alert"
+      aria-live="assertive"
+    >
       <div className="text-center p-6 bg-red-50 rounded-lg border border-red-200 max-w-md">
         <svg
           className="mx-auto h-12 w-12 text-red-400 mb-4"
@@ -151,8 +157,9 @@ const ErrorDisplay = memo(function ErrorDisplay({
         <p className="text-red-500 text-sm mt-2">{message}</p>
         {onRetry && (
           <button
+            type="button"
             onClick={onRetry}
-            className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
           >
             Retry
           </button>
@@ -166,6 +173,7 @@ const ErrorDisplay = memo(function ErrorDisplay({
 // Mobile Content Component
 // ============================================================================
 
+/** Props for MobileContent component */
 interface MobileContentProps {
   activeTab: MobileTab;
   worktreeId: string;
@@ -176,6 +184,7 @@ interface MobileContentProps {
   onFilePathClick: (path: string) => void;
 }
 
+/** Renders content based on active mobile tab */
 const MobileContent = memo(function MobileContent({
   activeTab,
   worktreeId,
@@ -210,13 +219,13 @@ const MobileContent = memo(function MobileContent({
       );
     case 'logs':
       return (
-        <div className="p-4 text-gray-500 text-center">
+        <div className="p-4 text-gray-500 text-center" role="status">
           Logs view coming soon
         </div>
       );
     case 'info':
       return (
-        <div className="p-4 text-gray-500 text-center">
+        <div className="p-4 text-gray-500 text-center" role="status">
           Info view coming soon
         </div>
       );
@@ -232,14 +241,6 @@ const MobileContent = memo(function MobileContent({
 /**
  * WorktreeDetailRefactored - Integrated worktree detail component
  *
- * Features:
- * - Desktop: 2-column layout (History | Terminal) with resizable panes
- * - Mobile: Tab navigation with header and bottom tab bar
- * - Prompt detection and response handling (PromptPanel/MobilePromptSheet)
- * - useReducer-based state management
- * - ErrorBoundary wrapping for fault isolation
- * - Real-time terminal output with auto-scroll
- *
  * @example
  * ```tsx
  * <WorktreeDetailRefactored worktreeId="feature-123" />
@@ -251,25 +252,23 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
   const isMobile = useIsMobile();
   const { state, actions } = useWorktreeUIState();
 
-  // Local state for worktree data
-  const [worktree, setWorktree] = React.useState<Worktree | null>(null);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
+  // Local state for worktree data and loading status
+  const [worktree, setWorktree] = useState<Worktree | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // ========================================================================
   // API Fetch Functions
   // ========================================================================
 
-  /**
-   * Fetch worktree data
-   */
-  const fetchWorktree = useCallback(async () => {
+  /** Fetch worktree metadata */
+  const fetchWorktree = useCallback(async (): Promise<Worktree | null> => {
     try {
       const response = await fetch(`/api/worktrees/${worktreeId}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch worktree: ${response.status}`);
       }
-      const data = await response.json();
+      const data: Worktree = await response.json();
       setWorktree(data);
       return data;
     } catch (err) {
@@ -279,31 +278,22 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
     }
   }, [worktreeId]);
 
-  /**
-   * Fetch messages for the worktree
-   */
-  const fetchMessages = useCallback(async () => {
+  /** Fetch message history for the worktree */
+  const fetchMessages = useCallback(async (): Promise<void> => {
     try {
       const response = await fetch(`/api/worktrees/${worktreeId}/messages?cliTool=claude`);
       if (!response.ok) {
         throw new Error(`Failed to fetch messages: ${response.status}`);
       }
       const data: ChatMessage[] = await response.json();
-      // Convert timestamp strings to Date objects
-      const messagesWithDates = data.map((msg) => ({
-        ...msg,
-        timestamp: new Date(msg.timestamp),
-      }));
-      actions.setMessages(messagesWithDates);
+      actions.setMessages(parseMessageTimestamps(data));
     } catch (err) {
       console.error('[WorktreeDetailRefactored] Error fetching messages:', err);
     }
   }, [worktreeId, actions]);
 
-  /**
-   * Fetch current terminal output
-   */
-  const fetchCurrentOutput = useCallback(async () => {
+  /** Fetch current terminal output and prompt status */
+  const fetchCurrentOutput = useCallback(async (): Promise<void> => {
     try {
       const response = await fetch(`/api/worktrees/${worktreeId}/current-output?cliTool=claude`);
       if (!response.ok) {
@@ -312,11 +302,11 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
       const data: CurrentOutputResponse = await response.json();
 
       // Update terminal state
-      actions.setTerminalOutput(data.content || '', data.realtimeSnippet || '');
-      actions.setTerminalActive(data.isRunning || false);
-      actions.setTerminalThinking(data.thinking || false);
+      actions.setTerminalOutput(data.content ?? '', data.realtimeSnippet ?? '');
+      actions.setTerminalActive(data.isRunning ?? false);
+      actions.setTerminalThinking(data.thinking ?? false);
 
-      // Handle prompt state
+      // Handle prompt state transitions
       if (data.isPromptWaiting && data.promptData) {
         actions.showPrompt(data.promptData, `prompt-${Date.now()}`);
       } else if (!data.isPromptWaiting && state.prompt.visible) {
@@ -331,19 +321,14 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
   // Event Handlers
   // ========================================================================
 
-  /**
-   * Handle file path click in history pane
-   */
+  /** Handle file path click in history pane (placeholder for future implementation) */
   const handleFilePathClick = useCallback((path: string) => {
-    // TODO: Implement file opening logic
     console.log('[WorktreeDetailRefactored] File path clicked:', path);
   }, []);
 
-  /**
-   * Handle prompt response
-   */
+  /** Handle prompt response submission */
   const handlePromptRespond = useCallback(
-    async (answer: string) => {
+    async (answer: string): Promise<void> => {
       actions.setPromptAnswering(true);
       try {
         const response = await fetch(`/api/worktrees/${worktreeId}/prompt-response`, {
@@ -364,26 +349,20 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
     [worktreeId, actions]
   );
 
-  /**
-   * Handle prompt dismiss
-   */
+  /** Handle prompt dismiss without response */
   const handlePromptDismiss = useCallback(() => {
     actions.clearPrompt();
   }, [actions]);
 
-  /**
-   * Handle mobile tab change
-   */
+  /** Handle mobile tab navigation */
   const handleMobileTabChange = useCallback(
     (tab: MobileTab) => {
-      actions.setMobileActivePane(mobileTabToActivePane(tab));
+      actions.setMobileActivePane(toActivePane(tab));
     },
     [actions]
   );
 
-  /**
-   * Handle auto-scroll change
-   */
+  /** Handle terminal auto-scroll toggle */
   const handleAutoScrollChange = useCallback(
     (enabled: boolean) => {
       actions.setAutoScroll(enabled);
@@ -391,30 +370,26 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
     [actions]
   );
 
-  /**
-   * Retry loading data
-   */
-  const handleRetry = useCallback(() => {
+  /** Retry loading all data after error */
+  const handleRetry = useCallback(async (): Promise<void> => {
     setError(null);
     setLoading(true);
-    fetchWorktree().then(() => {
-      fetchMessages();
-      fetchCurrentOutput();
-      setLoading(false);
-    });
+    const worktreeData = await fetchWorktree();
+    if (worktreeData) {
+      await Promise.all([fetchMessages(), fetchCurrentOutput()]);
+    }
+    setLoading(false);
   }, [fetchWorktree, fetchMessages, fetchCurrentOutput]);
 
   // ========================================================================
   // Effects
   // ========================================================================
 
-  /**
-   * Initial data fetch
-   */
+  /** Initial data fetch on mount */
   useEffect(() => {
     let isMounted = true;
 
-    const loadData = async () => {
+    const loadInitialData = async () => {
       setLoading(true);
       const worktreeData = await fetchWorktree();
       if (!isMounted) return;
@@ -427,29 +402,27 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
       }
     };
 
-    loadData();
+    loadInitialData();
 
     return () => {
       isMounted = false;
     };
   }, [fetchWorktree, fetchMessages, fetchCurrentOutput]);
 
-  /**
-   * Poll for current output
-   */
+  /** Poll for current output at adaptive intervals */
   useEffect(() => {
     if (loading || error) return;
 
-    const interval = setInterval(() => {
-      fetchCurrentOutput();
-    }, state.terminal.isActive ? POLLING_INTERVAL_MS : IDLE_POLLING_INTERVAL_MS);
+    const pollingInterval = state.terminal.isActive
+      ? ACTIVE_POLLING_INTERVAL_MS
+      : IDLE_POLLING_INTERVAL_MS;
 
-    return () => clearInterval(interval);
+    const intervalId = setInterval(fetchCurrentOutput, pollingInterval);
+
+    return () => clearInterval(intervalId);
   }, [loading, error, fetchCurrentOutput, state.terminal.isActive]);
 
-  /**
-   * Update layout mode based on viewport
-   */
+  /** Sync layout mode with viewport size */
   useEffect(() => {
     actions.setLayoutMode(isMobile ? 'tabs' : 'split');
   }, [isMobile, actions]);
@@ -458,9 +431,10 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
   // Computed Values
   // ========================================================================
 
+  /** Derive worktree status for mobile header display */
   const worktreeStatus = useMemo<WorktreeStatus>(
     () =>
-      getWorktreeStatus(
+      deriveWorktreeStatus(
         state.terminal.isActive,
         state.phase === 'receiving',
         state.prompt.visible,
@@ -469,26 +443,30 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
     [state.terminal.isActive, state.phase, state.prompt.visible, state.error.type]
   );
 
+  /** Convert layout pane to mobile tab */
   const activeTab = useMemo<MobileTab>(
-    () => mobileActivePaneToTab(state.layout.mobileActivePane),
+    () => toMobileTab(state.layout.mobileActivePane),
     [state.layout.mobileActivePane]
   );
+
+  /** Display name for worktree */
+  const worktreeName = worktree?.name ?? DEFAULT_WORKTREE_NAME;
 
   // ========================================================================
   // Render
   // ========================================================================
 
-  // Loading state
+  // Handle loading state
   if (loading) {
     return <LoadingIndicator />;
   }
 
-  // Error state
+  // Handle error state
   if (error) {
     return <ErrorDisplay message={error} onRetry={handleRetry} />;
   }
 
-  // Desktop layout
+  // Render desktop layout
   if (!isMobile) {
     return (
       <ErrorBoundary componentName="WorktreeDetailRefactored">
@@ -514,8 +492,6 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
             minLeftWidth={20}
             maxLeftWidth={60}
           />
-
-          {/* Prompt Panel for desktop */}
           <PromptPanel
             promptData={state.prompt.data}
             messageId={state.prompt.messageId}
@@ -529,18 +505,13 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
     );
   }
 
-  // Mobile layout
+  // Render mobile layout
   return (
     <ErrorBoundary componentName="WorktreeDetailRefactored">
       <div className="h-full flex flex-col">
-        {/* Mobile Header */}
-        <MobileHeader
-          worktreeName={worktree?.name || 'Unknown'}
-          status={worktreeStatus}
-        />
+        <MobileHeader worktreeName={worktreeName} status={worktreeStatus} />
 
-        {/* Content area with padding for header and tab bar */}
-        <div className="flex-1 pt-14 pb-16 overflow-hidden">
+        <main className="flex-1 pt-14 pb-16 overflow-hidden">
           <MobileContent
             activeTab={activeTab}
             worktreeId={worktreeId}
@@ -550,9 +521,8 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
             isThinking={state.terminal.isThinking}
             onFilePathClick={handleFilePathClick}
           />
-        </div>
+        </main>
 
-        {/* Mobile Tab Bar */}
         <MobileTabBar
           activeTab={activeTab}
           onTabChange={handleMobileTabChange}
@@ -560,7 +530,6 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
           hasPrompt={state.prompt.visible}
         />
 
-        {/* Mobile Prompt Sheet */}
         <MobilePromptSheet
           promptData={state.prompt.data}
           visible={state.prompt.visible}
