@@ -30,6 +30,7 @@ import { MobilePromptSheet } from '@/components/mobile/MobilePromptSheet';
 import { ErrorBoundary } from '@/components/error/ErrorBoundary';
 import { MessageInput } from '@/components/worktree/MessageInput';
 import { Modal } from '@/components/ui/Modal';
+import { worktreeApi } from '@/lib/api-client';
 import type { Worktree, ChatMessage, PromptData } from '@/types/models';
 
 // ============================================================================
@@ -173,19 +174,52 @@ interface InfoModalProps {
   worktree: Worktree | null;
   isOpen: boolean;
   onClose: () => void;
+  onWorktreeUpdate: (updated: Worktree) => void;
 }
 
-/** Modal displaying worktree information */
+/** Modal displaying worktree information with memo editing */
 const InfoModal = memo(function InfoModal({
   worktree,
   isOpen,
   onClose,
+  onWorktreeUpdate,
 }: InfoModalProps) {
+  const [isEditingMemo, setIsEditingMemo] = useState(false);
+  const [memoText, setMemoText] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Sync memo text when worktree changes or modal opens
+  useEffect(() => {
+    if (worktree && isOpen) {
+      setMemoText(worktree.memo || '');
+      setIsEditingMemo(false);
+    }
+  }, [worktree, isOpen]);
+
+  const handleSaveMemo = useCallback(async () => {
+    if (!worktree) return;
+    setIsSaving(true);
+    try {
+      const updated = await worktreeApi.updateMemo(worktree.id, memoText);
+      onWorktreeUpdate(updated);
+      setIsEditingMemo(false);
+    } catch (err) {
+      console.error('Failed to save memo:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [worktree, memoText, onWorktreeUpdate]);
+
+  const handleCancelMemo = useCallback(() => {
+    setMemoText(worktree?.memo || '');
+    setIsEditingMemo(false);
+  }, [worktree]);
+
   if (!worktree) return null;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Worktree Information" size="md">
-      <div className="space-y-4">
+      <div className="space-y-4 max-h-[70vh] overflow-y-auto">
         {/* Worktree Name */}
         <div className="bg-gray-50 rounded-lg p-4">
           <h2 className="text-sm font-medium text-gray-500 mb-1">Worktree</h2>
@@ -219,13 +253,58 @@ const InfoModal = memo(function InfoModal({
           </div>
         )}
 
-        {/* Memo */}
-        {worktree.memo && (
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h2 className="text-sm font-medium text-gray-500 mb-1">Memo</h2>
-            <p className="text-sm text-gray-700 whitespace-pre-wrap">{worktree.memo}</p>
+        {/* Memo - Editable */}
+        <div className="bg-gray-50 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-medium text-gray-500">Memo</h2>
+            {!isEditingMemo && (
+              <button
+                type="button"
+                onClick={() => setIsEditingMemo(true)}
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                Edit
+              </button>
+            )}
           </div>
-        )}
+          {isEditingMemo ? (
+            <div className="space-y-3">
+              <textarea
+                value={memoText}
+                onChange={(e) => setMemoText(e.target.value)}
+                placeholder="Add notes about this branch..."
+                className="w-full min-h-[150px] p-3 border border-gray-300 rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleSaveMemo}
+                  disabled={isSaving}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
+                >
+                  {isSaving ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelMemo}
+                  disabled={isSaving}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 text-sm font-medium"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="min-h-[50px]">
+              {worktree.memo ? (
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{worktree.memo}</p>
+              ) : (
+                <p className="text-sm text-gray-400 italic">No memo added yet</p>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Link */}
         {worktree.link && (
@@ -327,6 +406,171 @@ const ErrorDisplay = memo(function ErrorDisplay({
 // Mobile Content Component
 // ============================================================================
 
+/** Props for MobileInfoContent component */
+interface MobileInfoContentProps {
+  worktree: Worktree | null;
+  onWorktreeUpdate: (updated: Worktree) => void;
+}
+
+/** Mobile Info tab content with memo editing */
+const MobileInfoContent = memo(function MobileInfoContent({
+  worktree,
+  onWorktreeUpdate,
+}: MobileInfoContentProps) {
+  const [isEditingMemo, setIsEditingMemo] = useState(false);
+  const [memoText, setMemoText] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Sync memo text when worktree changes
+  useEffect(() => {
+    if (worktree) {
+      setMemoText(worktree.memo || '');
+    }
+  }, [worktree]);
+
+  const handleSaveMemo = useCallback(async () => {
+    if (!worktree) return;
+    setIsSaving(true);
+    try {
+      const updated = await worktreeApi.updateMemo(worktree.id, memoText);
+      onWorktreeUpdate(updated);
+      setIsEditingMemo(false);
+    } catch (err) {
+      console.error('Failed to save memo:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [worktree, memoText, onWorktreeUpdate]);
+
+  const handleCancelMemo = useCallback(() => {
+    setMemoText(worktree?.memo || '');
+    setIsEditingMemo(false);
+  }, [worktree]);
+
+  if (!worktree) {
+    return (
+      <div className="text-gray-500 text-center py-8">
+        Loading worktree info...
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 space-y-4 overflow-y-auto h-full">
+      {/* Worktree Name */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <h2 className="text-sm font-medium text-gray-500 mb-1">Worktree</h2>
+        <p className="text-lg font-semibold text-gray-900">{worktree.name}</p>
+      </div>
+
+      {/* Repository Info */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <h2 className="text-sm font-medium text-gray-500 mb-1">Repository</h2>
+        <p className="text-base text-gray-900">{worktree.repositoryName}</p>
+        <p className="text-xs text-gray-500 mt-1 break-all">{worktree.repositoryPath}</p>
+      </div>
+
+      {/* Path */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <h2 className="text-sm font-medium text-gray-500 mb-1">Path</h2>
+        <p className="text-sm text-gray-700 break-all font-mono">{worktree.path}</p>
+      </div>
+
+      {/* Status */}
+      {worktree.status && (
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <h2 className="text-sm font-medium text-gray-500 mb-1">Status</h2>
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+            worktree.status === 'done' ? 'bg-green-100 text-green-800' :
+            worktree.status === 'doing' ? 'bg-blue-100 text-blue-800' :
+            'bg-gray-100 text-gray-800'
+          }`}>
+            {worktree.status.toUpperCase()}
+          </span>
+        </div>
+      )}
+
+      {/* Memo - Editable */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-sm font-medium text-gray-500">Memo</h2>
+          {!isEditingMemo && (
+            <button
+              type="button"
+              onClick={() => setIsEditingMemo(true)}
+              className="text-sm text-blue-600 hover:text-blue-800"
+            >
+              Edit
+            </button>
+          )}
+        </div>
+        {isEditingMemo ? (
+          <div className="space-y-3">
+            <textarea
+              value={memoText}
+              onChange={(e) => setMemoText(e.target.value)}
+              placeholder="Add notes about this branch..."
+              className="w-full min-h-[150px] p-3 border border-gray-300 rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleSaveMemo}
+                disabled={isSaving}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
+              >
+                {isSaving ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelMemo}
+                disabled={isSaving}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 text-sm font-medium"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="min-h-[50px]">
+            {worktree.memo ? (
+              <p className="text-sm text-gray-700 whitespace-pre-wrap">{worktree.memo}</p>
+            ) : (
+              <p className="text-sm text-gray-400 italic">No memo added yet</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Link */}
+      {worktree.link && (
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <h2 className="text-sm font-medium text-gray-500 mb-1">Link</h2>
+          <a
+            href={worktree.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-blue-600 hover:underline break-all"
+          >
+            {worktree.link}
+          </a>
+        </div>
+      )}
+
+      {/* Last Updated */}
+      {worktree.updatedAt && (
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <h2 className="text-sm font-medium text-gray-500 mb-1">Last Updated</h2>
+          <p className="text-sm text-gray-700">
+            {new Date(worktree.updatedAt).toLocaleString()}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+});
+
 /** Props for MobileContent component */
 interface MobileContentProps {
   activeTab: MobileTab;
@@ -337,6 +581,7 @@ interface MobileContentProps {
   isTerminalActive: boolean;
   isThinking: boolean;
   onFilePathClick: (path: string) => void;
+  onWorktreeUpdate: (updated: Worktree) => void;
 }
 
 /** Renders content based on active mobile tab */
@@ -349,6 +594,7 @@ const MobileContent = memo(function MobileContent({
   isTerminalActive,
   isThinking,
   onFilePathClick,
+  onWorktreeUpdate,
 }: MobileContentProps) {
   switch (activeTab) {
     case 'terminal':
@@ -381,81 +627,10 @@ const MobileContent = memo(function MobileContent({
       );
     case 'info':
       return (
-        <div className="p-4 space-y-4 overflow-y-auto h-full">
-          {worktree ? (
-            <>
-              {/* Worktree Name */}
-              <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <h2 className="text-sm font-medium text-gray-500 mb-1">Worktree</h2>
-                <p className="text-lg font-semibold text-gray-900">{worktree.name}</p>
-              </div>
-
-              {/* Repository Info */}
-              <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <h2 className="text-sm font-medium text-gray-500 mb-1">Repository</h2>
-                <p className="text-base text-gray-900">{worktree.repositoryName}</p>
-                <p className="text-xs text-gray-500 mt-1 break-all">{worktree.repositoryPath}</p>
-              </div>
-
-              {/* Path */}
-              <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <h2 className="text-sm font-medium text-gray-500 mb-1">Path</h2>
-                <p className="text-sm text-gray-700 break-all font-mono">{worktree.path}</p>
-              </div>
-
-              {/* Status */}
-              {worktree.status && (
-                <div className="bg-white rounded-lg border border-gray-200 p-4">
-                  <h2 className="text-sm font-medium text-gray-500 mb-1">Status</h2>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    worktree.status === 'done' ? 'bg-green-100 text-green-800' :
-                    worktree.status === 'doing' ? 'bg-blue-100 text-blue-800' :
-                    'bg-gray-100 text-gray-800'
-                  }`}>
-                    {worktree.status.toUpperCase()}
-                  </span>
-                </div>
-              )}
-
-              {/* Memo */}
-              {worktree.memo && (
-                <div className="bg-white rounded-lg border border-gray-200 p-4">
-                  <h2 className="text-sm font-medium text-gray-500 mb-1">Memo</h2>
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{worktree.memo}</p>
-                </div>
-              )}
-
-              {/* Link */}
-              {worktree.link && (
-                <div className="bg-white rounded-lg border border-gray-200 p-4">
-                  <h2 className="text-sm font-medium text-gray-500 mb-1">Link</h2>
-                  <a
-                    href={worktree.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-blue-600 hover:underline break-all"
-                  >
-                    {worktree.link}
-                  </a>
-                </div>
-              )}
-
-              {/* Last Updated */}
-              {worktree.updatedAt && (
-                <div className="bg-white rounded-lg border border-gray-200 p-4">
-                  <h2 className="text-sm font-medium text-gray-500 mb-1">Last Updated</h2>
-                  <p className="text-sm text-gray-700">
-                    {new Date(worktree.updatedAt).toLocaleString()}
-                  </p>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="text-gray-500 text-center py-8">
-              Loading worktree info...
-            </div>
-          )}
-        </div>
+        <MobileInfoContent
+          worktree={worktree}
+          onWorktreeUpdate={onWorktreeUpdate}
+        />
       );
     default:
       return null;
@@ -788,6 +963,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
             worktree={worktree}
             isOpen={isInfoModalOpen}
             onClose={handleInfoModalClose}
+            onWorktreeUpdate={setWorktree}
           />
         </div>
       </ErrorBoundary>
@@ -814,6 +990,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
             isTerminalActive={state.terminal.isActive}
             isThinking={state.terminal.isThinking}
             onFilePathClick={handleFilePathClick}
+            onWorktreeUpdate={setWorktree}
           />
         </main>
 
