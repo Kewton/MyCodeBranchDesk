@@ -27,6 +27,7 @@ import { MobileHeader, type WorktreeStatus } from '@/components/mobile/MobileHea
 import { MobileTabBar, type MobileTab } from '@/components/mobile/MobileTabBar';
 import { MobilePromptSheet } from '@/components/mobile/MobilePromptSheet';
 import { ErrorBoundary } from '@/components/error/ErrorBoundary';
+import { MessageInput } from '@/components/worktree/MessageInput';
 import type { Worktree, ChatMessage, PromptData } from '@/types/models';
 
 // ============================================================================
@@ -370,6 +371,16 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
     [actions]
   );
 
+  /** Handle message sent - refresh messages after sending */
+  const handleMessageSent = useCallback(
+    () => {
+      // Refresh messages after sending
+      void fetchMessages();
+      void fetchCurrentOutput();
+    },
+    [fetchMessages, fetchCurrentOutput]
+  );
+
   /** Retry loading all data after error */
   const handleRetry = useCallback(async (): Promise<void> => {
     setError(null);
@@ -471,27 +482,36 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
     return (
       <ErrorBoundary componentName="WorktreeDetailRefactored">
         <div className="h-full flex flex-col">
-          <WorktreeDesktopLayout
-            leftPane={
-              <HistoryPane
-                messages={state.messages}
-                worktreeId={worktreeId}
-                onFilePathClick={handleFilePathClick}
-              />
-            }
-            rightPane={
-              <TerminalDisplay
-                output={state.terminal.output}
-                isActive={state.terminal.isActive}
-                isThinking={state.terminal.isThinking}
-                autoScroll={state.terminal.autoScroll}
-                onScrollChange={handleAutoScrollChange}
-              />
-            }
-            initialLeftWidth={40}
-            minLeftWidth={20}
-            maxLeftWidth={60}
-          />
+          <div className="flex-1 min-h-0">
+            <WorktreeDesktopLayout
+              leftPane={
+                <HistoryPane
+                  messages={state.messages}
+                  worktreeId={worktreeId}
+                  onFilePathClick={handleFilePathClick}
+                />
+              }
+              rightPane={
+                <TerminalDisplay
+                  output={state.terminal.output}
+                  isActive={state.terminal.isActive}
+                  isThinking={state.terminal.isThinking}
+                  autoScroll={state.terminal.autoScroll}
+                  onScrollChange={handleAutoScrollChange}
+                />
+              }
+              initialLeftWidth={40}
+              minLeftWidth={20}
+              maxLeftWidth={60}
+            />
+          </div>
+          <div className="flex-shrink-0 border-t border-gray-200 p-4 bg-gray-50">
+            <MessageInput
+              worktreeId={worktreeId}
+              onMessageSent={handleMessageSent}
+              cliToolId="claude"
+            />
+          </div>
           <PromptPanel
             promptData={state.prompt.data}
             messageId={state.prompt.messageId}
@@ -511,7 +531,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
       <div className="h-full flex flex-col">
         <MobileHeader worktreeName={worktreeName} status={worktreeStatus} />
 
-        <main className="flex-1 pt-14 pb-16 overflow-hidden">
+        <main className="flex-1 pt-14 pb-32 overflow-hidden">
           <MobileContent
             activeTab={activeTab}
             worktreeId={worktreeId}
@@ -522,6 +542,15 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
             onFilePathClick={handleFilePathClick}
           />
         </main>
+
+        {/* Message Input - fixed above tab bar */}
+        <div className="fixed bottom-16 left-0 right-0 border-t border-gray-200 bg-white p-2 z-10">
+          <MessageInput
+            worktreeId={worktreeId}
+            onMessageSent={handleMessageSent}
+            cliToolId="claude"
+          />
+        </div>
 
         <MobileTabBar
           activeTab={activeTab}
