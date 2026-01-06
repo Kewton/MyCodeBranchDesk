@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, memo } from 'react';
 
 /**
  * Tab type for mobile view
@@ -36,35 +36,21 @@ interface TabConfig {
   icon: React.ReactNode;
 }
 
-/**
- * Terminal icon
- */
-function TerminalIcon() {
-  return (
-    <svg
-      className="w-5 h-5"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-      />
-    </svg>
-  );
+/** Common SVG icon props */
+interface IconProps {
+  /** SVG path d attribute */
+  path: string;
+  /** Icon size class (default: w-5 h-5) */
+  className?: string;
 }
 
 /**
- * History icon
+ * Base icon component to reduce SVG attribute repetition
  */
-function HistoryIcon() {
+const Icon = memo(function Icon({ path, className = 'w-5 h-5' }: IconProps) {
   return (
     <svg
-      className="w-5 h-5"
+      className={className}
       fill="none"
       viewBox="0 0 24 24"
       stroke="currentColor"
@@ -74,64 +60,28 @@ function HistoryIcon() {
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={2}
-        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+        d={path}
       />
     </svg>
   );
-}
+});
 
-/**
- * Logs icon
- */
-function LogsIcon() {
-  return (
-    <svg
-      className="w-5 h-5"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-      />
-    </svg>
-  );
-}
-
-/**
- * Info icon
- */
-function InfoIcon() {
-  return (
-    <svg
-      className="w-5 h-5"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-      />
-    </svg>
-  );
-}
+/** Icon path definitions */
+const ICON_PATHS = {
+  terminal: 'M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+  history: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+  logs: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+  info: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+} as const;
 
 /**
  * Tab configurations
  */
 const TABS: TabConfig[] = [
-  { id: 'terminal', label: 'Terminal', icon: <TerminalIcon /> },
-  { id: 'history', label: 'History', icon: <HistoryIcon /> },
-  { id: 'logs', label: 'Logs', icon: <LogsIcon /> },
-  { id: 'info', label: 'Info', icon: <InfoIcon /> },
+  { id: 'terminal', label: 'Terminal', icon: <Icon path={ICON_PATHS.terminal} /> },
+  { id: 'history', label: 'History', icon: <Icon path={ICON_PATHS.history} /> },
+  { id: 'logs', label: 'Logs', icon: <Icon path={ICON_PATHS.logs} /> },
+  { id: 'info', label: 'Info', icon: <Icon path={ICON_PATHS.info} /> },
 ];
 
 /**

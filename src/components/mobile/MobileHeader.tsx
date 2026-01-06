@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, memo } from 'react';
 
 /**
  * Status type for worktree
@@ -27,35 +27,21 @@ export interface MobileHeaderProps {
   onMenuClick?: () => void;
 }
 
-/**
- * Back arrow icon
- */
-function BackIcon() {
-  return (
-    <svg
-      className="w-6 h-6"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M15 19l-7-7 7-7"
-      />
-    </svg>
-  );
+/** Common SVG icon props */
+interface IconProps {
+  /** SVG path d attribute */
+  path: string;
+  /** Icon size class (default: w-6 h-6) */
+  className?: string;
 }
 
 /**
- * Menu hamburger icon
+ * Base icon component to reduce SVG attribute repetition
  */
-function MenuIcon() {
+const Icon = memo(function Icon({ path, className = 'w-6 h-6' }: IconProps) {
   return (
     <svg
-      className="w-6 h-6"
+      className={className}
       fill="none"
       viewBox="0 0 24 24"
       stroke="currentColor"
@@ -65,11 +51,17 @@ function MenuIcon() {
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={2}
-        d="M4 6h16M4 12h16M4 18h16"
+        d={path}
       />
     </svg>
   );
-}
+});
+
+/** Icon path definitions */
+const ICON_PATHS = {
+  back: 'M15 19l-7-7 7-7',
+  menu: 'M4 6h16M4 12h16M4 18h16',
+} as const;
 
 /**
  * Status indicator configuration
@@ -129,7 +121,7 @@ export function MobileHeader({
               aria-label="Back"
               className="p-2 -ml-2 rounded-full hover:bg-gray-100 transition-colors"
             >
-              <BackIcon />
+              <Icon path={ICON_PATHS.back} />
             </button>
           )}
         </div>
@@ -163,7 +155,7 @@ export function MobileHeader({
               aria-label="Menu"
               className="p-2 -mr-2 rounded-full hover:bg-gray-100 transition-colors"
             >
-              <MenuIcon />
+              <Icon path={ICON_PATHS.menu} />
             </button>
           )}
         </div>

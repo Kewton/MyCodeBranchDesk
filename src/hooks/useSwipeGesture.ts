@@ -9,6 +9,11 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 
 /**
+ * Swipe direction type
+ */
+export type SwipeDirection = 'left' | 'right' | 'up' | 'down';
+
+/**
  * Options for useSwipeGesture hook
  */
 export interface UseSwipeGestureOptions {
@@ -35,11 +40,19 @@ export interface UseSwipeGestureReturn {
   /** Whether user is currently swiping */
   isSwiping: boolean;
   /** Detected swipe direction (null if no swipe detected) */
-  swipeDirection: 'left' | 'right' | 'up' | 'down' | null;
+  swipeDirection: SwipeDirection | null;
+  /** Reset swipe direction to null */
+  resetSwipeDirection: () => void;
 }
 
 /** Default swipe threshold in pixels */
 const DEFAULT_THRESHOLD = 50;
+
+/** Touch start coordinates type */
+interface TouchPosition {
+  x: number;
+  y: number;
+}
 
 /**
  * Hook for detecting swipe gestures
@@ -73,10 +86,17 @@ export function useSwipeGesture(options: UseSwipeGestureOptions = {}): UseSwipeG
 
   const ref = useRef<HTMLElement>(null);
   const [isSwiping, setIsSwiping] = useState(false);
-  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | 'up' | 'down' | null>(null);
+  const [swipeDirection, setSwipeDirection] = useState<SwipeDirection | null>(null);
 
   // Touch start coordinates
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const touchStartRef = useRef<TouchPosition | null>(null);
+
+  /**
+   * Reset swipe direction to null
+   */
+  const resetSwipeDirection = useCallback(() => {
+    setSwipeDirection(null);
+  }, []);
 
   /**
    * Handle touch start
@@ -177,6 +197,7 @@ export function useSwipeGesture(options: UseSwipeGestureOptions = {}): UseSwipeG
     ref,
     isSwiping,
     swipeDirection,
+    resetSwipeDirection,
   };
 }
 

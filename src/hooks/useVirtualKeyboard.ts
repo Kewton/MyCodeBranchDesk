@@ -19,10 +19,16 @@ export interface UseVirtualKeyboardReturn {
 }
 
 /**
- * Minimum height difference to consider keyboard visible
- * Small changes might be due to browser chrome or orientation changes
+ * Minimum height difference to consider keyboard visible.
+ * Small changes might be due to browser chrome or orientation changes.
  */
 const KEYBOARD_THRESHOLD = 100;
+
+/**
+ * Check if visualViewport API is available
+ */
+const isVisualViewportSupported = (): boolean =>
+  typeof window !== 'undefined' && window.visualViewport != null;
 
 /**
  * Hook for detecting virtual keyboard visibility
@@ -53,35 +59,30 @@ export function useVirtualKeyboard(): UseVirtualKeyboardReturn {
    * Calculate keyboard height and visibility
    */
   const updateKeyboardState = useCallback(() => {
-    if (typeof window === 'undefined' || !window.visualViewport) {
+    if (!isVisualViewportSupported()) {
       return;
     }
 
-    const viewport = window.visualViewport;
+    const viewport = window.visualViewport!;
     const windowHeight = window.innerHeight;
     const viewportHeight = viewport.height;
     const heightDiff = windowHeight - viewportHeight;
 
     // Only consider keyboard visible if the difference exceeds threshold
-    if (heightDiff > KEYBOARD_THRESHOLD) {
-      setIsKeyboardVisible(true);
-      setKeyboardHeight(heightDiff);
-    } else {
-      setIsKeyboardVisible(false);
-      setKeyboardHeight(0);
-    }
+    const isVisible = heightDiff > KEYBOARD_THRESHOLD;
+    setIsKeyboardVisible(isVisible);
+    setKeyboardHeight(isVisible ? heightDiff : 0);
   }, []);
 
   /**
    * Attach event listeners to visualViewport
    */
   useEffect(() => {
-    // Check if visualViewport is available
-    if (typeof window === 'undefined' || !window.visualViewport) {
+    if (!isVisualViewportSupported()) {
       return;
     }
 
-    const viewport = window.visualViewport;
+    const viewport = window.visualViewport!;
 
     // Initial calculation
     updateKeyboardState();

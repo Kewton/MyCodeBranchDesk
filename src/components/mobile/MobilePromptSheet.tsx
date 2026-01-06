@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useCallback, useId, useMemo, useRef, useEffect } from 'react';
+import { useState, useCallback, useId, useMemo, useRef, useEffect, memo } from 'react';
 import type { PromptData, YesNoPromptData, MultipleChoicePromptData } from '@/types/models';
 import { ErrorBoundary } from '@/components/error/ErrorBoundary';
 import { usePromptAnimation } from '@/hooks/usePromptAnimation';
@@ -17,18 +17,17 @@ const ANIMATION_DURATION_MS = 300;
 /** Swipe threshold to dismiss in pixels */
 const SWIPE_DISMISS_THRESHOLD = 100;
 
-/** Common button base styles */
-const BUTTON_BASE_STYLES = `
-  px-6 py-3 rounded-lg font-medium transition-all
-  disabled:opacity-50 disabled:cursor-not-allowed
-  focus:outline-none focus:ring-2 focus:ring-offset-2
-`.trim();
-
-/** Primary button styles */
-const BUTTON_PRIMARY_STYLES = 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500';
-
-/** Secondary button styles */
-const BUTTON_SECONDARY_STYLES = 'bg-white border-2 border-gray-300 hover:bg-gray-50 text-gray-800 focus:ring-gray-500';
+/** Button style constants */
+const BUTTON_STYLES = {
+  /** Common button base styles */
+  base: 'px-6 py-3 rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2',
+  /** Primary button styles */
+  primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500',
+  /** Secondary button styles */
+  secondary: 'bg-white border-2 border-gray-300 hover:bg-gray-50 text-gray-800 focus:ring-gray-500',
+  /** Default selected button styles */
+  defaultSelected: 'bg-gray-600 text-white hover:bg-gray-700',
+} as const;
 
 /**
  * Props for MobilePromptSheet component
@@ -309,7 +308,7 @@ interface YesNoActionsProps {
 /**
  * Yes/No action buttons
  */
-function YesNoActions({
+const YesNoActions = memo(function YesNoActions({
   promptData,
   disabled,
   onYes,
@@ -324,7 +323,7 @@ function YesNoActions({
         type="button"
         onClick={onYes}
         disabled={disabled}
-        className={`flex-1 ${BUTTON_BASE_STYLES} ${BUTTON_PRIMARY_STYLES} ${isYesDefault ? 'ring-2 ring-blue-300' : ''}`}
+        className={`flex-1 ${BUTTON_STYLES.base} ${BUTTON_STYLES.primary} ${isYesDefault ? 'ring-2 ring-blue-300' : ''}`}
       >
         Yes
       </button>
@@ -332,13 +331,13 @@ function YesNoActions({
         type="button"
         onClick={onNo}
         disabled={disabled}
-        className={`flex-1 ${BUTTON_BASE_STYLES} ${isNoDefault ? 'bg-gray-600 text-white hover:bg-gray-700' : BUTTON_SECONDARY_STYLES}`}
+        className={`flex-1 ${BUTTON_STYLES.base} ${isNoDefault ? BUTTON_STYLES.defaultSelected : BUTTON_STYLES.secondary}`}
       >
         No
       </button>
     </div>
   );
-}
+});
 
 /**
  * Props for MultipleChoiceActions component
@@ -357,7 +356,7 @@ interface MultipleChoiceActionsProps {
 /**
  * Multiple choice action options
  */
-function MultipleChoiceActions({
+const MultipleChoiceActions = memo(function MultipleChoiceActions({
   promptData,
   disabled,
   selectedOption,
@@ -429,12 +428,12 @@ function MultipleChoiceActions({
         type="button"
         onClick={onSubmit}
         disabled={disabled || selectedOption === null}
-        className={`w-full ${BUTTON_BASE_STYLES} ${BUTTON_PRIMARY_STYLES}`}
+        className={`w-full ${BUTTON_STYLES.base} ${BUTTON_STYLES.primary}`}
       >
         Submit
       </button>
     </div>
   );
-}
+});
 
 export default MobilePromptSheet;

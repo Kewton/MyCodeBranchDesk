@@ -162,6 +162,7 @@ describe('useSwipeGesture', () => {
         ref: expect.any(Object),
         isSwiping: false,
         swipeDirection: null,
+        resetSwipeDirection: expect.any(Function),
       });
     });
 
@@ -171,6 +172,7 @@ describe('useSwipeGesture', () => {
         ref: expect.any(Object),
         isSwiping: false,
         swipeDirection: null,
+        resetSwipeDirection: expect.any(Function),
       });
     });
   });
