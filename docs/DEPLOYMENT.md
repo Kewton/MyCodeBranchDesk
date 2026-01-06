@@ -218,6 +218,39 @@ sudo certbot --nginx -d your-domain.com
 
 ## トラブルシューティング
 
+### 開発モードでの WebSocket エラー（モバイルアクセス時）
+
+開発モード（`npm run dev`）でモバイルブラウザからアクセスすると、以下のようなエラーが表示されることがあります：
+
+```
+⨯ uncaughtException: RangeError: Invalid WebSocket frame: invalid status code XXXXX
+```
+
+**原因**: Next.js の HMR (Hot Module Replacement) WebSocket がモバイルブラウザの不正なクローズフレームを受信
+
+**解決策**: モバイルからアクセスする場合は **本番モード** を使用してください：
+
+```bash
+npm run build
+npm start
+```
+
+> **注意**: このエラーはサーバーの動作には影響しません（クラッシュしません）。
+> 開発モードでは HMR が有効なため、この種のエラーログは完全には抑制できません。
+
+### サーバーが Ctrl+C で停止しない
+
+WebSocket 接続がアクティブな場合、グレースフルシャットダウンに時間がかかることがあります。
+
+**解決策**:
+- 1回目の Ctrl+C でシャットダウン開始（3秒以内に完了）
+- 2回目の Ctrl+C で強制終了
+- または、以下のコマンドで強制終了：
+
+```bash
+lsof -ti:3000 | xargs kill -9
+```
+
 ### ポートが使用中
 
 ```bash

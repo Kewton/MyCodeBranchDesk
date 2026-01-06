@@ -166,16 +166,22 @@ MCBD_AUTH_TOKEN=local-dev-only-token
 
 1. 起動
 
-開発モードで起動する場合:
+**開発モード**（PC のみ推奨）:
 
 ```bash
 npm run dev
+```
 
-ビルド済みのアプリを起動する場合（任意）:
+**本番モード**（モバイルアクセス推奨）:
 
+```bash
 npm run build
 npm start
 ```
+
+> **重要**: モバイルデバイスからアクセスする場合は、**本番モード**（`npm run build && npm start`）を推奨します。
+> 開発モードでは Next.js の HMR (Hot Module Replacement) WebSocket がモバイルブラウザの
+> 不正なクローズフレームでエラーログを出力することがあります（動作には影響しません）。
 
 ブラウザから以下にアクセスします。
 - PC から: http://localhost:3000
