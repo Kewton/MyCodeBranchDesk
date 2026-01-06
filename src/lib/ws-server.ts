@@ -38,6 +38,11 @@ const rooms = new Map<string, Set<WebSocket>>();
 export function setupWebSocket(server: HTTPServer): void {
   wss = new WebSocketServer({ server });
 
+  // Handle server-level errors (e.g., invalid WebSocket frames from clients)
+  wss.on('error', (error) => {
+    console.error('[WS Server] Error:', error.message || error);
+  });
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
     console.log('WebSocket client connected');
@@ -62,15 +67,28 @@ export function setupWebSocket(server: HTTPServer): void {
 
     // Handle disconnection
     ws.on('close', (code, reason) => {
-      const clientInfo = clients.get(ws);
-      const subscribedWorktrees = clientInfo ? Array.from(clientInfo.worktreeIds) : [];
-      console.log(`[WS] Client disconnected - code: ${code}, reason: ${reason || 'none'}, subscribed to: ${subscribedWorktrees.join(', ') || 'none'}`);
+      try {
+        const clientInfo = clients.get(ws);
+        const subscribedWorktrees = clientInfo ? Array.from(clientInfo.worktreeIds) : [];
+        // Safely convert reason to string (may be Buffer or undefined)
+        const reasonStr = reason ? (typeof reason === 'string' ? reason : reason.toString('utf8')) : 'none';
+        console.log(`[WS] Client disconnected - code: ${code}, reason: ${reasonStr}, subscribed to: ${subscribedWorktrees.join(', ') || 'none'}`);
+      } catch {
+        console.log(`[WS] Client disconnected - code: ${code}, reason: [parse error]`);
+      }
       handleDisconnect(ws);
     });
 
-    // Handle errors
-    ws.on('error', (error) => {
-      console.error('WebSocket error:', error);
+    // Handle errors - this catches invalid frame errors from individual clients
+    ws.on('error', (error: Error & { code?: string }) => {
+      // Don't log full stack trace for common mobile browser disconnect errors
+      if (error.code === 'WS_ERR_INVALID_CLOSE_CODE') {
+        console.log('[WS] Client sent invalid close frame (common on mobile browsers)');
+      } else {
+        console.error('[WS] WebSocket error:', error.message || error);
+      }
+      // Clean up the connection
+      handleDisconnect(ws);
     });
   });
 
