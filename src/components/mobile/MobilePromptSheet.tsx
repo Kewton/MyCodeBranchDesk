@@ -134,6 +134,7 @@ export function MobilePromptSheet({
   const isAnimatingIn = animationClass === 'animate-fade-in';
   const sheetTransform = translateY > 0 ? `translateY(${translateY}px)` : undefined;
   const overlayOpacity = isAnimatingIn ? 'opacity-100' : 'opacity-0';
+  const overlayPointerEvents = isAnimatingIn ? '' : 'pointer-events-none';
   const sheetAnimation = isAnimatingIn ? 'translate-y-0' : 'translate-y-full';
 
   return (
@@ -142,7 +143,7 @@ export function MobilePromptSheet({
       <div
         data-testid="prompt-overlay"
         onClick={handleOverlayClick}
-        className={`fixed inset-0 bg-black/50 z-50 transition-opacity duration-300 ${overlayOpacity}`}
+        className={`fixed inset-0 bg-black/50 z-50 transition-opacity duration-300 ${overlayOpacity} ${overlayPointerEvents}`}
         aria-hidden="true"
       />
 
