@@ -106,9 +106,8 @@ export const TerminalDisplay = memo(function TerminalDisplay({
         // Border
         'border',
         'border-gray-700',
-        // Height
-        'min-h-[200px]',
-        'max-h-[500px]',
+        // Height - flex container will control actual height
+        'h-full',
         // Active state
         isActive ? 'active' : '',
         isActive ? 'border-blue-500' : '',
@@ -121,7 +120,7 @@ export const TerminalDisplay = memo(function TerminalDisplay({
   );
 
   return (
-    <div className="relative">
+    <div className="relative h-full flex flex-col">
       <div
         ref={scrollRef}
         role="log"

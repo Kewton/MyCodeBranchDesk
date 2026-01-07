@@ -7,7 +7,7 @@
 
 'use client';
 
-import React, { useMemo, useCallback, memo } from 'react';
+import React, { useMemo, useCallback, memo, useState } from 'react';
 import type { ChatMessage } from '@/types/models';
 
 // ============================================================================
@@ -57,6 +57,12 @@ interface MessageItemProps {
  * Matches paths like /path/to/file.ts, ./relative/path.js, etc.
  */
 const FILE_PATH_REGEX = /(\/[^\s\n<>"']+\.[a-zA-Z0-9]+)/g;
+
+/** Maximum lines to show in collapsed state */
+const COLLAPSED_MAX_LINES = 3;
+
+/** Maximum characters to show in collapsed state */
+const COLLAPSED_MAX_CHARS = 200;
 
 // ============================================================================
 // Sub-components
@@ -127,14 +133,39 @@ const MessageContent = memo(function MessageContent({
 });
 
 /**
+ * Get truncated content for collapsed view
+ */
+function getTruncatedContent(content: string): { text: string; isTruncated: boolean } {
+  const lines = content.split('\n');
+
+  // Check if content exceeds limits
+  if (lines.length <= COLLAPSED_MAX_LINES && content.length <= COLLAPSED_MAX_CHARS) {
+    return { text: content, isTruncated: false };
+  }
+
+  // Truncate by lines first
+  let truncated = lines.slice(0, COLLAPSED_MAX_LINES).join('\n');
+
+  // Then truncate by characters if still too long
+  if (truncated.length > COLLAPSED_MAX_CHARS) {
+    truncated = truncated.slice(0, COLLAPSED_MAX_CHARS);
+  }
+
+  return { text: truncated, isTruncated: true };
+}
+
+/**
  * Single message display component.
  * Memoized to prevent unnecessary re-renders when other messages update.
+ * Assistant messages are collapsible by default.
  */
 const MessageItem = memo(function MessageItem({
   message,
   onFilePathClick,
 }: MessageItemProps) {
   const isUser = message.role === 'user';
+  // Assistant messages start collapsed, user messages are always expanded
+  const [isExpanded, setIsExpanded] = useState(isUser);
 
   const containerClassName = useMemo(
     () =>
@@ -156,16 +187,60 @@ const MessageItem = memo(function MessageItem({
     [message.timestamp]
   );
 
+  // Calculate truncated content for assistant messages
+  const { text: truncatedText, isTruncated } = useMemo(
+    () => (isUser ? { text: message.content, isTruncated: false } : getTruncatedContent(message.content)),
+    [message.content, isUser]
+  );
+
+  const displayContent = isExpanded ? message.content : truncatedText;
+
+  const handleToggle = useCallback(() => {
+    setIsExpanded((prev) => !prev);
+  }, []);
+
   return (
     <div data-testid={`message-${message.role}`} className={containerClassName}>
-      <div className="flex items-center gap-2 mb-1">
-        <span className={labelClassName}>
-          {isUser ? 'You' : 'Assistant'}
-        </span>
-        <span className="text-xs text-gray-500">{formattedTime}</span>
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-2">
+          <span className={labelClassName}>
+            {isUser ? 'You' : 'Assistant'}
+          </span>
+          <span className="text-xs text-gray-500">{formattedTime}</span>
+        </div>
+        {/* Toggle button for assistant messages that are truncatable */}
+        {!isUser && isTruncated && (
+          <button
+            type="button"
+            onClick={handleToggle}
+            className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors"
+            aria-expanded={isExpanded}
+            aria-label={isExpanded ? 'Collapse message' : 'Expand message'}
+          >
+            <svg
+              className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+            {isExpanded ? 'Close' : 'Expand'}
+          </button>
+        )}
       </div>
       <div className="text-sm text-gray-200 whitespace-pre-wrap break-words">
-        <MessageContent content={message.content} onFilePathClick={onFilePathClick} />
+        <MessageContent content={displayContent} onFilePathClick={onFilePathClick} />
+        {/* Truncation indicator */}
+        {!isUser && isTruncated && !isExpanded && (
+          <span className="text-gray-500">...</span>
+        )}
       </div>
     </div>
   );

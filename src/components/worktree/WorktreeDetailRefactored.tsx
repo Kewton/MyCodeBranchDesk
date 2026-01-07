@@ -980,7 +980,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
           onBackClick={handleBackClick}
         />
 
-        <main className="flex-1 pt-14 pb-32 overflow-hidden">
+        <main className="flex-1 pt-14 pb-28 overflow-hidden">
           <MobileContent
             activeTab={activeTab}
             worktreeId={worktreeId}
