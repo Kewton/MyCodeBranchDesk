@@ -10,7 +10,7 @@ import { join } from 'path';
 import { mkdirSync, writeFileSync, rmSync, symlinkSync } from 'fs';
 import { tmpdir } from 'os';
 
-// Import the file tree module (will be created)
+// Import the file tree module
 import {
   readDirectory,
   filterExcludedItems,
@@ -18,6 +18,9 @@ import {
   isExcludedPattern,
   EXCLUDED_PATTERNS,
   LIMITS,
+  parseDirectoryError,
+  createWorktreeNotFoundError,
+  createAccessDeniedError,
 } from '@/lib/file-tree';
 import type { TreeItem } from '@/types/models';
 
@@ -384,6 +387,89 @@ describe('File Tree Business Logic', () => {
       expect(result.path).toBe('');
       expect(result.name).toBe('');
       expect(result.parentPath).toBeNull();
+    });
+  });
+
+  // ============================================================================
+  // API Helper Functions Tests
+  // ============================================================================
+
+  describe('parseDirectoryError', () => {
+    it('should return 404 for "not found" error messages', () => {
+      const error = new Error('Directory not found: /some/path');
+      const result = parseDirectoryError(error);
+
+      expect(result.status).toBe(404);
+      expect(result.error).toBe('Directory not found');
+    });
+
+    it('should return 400 for "not a directory" error messages', () => {
+      const error = new Error('Path is not a directory: /some/path');
+      const result = parseDirectoryError(error);
+
+      expect(result.status).toBe(400);
+      expect(result.error).toBe('Path is not a directory');
+    });
+
+    it('should return 500 for unknown errors', () => {
+      const error = new Error('Some unexpected error');
+      const result = parseDirectoryError(error);
+
+      expect(result.status).toBe(500);
+      expect(result.error).toBe('Failed to read directory');
+    });
+
+    it('should handle non-Error objects', () => {
+      const result = parseDirectoryError('string error');
+
+      expect(result.status).toBe(500);
+      expect(result.error).toBe('Failed to read directory');
+    });
+
+    it('should handle null/undefined errors', () => {
+      const result = parseDirectoryError(null);
+
+      expect(result.status).toBe(500);
+      expect(result.error).toBe('Failed to read directory');
+    });
+  });
+
+  describe('createWorktreeNotFoundError', () => {
+    it('should create 404 error with worktree ID in message', () => {
+      const result = createWorktreeNotFoundError('my-worktree');
+
+      expect(result.status).toBe(404);
+      expect(result.error).toBe("Worktree 'my-worktree' not found");
+    });
+
+    it('should handle special characters in worktree ID', () => {
+      const result = createWorktreeNotFoundError('feature/test-123');
+
+      expect(result.status).toBe(404);
+      expect(result.error).toContain('feature/test-123');
+    });
+  });
+
+  describe('createAccessDeniedError', () => {
+    it('should create 403 error with custom reason', () => {
+      const result = createAccessDeniedError('Path contains excluded pattern');
+
+      expect(result.status).toBe(403);
+      expect(result.error).toBe('Access denied: Path contains excluded pattern');
+    });
+
+    it('should use default reason when not provided', () => {
+      const result = createAccessDeniedError();
+
+      expect(result.status).toBe(403);
+      expect(result.error).toBe('Access denied: Invalid path');
+    });
+
+    it('should handle empty string reason', () => {
+      const result = createAccessDeniedError('');
+
+      expect(result.status).toBe(403);
+      expect(result.error).toBe('Access denied: ');
     });
   });
 });

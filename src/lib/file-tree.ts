@@ -9,6 +9,25 @@ import { readdir, stat, lstat } from 'fs/promises';
 import { join, basename, extname, dirname } from 'path';
 import type { TreeItem, TreeResponse } from '@/types/models';
 
+// ============================================================================
+// Types
+// ============================================================================
+
+/**
+ * Standard API error response structure
+ */
+export interface ApiErrorResponse {
+  error: string;
+  status: number;
+}
+
+/**
+ * Result type for API operations that may fail
+ */
+export type ApiResult<T> =
+  | { success: true; data: T }
+  | { success: false; error: ApiErrorResponse };
+
 /**
  * Patterns for files and directories to exclude from the file tree
  */
@@ -209,5 +228,68 @@ export async function readDirectory(
     name: relativePath ? basename(relativePath) : '',
     items: sortedItems,
     parentPath,
+  };
+}
+
+// ============================================================================
+// API Helper Functions
+// ============================================================================
+
+/**
+ * Parse error message and return appropriate API error response
+ *
+ * Maps common error messages to HTTP status codes for consistent API responses.
+ *
+ * @param error - The error to parse
+ * @returns ApiErrorResponse with appropriate status code and message
+ */
+export function parseDirectoryError(error: unknown): ApiErrorResponse {
+  const message = error instanceof Error ? error.message : 'Unknown error';
+
+  if (message.includes('not found')) {
+    return {
+      error: 'Directory not found',
+      status: 404,
+    };
+  }
+
+  if (message.includes('not a directory')) {
+    return {
+      error: 'Path is not a directory',
+      status: 400,
+    };
+  }
+
+  return {
+    error: 'Failed to read directory',
+    status: 500,
+  };
+}
+
+/**
+ * Create a standardized worktree not found error response
+ *
+ * @param worktreeId - The ID of the worktree that was not found
+ * @returns ApiErrorResponse for a 404 not found error
+ */
+export function createWorktreeNotFoundError(worktreeId: string): ApiErrorResponse {
+  return {
+    error: `Worktree '${worktreeId}' not found`,
+    status: 404,
+  };
+}
+
+/**
+ * Create a standardized access denied error response
+ *
+ * @param reason - Optional reason for the access denial
+ * @returns ApiErrorResponse for a 403 forbidden error
+ */
+export function createAccessDeniedError(
+  reason: string = 'Invalid path'
+): ApiErrorResponse {
+  return {
+    error: `Access denied: ${reason}`,
+    status: 403,
   };
 }

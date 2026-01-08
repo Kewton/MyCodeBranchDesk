@@ -6,7 +6,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbInstance } from '@/lib/db-instance';
 import { getWorktreeById } from '@/lib/db';
-import { readDirectory } from '@/lib/file-tree';
+import {
+  readDirectory,
+  parseDirectoryError,
+  createWorktreeNotFoundError,
+} from '@/lib/file-tree';
 
 export async function GET(
   request: NextRequest,
@@ -18,9 +22,10 @@ export async function GET(
     // Check if worktree exists
     const worktree = getWorktreeById(db, params.id);
     if (!worktree) {
+      const errorResponse = createWorktreeNotFoundError(params.id);
       return NextResponse.json(
-        { error: `Worktree '${params.id}' not found` },
-        { status: 404 }
+        { error: errorResponse.error },
+        { status: errorResponse.status }
       );
     }
 
@@ -31,18 +36,10 @@ export async function GET(
   } catch (error: unknown) {
     console.error('Error reading directory:', error);
 
-    const message = error instanceof Error ? error.message : 'Unknown error';
-
-    if (message.includes('not found')) {
-      return NextResponse.json(
-        { error: 'Directory not found' },
-        { status: 404 }
-      );
-    }
-
+    const errorResponse = parseDirectoryError(error);
     return NextResponse.json(
-      { error: 'Failed to read directory' },
-      { status: 500 }
+      { error: errorResponse.error },
+      { status: errorResponse.status }
     );
   }
 }
