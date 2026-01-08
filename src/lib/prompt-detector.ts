@@ -167,7 +167,8 @@ function detectMultipleChoicePrompt(output: string): PromptDetectionResult {
   const lines = output.split('\n');
 
   // Look for lines that match the pattern: [optional leading spaces] [❯ or spaces] [number]. [text]
-  const optionPattern = /^\s*([❯ ]\s*)?(\d+)\.\s+(.+)$/;
+  // Note: ANSI codes sometimes cause spaces to be lost after stripping, so we use \s* instead of \s+
+  const optionPattern = /^\s*([❯ ]\s*)?(\d+)\.\s*(.+)$/;
   const options: Array<{ number: number; label: string; isDefault: boolean }> = [];
 
   let questionEndIndex = -1;
@@ -194,7 +195,10 @@ function detectMultipleChoicePrompt(output: string): PromptDetectionResult {
     } else if (options.length > 0 && line && !line.match(/^[-─]+$/)) {
       // Check if this is a continuation line (indented line between options)
       // Continuation lines typically start with spaces (like "  work/github...")
-      const isContinuationLine = rawLine.match(/^\s{2,}[^\d]/) && !rawLine.match(/^\s*\d+\./);
+      // Also treat very short lines (< 5 chars) as potential word-wrap fragments
+      const hasLeadingSpaces = rawLine.match(/^\s{2,}[^\d]/) && !rawLine.match(/^\s*\d+\./);
+      const isShortFragment = line.length < 5 && !line.endsWith('?');
+      const isContinuationLine = hasLeadingSpaces || isShortFragment;
 
       if (isContinuationLine) {
         // Skip continuation lines and continue scanning for more options

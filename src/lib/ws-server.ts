@@ -38,9 +38,14 @@ const rooms = new Map<string, Set<WebSocket>>();
 export function setupWebSocket(server: HTTPServer): void {
   wss = new WebSocketServer({ server });
 
+  // Handle WebSocket server errors (e.g., invalid frames from clients)
+  wss.on('error', (error) => {
+    console.error('[WS Server] Error:', error.message);
+  });
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
-    console.log('WebSocket client connected');
+    // Connection logging removed to reduce noise
 
     // Initialize client info
     const clientInfo: ClientInfo = {
@@ -48,6 +53,33 @@ export function setupWebSocket(server: HTTPServer): void {
       worktreeIds: new Set(),
     };
     clients.set(ws, clientInfo);
+
+    // Handle underlying socket errors (catches invalid frame errors earlier)
+    // Force destroy the socket on error to prevent further frame processing
+    const socket = (ws as unknown as { _socket?: { on: (event: string, handler: (err: Error) => void) => void; destroy?: () => void } })._socket;
+    if (socket) {
+      socket.on('error', (err: Error & { code?: string }) => {
+        // Suppress common mobile browser disconnect errors
+        const isExpectedError =
+          err.code === 'WS_ERR_INVALID_CLOSE_CODE' ||
+          err.message?.includes('Invalid WebSocket frame') ||
+          err.message?.includes('write after end') ||
+          err.message?.includes('ECONNRESET') ||
+          err.message?.includes('EPIPE');
+
+        if (!isExpectedError) {
+          console.error('[WS Socket] Error:', err.message);
+        }
+
+        // Immediately destroy the socket to prevent further errors
+        try {
+          if (socket.destroy) socket.destroy();
+        } catch {
+          // Socket may already be destroyed
+        }
+        handleDisconnect(ws);
+      });
+    }
 
     // Handle messages
     ws.on('message', (data: Buffer) => {
@@ -60,17 +92,30 @@ export function setupWebSocket(server: HTTPServer): void {
       }
     });
 
-    // Handle disconnection
-    ws.on('close', (code, reason) => {
-      const clientInfo = clients.get(ws);
-      const subscribedWorktrees = clientInfo ? Array.from(clientInfo.worktreeIds) : [];
-      console.log(`[WS] Client disconnected - code: ${code}, reason: ${reason || 'none'}, subscribed to: ${subscribedWorktrees.join(', ') || 'none'}`);
+    // Handle disconnection - silently clean up
+    ws.on('close', () => {
       handleDisconnect(ws);
     });
 
-    // Handle errors
-    ws.on('error', (error) => {
-      console.error('WebSocket error:', error);
+    // Handle errors (including invalid close codes from mobile browsers)
+    ws.on('error', (error: Error & { code?: string }) => {
+      // Suppress noisy errors from mobile browser disconnects
+      const isExpectedError =
+        error.code === 'WS_ERR_INVALID_CLOSE_CODE' ||
+        error.message?.includes('Invalid WebSocket frame') ||
+        error.message?.includes('write after end');
+
+      if (!isExpectedError) {
+        console.error('[WS] WebSocket error:', error.message);
+      }
+
+      // Immediately terminate to prevent further errors
+      try {
+        ws.terminate();
+      } catch {
+        // WebSocket may already be closed
+      }
+      handleDisconnect(ws);
     });
   });
 

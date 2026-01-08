@@ -3,6 +3,29 @@
  * Integrates WebSocket server for real-time communication
  */
 
+// IMPORTANT: Register uncaught exception handler FIRST, before any imports
+// This ensures we catch WebSocket frame errors before other handlers
+process.on('uncaughtException', (error: Error & { code?: string }) => {
+  // Check for WebSocket-related errors that are non-fatal
+  const isWebSocketError =
+    error.code === 'WS_ERR_INVALID_UTF8' ||
+    error.code === 'WS_ERR_INVALID_CLOSE_CODE' ||
+    error.code === 'WS_ERR_UNEXPECTED_RSV_1' ||
+    error.code === 'ECONNRESET' ||
+    error.code === 'EPIPE' ||
+    (error instanceof RangeError && error.message?.includes('Invalid WebSocket frame')) ||
+    error.message?.includes('write after end');
+
+  if (isWebSocketError) {
+    // Silently ignore these non-fatal WebSocket frame errors
+    // They commonly occur when mobile browsers send malformed close frames
+    return;
+  }
+  // For other uncaught exceptions, log and exit
+  console.error('Uncaught exception:', error);
+  process.exit(1);
+});
+
 import { createServer } from 'http';
 import { parse } from 'url';
 import next from 'next';
@@ -23,23 +46,6 @@ const port = parseInt(process.env.MCBD_PORT || process.env.PORT || '3000', 10);
 // Create Next.js app
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
-
-// Handle uncaught WebSocket errors
-process.on('uncaughtException', (error: any) => {
-  // Log WebSocket errors but don't crash the server
-  if (
-    error.code === 'WS_ERR_INVALID_UTF8' ||
-    error.code === 'WS_ERR_INVALID_CLOSE_CODE' ||
-    (error instanceof RangeError && error.message?.includes('Invalid WebSocket frame'))
-  ) {
-    // Silently ignore these non-fatal WebSocket frame errors
-    // They occur when browsers send malformed close frames
-    return;
-  }
-  // For other uncaught exceptions, log and exit
-  console.error('Uncaught exception:', error);
-  process.exit(1);
-});
 
 app.prepare().then(() => {
   // Create HTTP server
@@ -100,26 +106,38 @@ app.prepare().then(() => {
     await initializeWorktrees();
   });
 
-  // Graceful shutdown
-  process.on('SIGTERM', () => {
-    console.log('SIGTERM signal received: closing HTTP server');
-    stopAllPolling();
-    server.close(() => {
-      console.log('HTTP server closed');
-      closeWebSocket();
-      console.log('WebSocket server closed');
-      process.exit(0);
-    });
-  });
+  // Graceful shutdown with timeout
+  let isShuttingDown = false;
 
-  process.on('SIGINT', () => {
-    console.log('SIGINT signal received: closing HTTP server');
+  function gracefulShutdown(signal: string) {
+    if (isShuttingDown) {
+      console.log('Shutdown already in progress, forcing exit...');
+      process.exit(1);
+    }
+    isShuttingDown = true;
+
+    console.log(`${signal} received: shutting down...`);
+
+    // Stop polling first
     stopAllPolling();
+
+    // Close WebSocket connections immediately (don't wait)
+    closeWebSocket();
+
+    // Force exit after 3 seconds if graceful shutdown fails
+    const forceExitTimeout = setTimeout(() => {
+      console.log('Graceful shutdown timeout, forcing exit...');
+      process.exit(1);
+    }, 3000);
+
+    // Try graceful HTTP server close
     server.close(() => {
-      console.log('HTTP server closed');
-      closeWebSocket();
-      console.log('WebSocket server closed');
+      clearTimeout(forceExitTimeout);
+      console.log('Server closed gracefully');
       process.exit(0);
     });
-  });
+  }
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 });

@@ -63,6 +63,10 @@ Stop フック（CLAUDE_HOOKS_STOP）を活用した イベント駆動アーキ
 - 📝 Markdown ログ保存
 - 各 worktree 配下の .claude_logs/ に詳細な Markdown ログを保存
 - チャット画面には要約／短縮表示、ログ画面で詳細確認
+- 📐 レスポンシブ UI（Issue #13 で実装）
+- デスクトップ: 2カラム分割レイアウト（リサイズ可能）
+- モバイル: タブベースナビゲーション + ボトムシート
+- 詳細は [UI/UX ガイド](./docs/UI_UX_GUIDE.md) を参照
 - 🧩 Claude Code / SWE Agent フレンドリー
 - 設計書や構成を docs/ 配下に分離
 - SWE エージェント（Claude Code / OpenHands など）にタスクを振りやすい構造
@@ -166,16 +170,22 @@ MCBD_AUTH_TOKEN=local-dev-only-token
 
 1. 起動
 
-開発モードで起動する場合:
+**開発モード**（PC のみ推奨）:
 
 ```bash
 npm run dev
+```
 
-ビルド済みのアプリを起動する場合（任意）:
+**本番モード**（モバイルアクセス推奨）:
 
+```bash
 npm run build
 npm start
 ```
+
+> **重要**: モバイルデバイスからアクセスする場合は、**本番モード**（`npm run build && npm start`）を推奨します。
+> 開発モードでは Next.js の HMR (Hot Module Replacement) WebSocket がモバイルブラウザの
+> 不正なクローズフレームでエラーログを出力することがあります（動作には影響しません）。
 
 ブラウザから以下にアクセスします。
 - PC から: http://localhost:3000
