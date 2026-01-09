@@ -11,7 +11,7 @@ import { useCallback, useMemo, memo } from 'react';
 /**
  * Tab type for mobile view
  */
-export type MobileTab = 'terminal' | 'history' | 'files' | 'info';
+export type MobileTab = 'terminal' | 'history' | 'files' | 'memo' | 'info';
 
 /**
  * Props for MobileTabBar component

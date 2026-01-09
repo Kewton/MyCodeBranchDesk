@@ -16,7 +16,7 @@ import React, { useCallback, memo } from 'react';
 /**
  * Available tabs for the left pane
  */
-export type LeftPaneTab = 'history' | 'files';
+export type LeftPaneTab = 'history' | 'files' | 'memo';
 
 export interface LeftPaneTabSwitcherProps {
   /** Currently active tab */
