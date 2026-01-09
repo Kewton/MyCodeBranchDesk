@@ -32,6 +32,7 @@ import { MessageInput } from '@/components/worktree/MessageInput';
 import { FileTreeView } from '@/components/worktree/FileTreeView';
 import { LeftPaneTabSwitcher, type LeftPaneTab } from '@/components/worktree/LeftPaneTabSwitcher';
 import { FileViewer } from '@/components/worktree/FileViewer';
+import { MemoPane } from '@/components/worktree/MemoPane';
 import { Modal } from '@/components/ui/Modal';
 import { worktreeApi } from '@/lib/api-client';
 import type { Worktree, ChatMessage, PromptData } from '@/types/models';
@@ -634,6 +635,15 @@ const MobileContent = memo(function MobileContent({
           />
         </ErrorBoundary>
       );
+    case 'memo':
+      return (
+        <ErrorBoundary componentName="MemoPane">
+          <MemoPane
+            worktreeId={worktreeId}
+            className="h-full"
+          />
+        </ErrorBoundary>
+      );
     case 'info':
       return (
         <MobileInfoContent
@@ -958,18 +968,27 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
                     onTabChange={handleLeftPaneTabChange}
                   />
                   <div className="flex-1 min-h-0 overflow-hidden">
-                    {leftPaneTab === 'history' ? (
+                    {leftPaneTab === 'history' && (
                       <HistoryPane
                         messages={state.messages}
                         worktreeId={worktreeId}
                         onFilePathClick={handleFilePathClick}
                         className="h-full"
                       />
-                    ) : (
+                    )}
+                    {leftPaneTab === 'files' && (
                       <ErrorBoundary componentName="FileTreeView">
                         <FileTreeView
                           worktreeId={worktreeId}
                           onFileSelect={handleFileSelect}
+                          className="h-full"
+                        />
+                      </ErrorBoundary>
+                    )}
+                    {leftPaneTab === 'memo' && (
+                      <ErrorBoundary componentName="MemoPane">
+                        <MemoPane
+                          worktreeId={worktreeId}
                           className="h-full"
                         />
                       </ErrorBoundary>

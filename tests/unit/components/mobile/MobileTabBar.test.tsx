@@ -31,12 +31,13 @@ describe('MobileTabBar', () => {
       expect(screen.getByTestId('mobile-tab-bar')).toBeInTheDocument();
     });
 
-    it('should render all four tabs', () => {
+    it('should render all five tabs', () => {
       render(<MobileTabBar {...defaultProps} />);
 
       expect(screen.getByRole('tab', { name: /terminal/i })).toBeInTheDocument();
       expect(screen.getByRole('tab', { name: /history/i })).toBeInTheDocument();
       expect(screen.getByRole('tab', { name: /files/i })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /memo/i })).toBeInTheDocument();
       expect(screen.getByRole('tab', { name: /info/i })).toBeInTheDocument();
     });
 
@@ -241,7 +242,40 @@ describe('MobileTabBar', () => {
       expect(screen.getByRole('tab', { name: /terminal/i })).toBeInTheDocument();
       expect(screen.getByRole('tab', { name: /history/i })).toBeInTheDocument();
       expect(screen.getByRole('tab', { name: /files/i })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /memo/i })).toBeInTheDocument();
       expect(screen.getByRole('tab', { name: /info/i })).toBeInTheDocument();
+    });
+  });
+
+  describe('Memo Tab', () => {
+    it('should highlight memo tab when activeTab is memo', () => {
+      render(<MobileTabBar {...defaultProps} activeTab="memo" />);
+
+      const memoTab = screen.getByRole('tab', { name: /memo/i });
+      expect(memoTab).toHaveAttribute('aria-selected', 'true');
+    });
+
+    it('should call onTabChange with "memo" when memo tab is clicked', () => {
+      const onTabChange = vi.fn();
+      render(<MobileTabBar {...defaultProps} onTabChange={onTabChange} />);
+
+      fireEvent.click(screen.getByRole('tab', { name: /memo/i }));
+
+      expect(onTabChange).toHaveBeenCalledWith('memo');
+    });
+
+    it('should render memo tab in correct position (after files, before info)', () => {
+      render(<MobileTabBar {...defaultProps} />);
+
+      const tabs = screen.getAllByRole('tab');
+      const tabLabels = tabs.map(tab => tab.textContent?.toLowerCase().trim());
+
+      // Order: terminal, history, files, memo, info
+      expect(tabLabels[0]).toContain('terminal');
+      expect(tabLabels[1]).toContain('history');
+      expect(tabLabels[2]).toContain('files');
+      expect(tabLabels[3]).toContain('memo');
+      expect(tabLabels[4]).toContain('info');
     });
   });
 
