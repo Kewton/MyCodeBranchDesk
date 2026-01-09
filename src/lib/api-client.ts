@@ -4,6 +4,7 @@
  */
 
 import type { Worktree, ChatMessage } from '@/types/models';
+import type { SlashCommandGroup } from '@/types/slash-commands';
 
 /**
  * Repository summary from API
@@ -246,6 +247,25 @@ export const repositoryApi = {
     return fetchApi('/api/repositories/sync', {
       method: 'POST',
     });
+  },
+};
+
+/**
+ * Slash Commands API response
+ */
+export interface SlashCommandsResponse {
+  groups: SlashCommandGroup[];
+}
+
+/**
+ * Slash Command API client
+ */
+export const slashCommandApi = {
+  /**
+   * Get all slash commands grouped by category
+   */
+  async getAll(): Promise<SlashCommandsResponse> {
+    return fetchApi<SlashCommandsResponse>('/api/slash-commands');
   },
 };
 
