@@ -97,10 +97,27 @@ hotfix/*  ──PR──> main
 ```
 src/
 ├── app/           # Next.js App Router
+│   └── api/       # APIルート
 ├── components/    # UIコンポーネント
+│   ├── sidebar/   # サイドバー関連
+│   ├── mobile/    # モバイル専用
+│   └── worktree/  # ワークツリー詳細
+├── config/        # 設定（ステータス色など）
+├── contexts/      # React Context
 ├── lib/           # ユーティリティ・ビジネスロジック
+│   └── cli-tools/ # CLIツール抽象化層
 └── types/         # 型定義
 ```
+
+### 主要機能モジュール
+
+| モジュール | 説明 |
+|-----------|------|
+| `src/config/status-colors.ts` | ステータス色の一元管理 |
+| `src/lib/cli-patterns.ts` | CLIツール別パターン定義 |
+| `src/lib/prompt-detector.ts` | プロンプト検出ロジック |
+| `src/lib/cli-tools/` | CLIツール抽象化（Strategy パターン） |
+| `src/types/sidebar.ts` | サイドバーステータス判定 |
 
 ---
 
@@ -200,10 +217,32 @@ npm run db:reset      # DBリセット
 
 ---
 
+## 最近の実装機能
+
+### Issue #31: サイドバーのUX改善
+- **リアルタイムステータス検出**: ターミナル出力を直接解析
+- **ステータス色**: idle(グレー) / ready(緑) / running(スピナー) / waiting(黄)
+- **ポーリング間隔**: 2秒
+- 詳細: [ステータスインジケーター](./docs/features/sidebar-status-indicator.md)
+
+### Issue #22: マルチタスクサイドバー
+- **2カラムレイアウト**: デスクトップでサイドバー常時表示
+- **ブランチ一覧**: リアルタイムステータス付き
+- **ソート機能**: 更新日時、リポジトリ名、ブランチ名、ステータス
+
+### Issue #4: 複数CLIツールサポート
+- **対応ツール**: Claude Code / Codex CLI / Gemini CLI
+- **Strategy パターン**: 拡張可能な設計
+- **ワークツリー単位**: 各ブランチで異なるCLIツールを選択可能
+
+---
+
 ## 関連ドキュメント
 
 - [README.md](./README.md) - プロジェクト概要
+- [アーキテクチャ](./docs/architecture.md) - システム設計
 - [クイックスタートガイド](./docs/user-guide/quick-start.md) - 5分で始める開発フロー
 - [コマンド利用ガイド](./docs/user-guide/commands-guide.md) - コマンドの詳細
 - [エージェント利用ガイド](./docs/user-guide/agents-guide.md) - エージェントの詳細
 - [ワークフロー例](./docs/user-guide/workflow-examples.md) - 実践的な使用例
+- [ステータスインジケーター](./docs/features/sidebar-status-indicator.md) - サイドバー機能詳細
