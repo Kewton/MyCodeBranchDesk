@@ -6,7 +6,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { MainLayout } from '@/components/layout';
+import { AppShell } from '@/components/layout';
 import { WorktreeDetailRefactored } from '@/components/worktree/WorktreeDetailRefactored';
 
 export default function WorktreeDetailPage() {
@@ -14,8 +14,8 @@ export default function WorktreeDetailPage() {
   const worktreeId = params.id as string;
 
   return (
-    <MainLayout>
+    <AppShell>
       <WorktreeDetailRefactored worktreeId={worktreeId} />
-    </MainLayout>
+    </AppShell>
   );
 }

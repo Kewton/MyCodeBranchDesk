@@ -509,7 +509,40 @@ feature/foo
 - その他のCLI（openai, lmstudio等）を追加する場合は、`BaseCLITool`を継承して実装
 - Stop フックの仕様が異なる場合は各ツールクラス内で対応
 
-### 10.3 Observability
+### 10.3 リアルタイムステータス検出 ✅ 実装済み (Issue #31)
+
+**実装内容:**
+- ターミナル出力を直接解析してCLIツールの状態をリアルタイム検出
+- サイドバーに視覚的なステータスインジケーターを表示
+- 2秒間隔でポーリング更新
+
+**ステータス種別:**
+| ステータス | 表示 | 検出条件 |
+|-----------|------|----------|
+| `idle` | グレー● | セッション未起動 |
+| `ready` | 緑● | 入力プロンプト `❯` 表示中 |
+| `running` | 青スピナー | 思考インジケータ検出 |
+| `waiting` | 黄● | インタラクティブプロンプト検出 |
+
+**検出ロジック:**
+1. `captureSessionOutput()` でターミナル出力を取得
+2. ANSIエスケープコードを除去
+3. 空行をフィルタリングして最後15行を抽出
+4. 優先順位に従ってパターンマッチング:
+   - インタラクティブプロンプト → `waiting`
+   - 思考インジケータ (`✻ Thinking…`) → `running`
+   - 入力プロンプト (`❯`) → `ready`
+   - それ以外 → `running` (処理中と推定)
+
+**関連ファイル:**
+- `src/config/status-colors.ts` - ステータス色の一元管理
+- `src/lib/cli-patterns.ts` - CLIツール別パターン定義
+- `src/lib/prompt-detector.ts` - プロンプト検出
+- `src/types/sidebar.ts` - ステータス判定ロジック
+
+詳細は [ステータスインジケーター](./features/sidebar-status-indicator.md) を参照。
+
+### 10.4 Observability
 - 将来的に:
 - 応答時間（latency）の計測
 - エラー率

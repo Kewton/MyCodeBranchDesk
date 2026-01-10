@@ -5,7 +5,7 @@
 
 import { randomUUID } from 'crypto';
 import Database from 'better-sqlite3';
-import type { Worktree, ChatMessage, WorktreeSessionState } from '@/types/models';
+import type { Worktree, ChatMessage, WorktreeSessionState, WorktreeMemo } from '@/types/models';
 import type { CLIToolType } from '@/lib/cli-tools/types';
 
 type ChatMessageRow = {
@@ -175,25 +175,30 @@ function getLastMessagesByCliBatch(
 /**
  * Get all worktrees sorted by updated_at (desc)
  * Optionally filter by repository path
+ * Includes lastViewedAt and lastAssistantMessageAt for unread tracking
  */
 export function getWorktrees(
   db: Database.Database,
   repositoryPath?: string
 ): Worktree[] {
   let query = `
-    SELECT id, name, path, repository_path, repository_name, memo,
-           last_user_message, last_user_message_at, last_message_summary, updated_at, favorite, status, link, cli_tool_id
-    FROM worktrees
+    SELECT
+      w.id, w.name, w.path, w.repository_path, w.repository_name, w.memo,
+      w.last_user_message, w.last_user_message_at, w.last_message_summary,
+      w.updated_at, w.favorite, w.status, w.link, w.cli_tool_id, w.last_viewed_at,
+      (SELECT MAX(timestamp) FROM chat_messages
+       WHERE worktree_id = w.id AND role = 'assistant') as last_assistant_message_at
+    FROM worktrees w
   `;
 
   const params: string[] = [];
 
   if (repositoryPath) {
-    query += ` WHERE repository_path = ?`;
+    query += ` WHERE w.repository_path = ?`;
     params.push(repositoryPath);
   }
 
-  query += ` ORDER BY updated_at DESC NULLS LAST`;
+  query += ` ORDER BY w.updated_at DESC NULLS LAST`;
 
   const stmt = db.prepare(query);
   const rows = stmt.all(...params) as Array<{
@@ -211,6 +216,8 @@ export function getWorktrees(
     status: string | null;
     link: string | null;
     cli_tool_id: string | null;
+    last_viewed_at: string | null;
+    last_assistant_message_at: number | null;
   }>;
 
   // Batch fetch last messages for all worktrees (N+1 optimization)
@@ -232,6 +239,8 @@ export function getWorktrees(
       lastMessageSummary: row.last_message_summary || undefined,
       lastMessagesByCli,
       updatedAt: row.updated_at ? new Date(row.updated_at) : undefined,
+      lastViewedAt: row.last_viewed_at ? new Date(row.last_viewed_at) : undefined,
+      lastAssistantMessageAt: row.last_assistant_message_at ? new Date(row.last_assistant_message_at) : undefined,
       favorite: row.favorite === 1,
       status: (row.status as 'todo' | 'doing' | 'done' | null) || null,
       link: row.link || undefined,
@@ -274,16 +283,21 @@ export function getRepositories(db: Database.Database): Array<{
 
 /**
  * Get worktree by ID
+ * Includes lastViewedAt and lastAssistantMessageAt for unread tracking
  */
 export function getWorktreeById(
   db: Database.Database,
   id: string
 ): Worktree | null {
   const stmt = db.prepare(`
-    SELECT id, name, path, repository_path, repository_name, memo,
-           last_user_message, last_user_message_at, last_message_summary, updated_at, favorite, status, link, cli_tool_id
-    FROM worktrees
-    WHERE id = ?
+    SELECT
+      w.id, w.name, w.path, w.repository_path, w.repository_name, w.memo,
+      w.last_user_message, w.last_user_message_at, w.last_message_summary,
+      w.updated_at, w.favorite, w.status, w.link, w.cli_tool_id, w.last_viewed_at,
+      (SELECT MAX(timestamp) FROM chat_messages
+       WHERE worktree_id = w.id AND role = 'assistant') as last_assistant_message_at
+    FROM worktrees w
+    WHERE w.id = ?
   `);
 
   const row = stmt.get(id) as {
@@ -301,6 +315,8 @@ export function getWorktreeById(
     status: string | null;
     link: string | null;
     cli_tool_id: string | null;
+    last_viewed_at: string | null;
+    last_assistant_message_at: number | null;
   } | undefined;
 
   if (!row) {
@@ -318,6 +334,8 @@ export function getWorktreeById(
     lastUserMessageAt: row.last_user_message_at ? new Date(row.last_user_message_at) : undefined,
     lastMessageSummary: row.last_message_summary || undefined,
     updatedAt: row.updated_at ? new Date(row.updated_at) : undefined,
+    lastViewedAt: row.last_viewed_at ? new Date(row.last_viewed_at) : undefined,
+    lastAssistantMessageAt: row.last_assistant_message_at ? new Date(row.last_assistant_message_at) : undefined,
     favorite: row.favorite === 1,
     status: (row.status as 'todo' | 'doing' | 'done' | null) || null,
     link: row.link || undefined,
@@ -347,12 +365,12 @@ export function upsertWorktree(
       path = excluded.path,
       repository_path = excluded.repository_path,
       repository_name = excluded.repository_name,
-      memo = excluded.memo,
-      last_user_message = excluded.last_user_message,
-      last_user_message_at = excluded.last_user_message_at,
-      last_message_summary = excluded.last_message_summary,
-      updated_at = excluded.updated_at,
-      cli_tool_id = excluded.cli_tool_id
+      memo = COALESCE(excluded.memo, worktrees.memo),
+      last_user_message = COALESCE(excluded.last_user_message, worktrees.last_user_message),
+      last_user_message_at = COALESCE(excluded.last_user_message_at, worktrees.last_user_message_at),
+      last_message_summary = COALESCE(excluded.last_message_summary, worktrees.last_message_summary),
+      updated_at = COALESCE(excluded.updated_at, worktrees.updated_at),
+      cli_tool_id = COALESCE(excluded.cli_tool_id, worktrees.cli_tool_id)
   `);
 
   stmt.run(
@@ -402,6 +420,47 @@ export function updateWorktreeLink(
   `);
 
   stmt.run(link || null, worktreeId);
+}
+
+/**
+ * Update worktree's last_viewed_at timestamp
+ * Used for unread tracking (Issue #31)
+ */
+export function updateLastViewedAt(
+  db: Database.Database,
+  worktreeId: string,
+  viewedAt: Date
+): void {
+  const stmt = db.prepare(`
+    UPDATE worktrees
+    SET last_viewed_at = ?
+    WHERE id = ?
+  `);
+
+  stmt.run(viewedAt.toISOString(), worktreeId);
+}
+
+/**
+ * Get the timestamp of the most recent assistant message for a worktree
+ * Used for unread tracking (Issue #31)
+ */
+export function getLastAssistantMessageAt(
+  db: Database.Database,
+  worktreeId: string
+): Date | null {
+  const stmt = db.prepare(`
+    SELECT MAX(timestamp) as last_assistant_message_at
+    FROM chat_messages
+    WHERE worktree_id = ? AND role = 'assistant'
+  `);
+
+  const row = stmt.get(worktreeId) as { last_assistant_message_at: number | null } | undefined;
+
+  if (!row || row.last_assistant_message_at === null) {
+    return null;
+  }
+
+  return new Date(row.last_assistant_message_at);
 }
 
 /**
@@ -763,6 +822,57 @@ export function updatePromptData(
 }
 
 /**
+ * Mark all pending prompts as answered for a worktree/CLI tool
+ * This is called when we detect Claude has started processing (new response detected)
+ * which means any pending prompts must have been answered via terminal
+ */
+export function markPendingPromptsAsAnswered(
+  db: Database.Database,
+  worktreeId: string,
+  cliToolId: CLIToolType
+): number {
+  // Find all pending prompt messages for this worktree/CLI tool
+  const selectStmt = db.prepare(`
+    SELECT id, prompt_data
+    FROM chat_messages
+    WHERE worktree_id = ?
+      AND cli_tool_id = ?
+      AND message_type = 'prompt'
+      AND json_extract(prompt_data, '$.status') = 'pending'
+    ORDER BY timestamp DESC
+  `);
+
+  const rows = selectStmt.all(worktreeId, cliToolId) as { id: string; prompt_data: string }[];
+
+  if (rows.length === 0) {
+    return 0;
+  }
+
+  // Update each pending prompt to answered
+  const updateStmt = db.prepare(`
+    UPDATE chat_messages
+    SET prompt_data = ?
+    WHERE id = ?
+  `);
+
+  let updatedCount = 0;
+  for (const row of rows) {
+    try {
+      const promptData = JSON.parse(row.prompt_data);
+      promptData.status = 'answered';
+      promptData.answer = '(answered via terminal)';
+      promptData.answeredAt = new Date().toISOString();
+      updateStmt.run(JSON.stringify(promptData), row.id);
+      updatedCount++;
+    } catch {
+      // Skip if prompt_data is invalid JSON
+    }
+  }
+
+  return updatedCount;
+}
+
+/**
  * Update favorite status for a worktree
  */
 export function updateFavorite(
@@ -811,4 +921,220 @@ export function updateCliToolId(
   `);
 
   stmt.run(cliToolId, id);
+}
+
+// ============================================================
+// Memo Operations
+// ============================================================
+
+/**
+ * Database row type for worktree memos
+ */
+type WorktreeMemoRow = {
+  id: string;
+  worktree_id: string;
+  title: string;
+  content: string;
+  position: number;
+  created_at: number;
+  updated_at: number;
+};
+
+/**
+ * Map database row to WorktreeMemo model
+ */
+function mapMemoRow(row: WorktreeMemoRow): WorktreeMemo {
+  return {
+    id: row.id,
+    worktreeId: row.worktree_id,
+    title: row.title,
+    content: row.content,
+    position: row.position,
+    createdAt: new Date(row.created_at),
+    updatedAt: new Date(row.updated_at),
+  };
+}
+
+/**
+ * Get all memos for a worktree, sorted by position
+ */
+export function getMemosByWorktreeId(
+  db: Database.Database,
+  worktreeId: string
+): WorktreeMemo[] {
+  const stmt = db.prepare(`
+    SELECT id, worktree_id, title, content, position, created_at, updated_at
+    FROM worktree_memos
+    WHERE worktree_id = ?
+    ORDER BY position ASC
+  `);
+
+  const rows = stmt.all(worktreeId) as WorktreeMemoRow[];
+  return rows.map(mapMemoRow);
+}
+
+/**
+ * Get a memo by ID
+ *
+ * @param db - Database instance
+ * @param memoId - ID of the memo
+ * @returns Memo or null if not found
+ */
+export function getMemoById(
+  db: Database.Database,
+  memoId: string
+): WorktreeMemo | null {
+  const stmt = db.prepare(`
+    SELECT id, worktree_id, title, content, position, created_at, updated_at
+    FROM worktree_memos
+    WHERE id = ?
+  `);
+
+  const row = stmt.get(memoId) as WorktreeMemoRow | undefined;
+  return row ? mapMemoRow(row) : null;
+}
+
+/**
+ * Create a new memo for a worktree
+ *
+ * @param db - Database instance
+ * @param worktreeId - ID of the worktree
+ * @param options - Memo options (title, content, position)
+ * @returns Created memo
+ */
+export function createMemo(
+  db: Database.Database,
+  worktreeId: string,
+  options: {
+    title?: string;
+    content?: string;
+    position: number;
+  }
+): WorktreeMemo {
+  const id = randomUUID();
+  const now = Date.now();
+  const title = options.title ?? 'Memo';
+  const content = options.content ?? '';
+
+  const stmt = db.prepare(`
+    INSERT INTO worktree_memos (id, worktree_id, title, content, position, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  stmt.run(id, worktreeId, title, content, options.position, now, now);
+
+  return {
+    id,
+    worktreeId,
+    title,
+    content,
+    position: options.position,
+    createdAt: new Date(now),
+    updatedAt: new Date(now),
+  };
+}
+
+/**
+ * Update an existing memo
+ *
+ * @param db - Database instance
+ * @param memoId - ID of the memo to update
+ * @param updates - Fields to update (title and/or content)
+ */
+export function updateMemo(
+  db: Database.Database,
+  memoId: string,
+  updates: {
+    title?: string;
+    content?: string;
+  }
+): void {
+  const now = Date.now();
+  const assignments: string[] = ['updated_at = ?'];
+  const params: (string | number)[] = [now];
+
+  if (updates.title !== undefined) {
+    assignments.push('title = ?');
+    params.push(updates.title);
+  }
+
+  if (updates.content !== undefined) {
+    assignments.push('content = ?');
+    params.push(updates.content);
+  }
+
+  params.push(memoId);
+
+  const stmt = db.prepare(`
+    UPDATE worktree_memos
+    SET ${assignments.join(', ')}
+    WHERE id = ?
+  `);
+
+  stmt.run(...params);
+}
+
+/**
+ * Delete a memo by ID
+ *
+ * @param db - Database instance
+ * @param memoId - ID of the memo to delete
+ */
+export function deleteMemo(
+  db: Database.Database,
+  memoId: string
+): void {
+  const stmt = db.prepare(`
+    DELETE FROM worktree_memos
+    WHERE id = ?
+  `);
+
+  stmt.run(memoId);
+}
+
+/**
+ * Reorder memos for a worktree
+ *
+ * Uses a two-step approach to handle UNIQUE constraint on (worktree_id, position):
+ * 1. Set all positions to negative values (temporary)
+ * 2. Set new positions from the provided order
+ *
+ * @param db - Database instance
+ * @param worktreeId - ID of the worktree
+ * @param memoIds - Array of memo IDs in the desired order
+ */
+export function reorderMemos(
+  db: Database.Database,
+  worktreeId: string,
+  memoIds: string[]
+): void {
+  if (memoIds.length === 0) {
+    return;
+  }
+
+  const now = Date.now();
+
+  db.transaction(() => {
+    // Step 1: Set all positions to negative values (to avoid UNIQUE constraint violations)
+    const resetStmt = db.prepare(`
+      UPDATE worktree_memos
+      SET position = -1 - position
+      WHERE id = ?
+    `);
+
+    for (const memoId of memoIds) {
+      resetStmt.run(memoId);
+    }
+
+    // Step 2: Set new positions based on array order
+    const updateStmt = db.prepare(`
+      UPDATE worktree_memos
+      SET position = ?, updated_at = ?
+      WHERE id = ?
+    `);
+
+    memoIds.forEach((memoId, index) => {
+      updateStmt.run(index, now, memoId);
+    });
+  })();
 }

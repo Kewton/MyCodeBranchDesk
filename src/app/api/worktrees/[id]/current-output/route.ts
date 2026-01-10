@@ -68,9 +68,9 @@ export async function GET(
     const newLines = lines.slice(Math.max(0, lastCapturedLine));
     const newContent = newLines.join('\n');
 
-    // Check for thinking state (spinner showing)
-    const lastSection = stripAnsi(lines.slice(-20).join('\n'));
-    const thinking = detectThinkingState(cliToolId, lastSection);
+    // Check last 15 non-empty lines for state detection
+    const nonEmptyLines = lines.map(l => stripAnsi(l)).filter(line => line.trim() !== '');
+    const lastSection = nonEmptyLines.slice(-15).join('\n');
 
     // Check if it's an interactive prompt (yes/no or multiple choice)
     // Strip ANSI codes before prompt detection for reliable pattern matching
@@ -80,6 +80,10 @@ export async function GET(
     // isComplete is ONLY used for prompt detection (yes/no questions)
     // We no longer try to detect "normal" response completion
     const isPromptWaiting = promptDetection.isPrompt;
+
+    // Check for thinking indicator FIRST (takes priority)
+    // Even if input prompt is visible, thinking indicator means processing
+    const thinking = !isPromptWaiting && detectThinkingState(cliToolId, lastSection);
 
     // Extract realtime snippet (last 100 lines for better context)
     const realtimeSnippet = lines.slice(-100).join('\n');
@@ -94,8 +98,8 @@ export async function GET(
       lastCapturedLine,
       // isComplete only true for prompts now
       isComplete: isPromptWaiting,
-      // Always show as generating while session is running (unless prompt waiting)
-      isGenerating: !isPromptWaiting,
+      // Show as generating only when thinking (not when input prompt showing)
+      isGenerating: thinking,
       thinking,
       thinkingMessage: thinking ? 'Claude is thinking...' : null,
       // Prompt detection results

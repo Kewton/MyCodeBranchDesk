@@ -16,15 +16,17 @@
 
 'use client';
 
-import React, { useEffect, useCallback, useMemo, useState, memo } from 'react';
+import React, { useEffect, useCallback, useMemo, useState, memo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWorktreeUIState } from '@/hooks/useWorktreeUIState';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { useSidebarContext } from '@/contexts/SidebarContext';
 import { WorktreeDesktopLayout } from '@/components/worktree/WorktreeDesktopLayout';
 import { TerminalDisplay } from '@/components/worktree/TerminalDisplay';
 import { HistoryPane } from '@/components/worktree/HistoryPane';
 import { PromptPanel } from '@/components/worktree/PromptPanel';
 import { MobileHeader, type WorktreeStatus } from '@/components/mobile/MobileHeader';
+import { DESKTOP_STATUS_CONFIG } from '@/config/status-colors';
 import { MobileTabBar, type MobileTab } from '@/components/mobile/MobileTabBar';
 import { MobilePromptSheet } from '@/components/mobile/MobilePromptSheet';
 import { ErrorBoundary } from '@/components/error/ErrorBoundary';
@@ -32,6 +34,7 @@ import { MessageInput } from '@/components/worktree/MessageInput';
 import { FileTreeView } from '@/components/worktree/FileTreeView';
 import { LeftPaneTabSwitcher, type LeftPaneTab } from '@/components/worktree/LeftPaneTabSwitcher';
 import { FileViewer } from '@/components/worktree/FileViewer';
+import { MemoPane } from '@/components/worktree/MemoPane';
 import { Modal } from '@/components/ui/Modal';
 import { worktreeApi } from '@/lib/api-client';
 import type { Worktree, ChatMessage, PromptData } from '@/types/models';
@@ -75,16 +78,41 @@ const DEFAULT_WORKTREE_NAME = 'Unknown';
 // Helper Functions
 // ============================================================================
 
-/** Convert UI state to WorktreeStatus for MobileHeader display */
+/** Convert worktree data to WorktreeStatus - consistent with sidebar */
 function deriveWorktreeStatus(
-  isTerminalActive: boolean,
-  isReceiving: boolean,
-  isPromptVisible: boolean,
+  worktree: Worktree | null,
   hasError: boolean
 ): WorktreeStatus {
   if (hasError) return 'error';
-  if (isPromptVisible) return 'waiting';
-  if (isReceiving || isTerminalActive) return 'running';
+  if (!worktree) return 'idle';
+
+  // Use the same logic as sidebar (from API response)
+  const claudeStatus = worktree.sessionStatusByCli?.claude;
+  if (claudeStatus) {
+    if (claudeStatus.isWaitingForResponse) {
+      return 'waiting';
+    }
+    if (claudeStatus.isProcessing) {
+      return 'running';
+    }
+    // Session running but not processing = ready (waiting for user to type new message)
+    if (claudeStatus.isRunning) {
+      return 'ready';
+    }
+  }
+
+  // Fall back to legacy status fields
+  if (worktree.isWaitingForResponse) {
+    return 'waiting';
+  }
+  if (worktree.isProcessing) {
+    return 'running';
+  }
+  // Session running but not processing = ready
+  if (worktree.isSessionRunning) {
+    return 'ready';
+  }
+
   return 'idle';
 }
 
@@ -103,20 +131,61 @@ function parseMessageTimestamps(messages: ChatMessage[]): ChatMessage[] {
 /** Props for DesktopHeader component */
 interface DesktopHeaderProps {
   worktreeName: string;
+  repositoryName: string;
+  memo?: string;
+  status: WorktreeStatus;
   onBackClick: () => void;
   onInfoClick: () => void;
+  onMenuClick: () => void;
 }
 
-/** Desktop header with back button, worktree name, and info button */
+/** Status indicator configuration is imported from @/config/status-colors (SF1) */
+
+/** Desktop header with hamburger menu, back button, worktree name, repository, status, and info button */
 const DesktopHeader = memo(function DesktopHeader({
   worktreeName,
+  repositoryName,
+  memo: worktreeMemo,
+  status,
   onBackClick,
   onInfoClick,
+  onMenuClick,
 }: DesktopHeaderProps) {
+  const statusConfig = DESKTOP_STATUS_CONFIG[status];
+  // Truncate memo to 50 characters
+  const truncatedMemo = worktreeMemo
+    ? worktreeMemo.length > 50
+      ? `${worktreeMemo.substring(0, 50)}...`
+      : worktreeMemo
+    : null;
+
   return (
     <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200">
-      {/* Left: Back button and title */}
+      {/* Left: Menu, Back button and title */}
       <div className="flex items-center gap-3">
+        {/* Hamburger menu button */}
+        <button
+          type="button"
+          onClick={onMenuClick}
+          className="p-2 -ml-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+          aria-label="Toggle sidebar"
+        >
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 6h16M4 12h16M4 18h16"
+            />
+          </svg>
+        </button>
+        <div className="w-px h-6 bg-gray-300" aria-hidden="true" />
         <button
           type="button"
           onClick={onBackClick}
@@ -140,9 +209,41 @@ const DesktopHeader = memo(function DesktopHeader({
           <span className="text-sm font-medium">Back</span>
         </button>
         <div className="w-px h-6 bg-gray-300" aria-hidden="true" />
-        <h1 className="text-lg font-semibold text-gray-900 truncate max-w-md">
-          {worktreeName}
-        </h1>
+        {/* Status indicator */}
+        {statusConfig.type === 'spinner' ? (
+          <span
+            data-testid="desktop-status-indicator"
+            title={statusConfig.label}
+            aria-label={statusConfig.label}
+            className={`w-3 h-3 rounded-full flex-shrink-0 border-2 border-t-transparent animate-spin ${statusConfig.className}`}
+          />
+        ) : (
+          <span
+            data-testid="desktop-status-indicator"
+            title={statusConfig.label}
+            aria-label={statusConfig.label}
+            className={`w-3 h-3 rounded-full flex-shrink-0 ${statusConfig.className}`}
+          />
+        )}
+        {/* Worktree name, memo, and repository */}
+        <div className="flex flex-col min-w-0">
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-semibold text-gray-900 truncate max-w-[200px] leading-tight">
+              {worktreeName}
+            </h1>
+            {truncatedMemo && (
+              <span
+                className="text-sm text-gray-500 truncate max-w-md"
+                title={worktreeMemo}
+              >
+                {truncatedMemo}
+              </span>
+            )}
+          </div>
+          <span className="text-xs text-gray-500 truncate max-w-md">
+            {repositoryName}
+          </span>
+        </div>
       </div>
 
       {/* Right: Info button */}
@@ -191,9 +292,16 @@ const InfoModal = memo(function InfoModal({
   const [memoText, setMemoText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  // Sync memo text when worktree changes or modal opens
+  // Track previous isOpen state to detect modal opening
+  const prevIsOpenRef = useRef(isOpen);
+
+  // Only sync memo text when modal opens (not on every worktree poll)
   useEffect(() => {
-    if (worktree && isOpen) {
+    const wasOpened = isOpen && !prevIsOpenRef.current;
+    prevIsOpenRef.current = isOpen;
+
+    // Only reset memo text when modal first opens, not during editing
+    if (wasOpened && worktree) {
       setMemoText(worktree.memo || '');
       setIsEditingMemo(false);
     }
@@ -424,12 +532,19 @@ const MobileInfoContent = memo(function MobileInfoContent({
   const [memoText, setMemoText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  // Sync memo text when worktree changes
+  // Track previous worktree ID to detect worktree changes
+  const prevWorktreeIdRef = useRef(worktree?.id);
+
+  // Only sync memo text when worktree changes (not during editing due to polling)
   useEffect(() => {
-    if (worktree) {
+    const worktreeChanged = worktree?.id !== prevWorktreeIdRef.current;
+    prevWorktreeIdRef.current = worktree?.id;
+
+    // Only reset memo text when worktree changes, not during editing
+    if (worktreeChanged && worktree && !isEditingMemo) {
       setMemoText(worktree.memo || '');
     }
-  }, [worktree]);
+  }, [worktree, isEditingMemo]);
 
   const handleSaveMemo = useCallback(async () => {
     if (!worktree) return;
@@ -634,11 +749,14 @@ const MobileContent = memo(function MobileContent({
           />
         </ErrorBoundary>
       );
-    case 'logs':
+    case 'memo':
       return (
-        <div className="p-4 text-gray-500 text-center" role="status">
-          Logs view coming soon
-        </div>
+        <ErrorBoundary componentName="MemoPane">
+          <MemoPane
+            worktreeId={worktreeId}
+            className="h-full"
+          />
+        </ErrorBoundary>
       );
     case 'info':
       return (
@@ -669,6 +787,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
 }: WorktreeDetailRefactoredProps) {
   const router = useRouter();
   const isMobile = useIsMobile();
+  const { toggle, openMobileDrawer } = useSidebarContext();
   const { state, actions } = useWorktreeUIState();
 
   // Local state for worktree data and loading status
@@ -881,7 +1000,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
     };
   }, [fetchWorktree, fetchMessages, fetchCurrentOutput]);
 
-  /** Poll for current output at adaptive intervals */
+  /** Poll for current output and worktree status at adaptive intervals */
   useEffect(() => {
     if (loading || error) return;
 
@@ -889,10 +1008,14 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
       ? ACTIVE_POLLING_INTERVAL_MS
       : IDLE_POLLING_INTERVAL_MS;
 
-    const intervalId = setInterval(fetchCurrentOutput, pollingInterval);
+    const pollData = async () => {
+      await Promise.all([fetchCurrentOutput(), fetchWorktree()]);
+    };
+
+    const intervalId = setInterval(pollData, pollingInterval);
 
     return () => clearInterval(intervalId);
-  }, [loading, error, fetchCurrentOutput, state.terminal.isActive]);
+  }, [loading, error, fetchCurrentOutput, fetchWorktree, state.terminal.isActive]);
 
   /** Sync layout mode with viewport size */
   useEffect(() => {
@@ -903,16 +1026,10 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
   // Computed Values
   // ========================================================================
 
-  /** Derive worktree status for mobile header display */
+  /** Derive worktree status - consistent with sidebar display */
   const worktreeStatus = useMemo<WorktreeStatus>(
-    () =>
-      deriveWorktreeStatus(
-        state.terminal.isActive,
-        state.phase === 'receiving',
-        state.prompt.visible,
-        state.error.type !== null
-      ),
-    [state.terminal.isActive, state.phase, state.prompt.visible, state.error.type]
+    () => deriveWorktreeStatus(worktree, state.error.type !== null),
+    [worktree, state.error.type]
   );
 
   /** Current active tab for mobile view */
@@ -949,11 +1066,15 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
     return (
       <ErrorBoundary componentName="WorktreeDetailRefactored">
         <div className="h-full flex flex-col relative">
-          {/* Desktop Header with back button and info */}
+          {/* Desktop Header with back button, status, and info */}
           <DesktopHeader
             worktreeName={worktreeName}
+            repositoryName={worktree?.repositoryName ?? 'Unknown'}
+            memo={worktree?.memo}
+            status={worktreeStatus}
             onBackClick={handleBackClick}
             onInfoClick={handleInfoClick}
+            onMenuClick={toggle}
           />
           <div className="flex-1 min-h-0">
             <WorktreeDesktopLayout
@@ -964,18 +1085,27 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
                     onTabChange={handleLeftPaneTabChange}
                   />
                   <div className="flex-1 min-h-0 overflow-hidden">
-                    {leftPaneTab === 'history' ? (
+                    {leftPaneTab === 'history' && (
                       <HistoryPane
                         messages={state.messages}
                         worktreeId={worktreeId}
                         onFilePathClick={handleFilePathClick}
                         className="h-full"
                       />
-                    ) : (
+                    )}
+                    {leftPaneTab === 'files' && (
                       <ErrorBoundary componentName="FileTreeView">
                         <FileTreeView
                           worktreeId={worktreeId}
                           onFileSelect={handleFileSelect}
+                          className="h-full"
+                        />
+                      </ErrorBoundary>
+                    )}
+                    {leftPaneTab === 'memo' && (
+                      <ErrorBoundary componentName="MemoPane">
+                        <MemoPane
+                          worktreeId={worktreeId}
                           className="h-full"
                         />
                       </ErrorBoundary>
@@ -1042,8 +1172,10 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
       <div className="h-full flex flex-col">
         <MobileHeader
           worktreeName={worktreeName}
+          repositoryName={worktree?.repositoryName}
           status={worktreeStatus}
           onBackClick={handleBackClick}
+          onMenuClick={openMobileDrawer}
         />
 
         <main className="flex-1 pt-14 pb-28 overflow-hidden">

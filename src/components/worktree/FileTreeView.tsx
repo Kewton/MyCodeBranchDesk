@@ -65,18 +65,21 @@ function formatFileSize(bytes: number | undefined): string {
 }
 
 /**
- * Get indentation class based on depth
+ * Get indentation style based on depth
+ * Uses inline styles instead of Tailwind classes to support unlimited depth
+ * Tailwind CSS cannot generate dynamic class names at build time,
+ * so we use inline styles to ensure proper indentation at any depth.
+ *
+ * @param depth - The nesting depth (0 = root level)
+ * @returns React.CSSProperties with paddingLeft set
  */
-function getIndentClass(depth: number): string {
-  const paddingMap: Record<number, string> = {
-    0: 'pl-2',
-    1: 'pl-6',
-    2: 'pl-10',
-    3: 'pl-14',
-    4: 'pl-18',
-    5: 'pl-22',
-  };
-  return paddingMap[depth] || `pl-${2 + depth * 4}`;
+function getIndentStyle(depth: number): React.CSSProperties {
+  // Maximum visual depth to prevent excessive indentation
+  const maxVisualDepth = 20;
+  const effectiveDepth = Math.min(depth, maxVisualDepth);
+  // Base padding of 0.5rem + 1rem per depth level
+  const paddingLeft = 0.5 + effectiveDepth * 1;
+  return { paddingLeft: `${paddingLeft}rem` };
 }
 
 // ============================================================================
@@ -205,7 +208,7 @@ const TreeNode = memo(function TreeNode({
     [handleClick]
   );
 
-  const indentClass = getIndentClass(depth);
+  const indentStyle = getIndentStyle(depth);
 
   return (
     <>
@@ -215,7 +218,8 @@ const TreeNode = memo(function TreeNode({
         aria-selected={false}
         aria-expanded={isDirectory ? isExpanded : undefined}
         tabIndex={0}
-        className={`flex items-center gap-2 py-1.5 px-2 cursor-pointer hover:bg-gray-100 rounded transition-colors ${indentClass}`}
+        className="flex items-center gap-2 py-1.5 pr-2 cursor-pointer hover:bg-gray-100 rounded transition-colors"
+        style={indentStyle}
         onClick={handleClick}
         onKeyDown={handleKeyDown}
       >

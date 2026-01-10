@@ -5,10 +5,16 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+
+// Force dynamic rendering - this route uses searchParams and database access
+export const dynamic = 'force-dynamic';
 import { getDbInstance } from '@/lib/db-instance';
-import { getWorktrees, getRepositories, getMessages } from '@/lib/db';
+import { getWorktrees, getRepositories, getMessages, markPendingPromptsAsAnswered } from '@/lib/db';
 import { CLIToolManager } from '@/lib/cli-tools/manager';
 import type { CLIToolType } from '@/lib/cli-tools/types';
+import { captureSessionOutput } from '@/lib/cli-session';
+import { detectThinking, stripAnsi } from '@/lib/cli-patterns';
+import { detectPrompt } from '@/lib/prompt-detector';
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,43 +35,84 @@ export async function GET(request: NextRequest) {
       worktrees.map(async (worktree) => {
         // Check status for all CLI tools
         const sessionStatusByCli: {
-          claude?: { isRunning: boolean; isWaitingForResponse: boolean };
-          codex?: { isRunning: boolean; isWaitingForResponse: boolean };
-          gemini?: { isRunning: boolean; isWaitingForResponse: boolean };
+          claude?: { isRunning: boolean; isWaitingForResponse: boolean; isProcessing: boolean };
+          codex?: { isRunning: boolean; isWaitingForResponse: boolean; isProcessing: boolean };
+          gemini?: { isRunning: boolean; isWaitingForResponse: boolean; isProcessing: boolean };
         } = {};
 
         let anyRunning = false;
         let anyWaiting = false;
+        let anyProcessing = false;
 
         for (const cliToolId of allCliTools) {
           const cliTool = manager.getTool(cliToolId);
           const isRunning = await cliTool.isRunning(worktree.id);
 
-          // Check if waiting for this CLI tool's response
-          // Only consider it "waiting" if session is running AND last message is from user
+          // Check status based on terminal state
+          // - isWaitingForResponse: Interactive prompt (yes/no, multiple choice)
+          // - isProcessing: Thinking indicator visible
           let isWaitingForResponse = false;
+          let isProcessing = false;
           if (isRunning) {
-            const messages = getMessages(db, worktree.id, undefined, 1, cliToolId);
-            // If there are messages and the last one is from user, we're waiting for response
-            // If the last message is from assistant, the response is complete
-            if (messages.length > 0 && messages[0].role === 'user') {
-              isWaitingForResponse = true;
+            try {
+              const output = await captureSessionOutput(worktree.id, cliToolId, 100);
+              const cleanOutput = stripAnsi(output);
+
+              // Check for interactive prompt (yes/no, multiple choice, etc.)
+              const promptDetection = detectPrompt(cleanOutput);
+              if (promptDetection.isPrompt) {
+                isWaitingForResponse = true;
+              } else {
+                // Check LAST few lines for state detection (filter out empty lines)
+                const nonEmptyLines = cleanOutput.split('\n').filter(line => line.trim() !== '');
+                const lastLines = nonEmptyLines.slice(-15).join('\n');
+                // Check for thinking indicator FIRST (takes priority)
+                // Even if input prompt is visible, thinking indicator means processing
+                if (detectThinking(cliToolId, lastLines)) {
+                  isProcessing = true;
+                } else {
+                  // No thinking indicator - check for input prompt
+                  const hasInputPrompt = /^[>❯]\s*$/m.test(lastLines);
+                  if (!hasInputPrompt) {
+                    // Neither thinking nor input prompt - assume processing
+                    isProcessing = true;
+                  }
+                  // If hasInputPrompt && no thinking → "ready"
+                }
+              }
+
+              // Clean up stale pending prompts if no prompt is showing
+              if (!promptDetection.isPrompt) {
+                const messages = getMessages(db, worktree.id, undefined, 10, cliToolId);
+                const hasPendingPrompt = messages.some(
+                  msg => msg.messageType === 'prompt' && msg.promptData?.status !== 'answered'
+                );
+                if (hasPendingPrompt) {
+                  markPendingPromptsAsAnswered(db, worktree.id, cliToolId);
+                }
+              }
+            } catch {
+              // If capture fails, assume processing
+              isProcessing = true;
             }
           }
 
           sessionStatusByCli[cliToolId] = {
             isRunning,
             isWaitingForResponse,
+            isProcessing,
           };
 
           if (isRunning) anyRunning = true;
           if (isWaitingForResponse) anyWaiting = true;
+          if (isProcessing) anyProcessing = true;
         }
 
         return {
           ...worktree,
           isSessionRunning: anyRunning,
           isWaitingForResponse: anyWaiting,
+          isProcessing: anyProcessing,
           sessionStatusByCli,
         };
       })

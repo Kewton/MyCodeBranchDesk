@@ -32,6 +32,36 @@ vi.mock('@/hooks/useIsMobile', () => ({
   MOBILE_BREAKPOINT: 768,
 }));
 
+// Mock SidebarContext
+const mockOpenMobileDrawer = vi.fn();
+const mockToggle = vi.fn();
+vi.mock('@/contexts/SidebarContext', () => ({
+  useSidebarContext: () => ({
+    isOpen: true,
+    width: 288,
+    isMobileDrawerOpen: false,
+    toggle: mockToggle,
+    setWidth: vi.fn(),
+    openMobileDrawer: mockOpenMobileDrawer,
+    closeMobileDrawer: vi.fn(),
+  }),
+  SidebarProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
+// Mock useSlashCommands hook
+vi.mock('@/hooks/useSlashCommands', () => ({
+  useSlashCommands: () => ({
+    groups: [],
+    filteredGroups: [],
+    allCommands: [],
+    loading: false,
+    error: null,
+    filter: '',
+    setFilter: vi.fn(),
+    refresh: vi.fn(),
+  }),
+}));
+
 // Mock child components to isolate unit tests
 vi.mock('@/components/worktree/WorktreeDesktopLayout', () => ({
   WorktreeDesktopLayout: ({ leftPane, rightPane }: { leftPane: React.ReactNode; rightPane: React.ReactNode }) => (

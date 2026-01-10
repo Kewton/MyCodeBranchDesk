@@ -34,15 +34,21 @@ export interface Worktree {
   };
   /** Last updated timestamp */
   updatedAt?: Date;
+  /** Timestamp when user last viewed this worktree (for unread tracking) */
+  lastViewedAt?: Date;
+  /** Timestamp of the most recent assistant message (for unread tracking) */
+  lastAssistantMessageAt?: Date;
   /** Whether a tmux session is currently running for this worktree */
   isSessionRunning?: boolean;
   /** Whether this worktree is waiting for Claude's response */
   isWaitingForResponse?: boolean;
+  /** Whether Claude is actively processing a request (last message from user) */
+  isProcessing?: boolean;
   /** Session status per CLI tool */
   sessionStatusByCli?: {
-    claude?: { isRunning: boolean; isWaitingForResponse: boolean };
-    codex?: { isRunning: boolean; isWaitingForResponse: boolean };
-    gemini?: { isRunning: boolean; isWaitingForResponse: boolean };
+    claude?: { isRunning: boolean; isWaitingForResponse: boolean; isProcessing: boolean };
+    codex?: { isRunning: boolean; isWaitingForResponse: boolean; isProcessing: boolean };
+    gemini?: { isRunning: boolean; isWaitingForResponse: boolean; isProcessing: boolean };
   };
   /** Whether this worktree is marked as favorite */
   favorite?: boolean;
@@ -168,6 +174,27 @@ export interface ChatMessage {
   promptData?: PromptData;
   /** CLI tool type (claude, codex, gemini) - defaults to 'claude' */
   cliToolId?: CLIToolType;
+}
+
+/**
+ * Individual memo item for a worktree
+ * Supports up to 5 memos per worktree (position 0-4)
+ */
+export interface WorktreeMemo {
+  /** Unique memo ID (UUID) */
+  id: string;
+  /** Associated worktree ID */
+  worktreeId: string;
+  /** Memo title (max 100 characters) */
+  title: string;
+  /** Memo content (max 10000 characters) */
+  content: string;
+  /** Position in the memo list (0-4) */
+  position: number;
+  /** Creation timestamp */
+  createdAt: Date;
+  /** Last updated timestamp */
+  updatedAt: Date;
 }
 
 /**

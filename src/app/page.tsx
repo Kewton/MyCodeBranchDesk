@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { MainLayout } from '@/components/layout';
+import { AppShell } from '@/components/layout';
 import { WorktreeList } from '@/components/worktree';
 import { RepositoryManager } from '@/components/repository';
 
@@ -14,8 +14,8 @@ export default function Home() {
   }, []);
 
   return (
-    <MainLayout>
-      <div className="container-custom py-8">
+    <AppShell>
+      <div className="container-custom py-8 overflow-auto h-full">
         <div className="mb-8">
           <h1 className="mb-2">MyCodeBranchDesk</h1>
           <p className="text-lg text-gray-600">
@@ -31,6 +31,6 @@ export default function Home() {
         {/* Worktree List */}
         <WorktreeList key={refreshTrigger} />
       </div>
-    </MainLayout>
+    </AppShell>
   );
 }
