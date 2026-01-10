@@ -175,25 +175,30 @@ function getLastMessagesByCliBatch(
 /**
  * Get all worktrees sorted by updated_at (desc)
  * Optionally filter by repository path
+ * Includes lastViewedAt and lastAssistantMessageAt for unread tracking
  */
 export function getWorktrees(
   db: Database.Database,
   repositoryPath?: string
 ): Worktree[] {
   let query = `
-    SELECT id, name, path, repository_path, repository_name, memo,
-           last_user_message, last_user_message_at, last_message_summary, updated_at, favorite, status, link, cli_tool_id
-    FROM worktrees
+    SELECT
+      w.id, w.name, w.path, w.repository_path, w.repository_name, w.memo,
+      w.last_user_message, w.last_user_message_at, w.last_message_summary,
+      w.updated_at, w.favorite, w.status, w.link, w.cli_tool_id, w.last_viewed_at,
+      (SELECT MAX(timestamp) FROM chat_messages
+       WHERE worktree_id = w.id AND role = 'assistant') as last_assistant_message_at
+    FROM worktrees w
   `;
 
   const params: string[] = [];
 
   if (repositoryPath) {
-    query += ` WHERE repository_path = ?`;
+    query += ` WHERE w.repository_path = ?`;
     params.push(repositoryPath);
   }
 
-  query += ` ORDER BY updated_at DESC NULLS LAST`;
+  query += ` ORDER BY w.updated_at DESC NULLS LAST`;
 
   const stmt = db.prepare(query);
   const rows = stmt.all(...params) as Array<{
@@ -211,6 +216,8 @@ export function getWorktrees(
     status: string | null;
     link: string | null;
     cli_tool_id: string | null;
+    last_viewed_at: string | null;
+    last_assistant_message_at: number | null;
   }>;
 
   // Batch fetch last messages for all worktrees (N+1 optimization)
@@ -232,6 +239,8 @@ export function getWorktrees(
       lastMessageSummary: row.last_message_summary || undefined,
       lastMessagesByCli,
       updatedAt: row.updated_at ? new Date(row.updated_at) : undefined,
+      lastViewedAt: row.last_viewed_at ? new Date(row.last_viewed_at) : undefined,
+      lastAssistantMessageAt: row.last_assistant_message_at ? new Date(row.last_assistant_message_at) : undefined,
       favorite: row.favorite === 1,
       status: (row.status as 'todo' | 'doing' | 'done' | null) || null,
       link: row.link || undefined,
@@ -274,16 +283,21 @@ export function getRepositories(db: Database.Database): Array<{
 
 /**
  * Get worktree by ID
+ * Includes lastViewedAt and lastAssistantMessageAt for unread tracking
  */
 export function getWorktreeById(
   db: Database.Database,
   id: string
 ): Worktree | null {
   const stmt = db.prepare(`
-    SELECT id, name, path, repository_path, repository_name, memo,
-           last_user_message, last_user_message_at, last_message_summary, updated_at, favorite, status, link, cli_tool_id
-    FROM worktrees
-    WHERE id = ?
+    SELECT
+      w.id, w.name, w.path, w.repository_path, w.repository_name, w.memo,
+      w.last_user_message, w.last_user_message_at, w.last_message_summary,
+      w.updated_at, w.favorite, w.status, w.link, w.cli_tool_id, w.last_viewed_at,
+      (SELECT MAX(timestamp) FROM chat_messages
+       WHERE worktree_id = w.id AND role = 'assistant') as last_assistant_message_at
+    FROM worktrees w
+    WHERE w.id = ?
   `);
 
   const row = stmt.get(id) as {
@@ -301,6 +315,8 @@ export function getWorktreeById(
     status: string | null;
     link: string | null;
     cli_tool_id: string | null;
+    last_viewed_at: string | null;
+    last_assistant_message_at: number | null;
   } | undefined;
 
   if (!row) {
@@ -318,6 +334,8 @@ export function getWorktreeById(
     lastUserMessageAt: row.last_user_message_at ? new Date(row.last_user_message_at) : undefined,
     lastMessageSummary: row.last_message_summary || undefined,
     updatedAt: row.updated_at ? new Date(row.updated_at) : undefined,
+    lastViewedAt: row.last_viewed_at ? new Date(row.last_viewed_at) : undefined,
+    lastAssistantMessageAt: row.last_assistant_message_at ? new Date(row.last_assistant_message_at) : undefined,
     favorite: row.favorite === 1,
     status: (row.status as 'todo' | 'doing' | 'done' | null) || null,
     link: row.link || undefined,
@@ -402,6 +420,47 @@ export function updateWorktreeLink(
   `);
 
   stmt.run(link || null, worktreeId);
+}
+
+/**
+ * Update worktree's last_viewed_at timestamp
+ * Used for unread tracking (Issue #31)
+ */
+export function updateLastViewedAt(
+  db: Database.Database,
+  worktreeId: string,
+  viewedAt: Date
+): void {
+  const stmt = db.prepare(`
+    UPDATE worktrees
+    SET last_viewed_at = ?
+    WHERE id = ?
+  `);
+
+  stmt.run(viewedAt.toISOString(), worktreeId);
+}
+
+/**
+ * Get the timestamp of the most recent assistant message for a worktree
+ * Used for unread tracking (Issue #31)
+ */
+export function getLastAssistantMessageAt(
+  db: Database.Database,
+  worktreeId: string
+): Date | null {
+  const stmt = db.prepare(`
+    SELECT MAX(timestamp) as last_assistant_message_at
+    FROM chat_messages
+    WHERE worktree_id = ? AND role = 'assistant'
+  `);
+
+  const row = stmt.get(worktreeId) as { last_assistant_message_at: number | null } | undefined;
+
+  if (!row || row.last_assistant_message_at === null) {
+    return null;
+  }
+
+  return new Date(row.last_assistant_message_at);
 }
 
 /**

@@ -5,47 +5,42 @@
   "phase_results": {
     "tdd": {
       "status": "success",
-      "tests_total": 17,
-      "tests_passed": 17,
+      "tests_passed": 982,
       "tests_failed": 0,
-      "coverage": 100.0,
-      "files_created": [
-        "src/lib/sidebar-utils.ts",
-        "src/components/sidebar/SortSelector.tsx",
-        "tests/unit/lib/sidebar-utils.test.ts"
-      ],
-      "files_modified": [
-        "src/types/sidebar.ts",
-        "src/contexts/SidebarContext.tsx",
-        "src/components/layout/Sidebar.tsx",
-        "src/components/sidebar/BranchListItem.tsx"
-      ]
+      "coverage": 67.99
     },
     "acceptance": {
       "status": "passed",
-      "criteria_passed": 4,
-      "criteria_failed": 0,
-      "quality_checks": {
-        "eslint": "passed",
-        "typescript": "passed",
-        "build": "passed"
-      }
+      "criteria_met": 6,
+      "criteria_total": 6
     },
     "refactor": {
-      "status": "success",
-      "files_modified": 1,
-      "lines_reduced": 8,
-      "improvements": [
-        "Simplified direction handling logic in sortBranches function"
-      ]
+      "status": "skipped",
+      "reason": "Code already clean and follows best practices"
     }
   },
-  "commits": [
-    "5843d1b: feat(sidebar): add branch sorting and memo display (#31)"
+  "implemented_features": [
+    "G1: waitingステータスの色を黄色に変更（SF1で完了）",
+    "G2: hasUnreadロジックを lastAssistantMessageAt > lastViewedAt に修正",
+    "G3: DBスキーマに last_viewed_at カラムを追加",
+    "G4: 既読更新API（PATCH /api/worktrees/:id/viewed）を追加",
+    "G5: lastAssistantMessageAt をサブクエリで取得",
+    "G6: フロントエンド既読連携（ブランチ選択時にviewed API呼び出し）"
   ],
-  "next_steps": [
-    "PR作成",
-    "コードレビュー",
-    "マージ"
+  "files_modified": [
+    "src/config/status-colors.ts",
+    "src/types/sidebar.ts",
+    "src/lib/db.ts",
+    "src/lib/db-migrations.ts",
+    "src/app/api/worktrees/[id]/viewed/route.ts",
+    "src/contexts/WorktreeSelectionContext.tsx",
+    "src/lib/api-client.ts",
+    "src/types/models.ts"
+  ],
+  "test_files": [
+    "tests/unit/types/sidebar.test.ts",
+    "tests/unit/types/sidebar-hasunread.test.ts",
+    "tests/unit/db-viewed-tracking.test.ts",
+    "tests/integration/api-viewed.test.ts"
   ]
 }

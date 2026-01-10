@@ -78,6 +78,32 @@ function determineBranchStatus(worktree: Worktree): BranchStatus {
 }
 
 /**
+ * Calculate whether a worktree has unread messages
+ *
+ * hasUnread is true when:
+ * - There is at least one assistant message (lastAssistantMessageAt exists)
+ * - AND the user has never viewed this worktree (lastViewedAt is null)
+ *   OR the last assistant message is newer than the last view
+ *
+ * @param worktree - Source worktree data
+ * @returns true if there are unread messages
+ */
+export function calculateHasUnread(worktree: Worktree): boolean {
+  // No assistant messages = no unread
+  if (!worktree.lastAssistantMessageAt) {
+    return false;
+  }
+
+  // Never viewed but has assistant message = unread
+  if (!worktree.lastViewedAt) {
+    return true;
+  }
+
+  // Compare timestamps: unread if assistant message is newer than last view
+  return new Date(worktree.lastAssistantMessageAt) > new Date(worktree.lastViewedAt);
+}
+
+/**
  * Convert Worktree to SidebarBranchItem for display
  *
  * @param worktree - Source worktree data
@@ -86,9 +112,8 @@ function determineBranchStatus(worktree: Worktree): BranchStatus {
 export function toBranchItem(worktree: Worktree): SidebarBranchItem {
   const status = determineBranchStatus(worktree);
 
-  // Determine hasUnread based on recent activity
-  // For now, we consider it based on lastUserMessageAt presence
-  const hasUnread = Boolean(worktree.lastUserMessageAt);
+  // Use new hasUnread logic based on lastAssistantMessageAt and lastViewedAt
+  const hasUnread = calculateHasUnread(worktree);
 
   return {
     id: worktree.id,

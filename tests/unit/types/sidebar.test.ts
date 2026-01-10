@@ -68,7 +68,7 @@ describe('sidebar types', () => {
       expect(result.hasUnread).toBe(false);
     });
 
-    it('should set status to running when session is running', () => {
+    it('should set status to ready when session is running but not processing', () => {
       const worktree: Worktree = {
         id: 'feature-test',
         name: 'feature/test',
@@ -77,6 +77,24 @@ describe('sidebar types', () => {
         repositoryName: 'MyRepo',
         isSessionRunning: true,
         isWaitingForResponse: false,
+        isProcessing: false,
+      };
+
+      const result = toBranchItem(worktree);
+
+      expect(result.status).toBe('ready');
+    });
+
+    it('should set status to running when session is processing', () => {
+      const worktree: Worktree = {
+        id: 'feature-test',
+        name: 'feature/test',
+        path: '/path/to/worktree',
+        repositoryPath: '/path/to/repo',
+        repositoryName: 'MyRepo',
+        isSessionRunning: true,
+        isWaitingForResponse: false,
+        isProcessing: true,
       };
 
       const result = toBranchItem(worktree);
@@ -108,7 +126,7 @@ describe('sidebar types', () => {
         repositoryPath: '/path/to/repo',
         repositoryName: 'MyRepo',
         sessionStatusByCli: {
-          claude: { isRunning: true, isWaitingForResponse: true },
+          claude: { isRunning: true, isWaitingForResponse: true, isProcessing: false },
         },
       };
 
@@ -117,9 +135,9 @@ describe('sidebar types', () => {
       expect(result.status).toBe('waiting');
     });
 
-    it('should set hasUnread based on lastUserMessageAt', () => {
-      const recentDate = new Date();
-      recentDate.setMinutes(recentDate.getMinutes() - 5); // 5 minutes ago
+    it('should set hasUnread based on lastAssistantMessageAt and lastViewedAt', () => {
+      // hasUnread is now based on lastAssistantMessageAt > lastViewedAt
+      const assistantTime = new Date('2024-01-01T12:00:00Z');
 
       const worktree: Worktree = {
         id: 'feature-test',
@@ -127,13 +145,14 @@ describe('sidebar types', () => {
         path: '/path/to/worktree',
         repositoryPath: '/path/to/repo',
         repositoryName: 'MyRepo',
-        lastUserMessageAt: recentDate,
+        lastAssistantMessageAt: assistantTime,
+        // No lastViewedAt means never viewed = unread
       };
 
       const result = toBranchItem(worktree);
 
-      // hasUnread is determined by lastUserMessageAt presence
-      expect(typeof result.hasUnread).toBe('boolean');
+      // Should be unread since there's an assistant message but never viewed
+      expect(result.hasUnread).toBe(true);
     });
 
     it('should include lastActivity from updatedAt', () => {

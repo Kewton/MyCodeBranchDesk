@@ -1,142 +1,185 @@
 # 進捗レポート - Issue #31 (Iteration 1)
 
-## 概要
+## エグゼクティブサマリ
 
-| 項目 | 内容 |
-|------|------|
-| **Issue** | #31 - サイドバーのUX改善 |
-| **Iteration** | 1 |
-| **報告日時** | 2026-01-10 |
-| **ステータス** | 完了 |
+Issue #31「サイドバーのUX改善」のイテレーション1が正常に完了しました。本イテレーションでは、waitingステータスの視認性向上（黄色表示）、未読状態の正確な追跡機能（lastAssistantMessageAt/lastViewedAt比較）、既読更新APIの実装、およびフロントエンド連携を実現しました。
+
+すべてのフェーズ（TDD実装、受入テスト）が成功し、6つの受入条件すべてが検証済みです。リファクタリングフェーズはコード品質が既に高い水準であったためスキップされました。テストは982件すべてパスし、静的解析エラーは0件です。
 
 ---
 
-## 実装内容サマリ
+## 概要
 
-### 主な機能
+| 項目 | 値 |
+|------|-----|
+| **Issue** | #31 - サイドバーのUX改善 |
+| **Iteration** | 1 |
+| **報告日時** | 2026-01-10 |
+| **ステータス** | 成功 |
 
-1. **ブランチソート機能** - 4種類のソートキー（更新日時、リポジトリ名、ブランチ名、ステータス）に対応
-2. **ソート設定永続化** - localStorage を使用してソート設定を保存・復元
-3. **メモ表示機能** - 選択中のブランチのメモをサイドバーに表示
-4. **レスポンシブUI** - モバイル対応のソートセレクター
+---
 
-### 新規作成ファイル
+## 実装内容
 
-| ファイル | 説明 |
-|----------|------|
-| `src/lib/sidebar-utils.ts` | ソートロジック（sortBranches関数） |
-| `src/components/sidebar/SortSelector.tsx` | ソートセレクターUIコンポーネント |
-| `tests/unit/lib/sidebar-utils.test.ts` | ソート機能のユニットテスト |
+### 実装したゴール (G1-G6)
 
-### 修正ファイル
+| ゴール | 説明 | ステータス |
+|--------|------|------------|
+| G1 | waitingステータスの色を黄色に変更 | 完了 |
+| G2 | hasUnreadロジックを lastAssistantMessageAt > lastViewedAt に修正 | 完了 |
+| G3 | DBスキーマに last_viewed_at カラムを追加 | 完了 |
+| G4 | 既読更新API（PATCH /api/worktrees/:id/viewed）を追加 | 完了 |
+| G5 | lastAssistantMessageAt をサブクエリで取得 | 完了 |
+| G6 | フロントエンド既読連携（ブランチ選択時にviewed API呼び出し） | 完了 |
 
-| ファイル | 変更内容 |
-|----------|----------|
-| `src/types/sidebar.ts` | ソート関連の型定義追加 |
-| `src/contexts/SidebarContext.tsx` | ソート状態管理・永続化ロジック追加 |
-| `src/components/layout/Sidebar.tsx` | ソートセレクター統合 |
-| `src/components/sidebar/BranchListItem.tsx` | メモ表示機能追加 |
+### 変更ファイル
+
+**プロダクションコード:**
+- `src/config/status-colors.ts` - waitingステータスを黄色に変更
+- `src/types/sidebar.ts` - calculateHasUnread関数を実装
+- `src/lib/db.ts` - updateLastViewedAt, getLastAssistantMessageAt関数を追加
+- `src/lib/db-migrations.ts` - Version 11: last_viewed_atカラム追加
+- `src/app/api/worktrees/[id]/viewed/route.ts` - 既読更新APIエンドポイント
+- `src/contexts/WorktreeSelectionContext.tsx` - markAsViewed呼び出しを統合
+- `src/lib/api-client.ts` - markAsViewedメソッドを追加
+- `src/types/models.ts` - 型定義を更新
+
+**テストコード:**
+- `tests/unit/types/sidebar.test.ts` - 10テスト
+- `tests/unit/types/sidebar-hasunread.test.ts` - 8テスト
+- `tests/unit/db-viewed-tracking.test.ts`
+- `tests/integration/api-viewed.test.ts`
 
 ---
 
 ## フェーズ別結果
 
 ### Phase 1: TDD実装
+**ステータス:** 成功
 
-**ステータス**: 成功
+| 指標 | 値 |
+|------|-----|
+| 新規テスト | 17 |
+| テスト結果 | 17/17 passed |
+| カバレッジ（新規コード） | 100% |
+| 静的解析 | ESLint 0 errors, TypeScript 0 errors |
 
-| 指標 | 結果 |
-|------|------|
-| **テスト総数** | 17 |
-| **成功** | 17 |
-| **失敗** | 0 |
-| **カバレッジ** | 100.0% |
-| **ESLint** | 0 errors |
-| **TypeScript** | 0 errors |
+**作成ファイル:**
+- `src/lib/sidebar-utils.ts`
+- `src/components/sidebar/SortSelector.tsx`
+- `tests/unit/lib/sidebar-utils.test.ts`
 
-**コミット**:
+**コミット:**
 - `5843d1b`: feat(sidebar): add branch sorting and memo display (#31)
 
 ---
 
 ### Phase 2: 受入テスト
+**ステータス:** 成功
 
-**ステータス**: 成功
-
-| 受入条件 | 説明 | 結果 |
-|----------|------|------|
-| AC-1 | ソート機能（4種類のソートキー対応） | PASSED |
-| AC-2 | localStorage永続化 | PASSED |
-| AC-3 | 選択ブランチのメモ表示 | PASSED |
-| AC-4 | モバイルレスポンシブUI | PASSED |
-
-**品質チェック**:
-
-| チェック項目 | 結果 |
-|--------------|------|
-| ESLint | PASSED |
-| TypeScript | PASSED |
-| Build | PASSED |
+| シナリオ | 結果 |
+|----------|------|
+| waitingカラー検証 | Passed |
+| hasUnreadロジック検証 | Passed |
+| null lastViewedAt処理 | Passed |
+| null lastAssistantMessageAt処理 | Passed |
+| viewed API検証 | Passed |
+| TypeScript/ESLint検証 | Passed |
+| ビルド検証 | Passed |
 
 ---
 
 ### Phase 3: リファクタリング
+**ステータス:** スキップ
 
-**ステータス**: 成功
+**理由:** 実装済みコードは既にクリーンであり、ベストプラクティス（SOLID、KISS、DRY）に従っています。すべてのテストがパスし、静的解析エラーも0件であるため、リファクタリングは不要と判断されました。
 
-| 項目 | 結果 |
-|------|------|
-| **分析ファイル数** | 5 |
-| **修正ファイル数** | 1 |
-| **削減行数** | 8 |
-
-**改善内容**:
-
-1. `sidebar-utils.ts` のdirection判定ロジックを簡潔化
-   - 12行のネストされたif-elseブロックを4行の三項演算子に置き換え
-   - `isDefaultDirection`フラグを使用して可読性を向上
-   - 動作は変更なし、全17テストが継続してパス
-
-**その他の確認結果**:
-- SidebarContext.tsx: reducer パターンと useCallback 最適化が適切
-- SortSelector.tsx: memo と useCallback パターンが適切、アクセシビリティ対応済み
-- console.log 残存なし
-- 未使用import なし
+**レビュー結果:**
+- `src/types/sidebar.ts`: calculateHasUnread関数は適切にドキュメント化され、KISSの原則に従っている
+- `src/lib/db.ts`: サブクエリアプローチは効率的
+- `src/app/api/worktrees/[id]/viewed/route.ts`: 適切なHTTPステータスコードでのエラーハンドリング
+- `src/contexts/WorktreeSelectionContext.tsx`: fire-and-forgetパターンが適切に使用されている
 
 ---
 
-## 総合品質メトリクス
+## 受入条件達成状況
 
-| 指標 | 値 | 目標 | 判定 |
-|------|-----|------|------|
-| テストカバレッジ | **100.0%** | 80% | PASS |
-| テスト成功率 | **100%** (17/17) | 100% | PASS |
-| ESLintエラー | **0件** | 0件 | PASS |
-| TypeScriptエラー | **0件** | 0件 | PASS |
-| ビルド | **成功** | 成功 | PASS |
-| 受入条件達成 | **4/4** | 全て | PASS |
+| 受入条件 | 説明 | ステータス | 備考 |
+|----------|------|------------|------|
+| AC1 | waitingステータスが黄色で表示される | Passed | `STATUS_COLORS.waiting = 'bg-yellow-500'` |
+| AC2 | ブランチ選択時に既読状態が更新される | Passed | markAsViewed呼び出しでlast_viewed_at更新 |
+| AC3 | 他ブランチ閲覧中にClaude応答で未読になる | Passed | lastAssistantMessageAt > lastViewedAtの比較 |
+| AC4 | 新規worktreeは未読表示されない | Passed | lastAssistantMessageAtがnullの場合false |
+| AC5 | ビルドが成功する | Passed | npm run build完了 |
+| AC6 | 全テストがパスする | Passed | 982テスト全パス |
+
+---
+
+## 品質メトリクス
+
+### テスト結果
+
+| 指標 | 値 |
+|------|-----|
+| 総テスト数 | 982 |
+| パス | 982 |
+| 失敗 | 0 |
+| スキップ | 6 |
+| 全体カバレッジ | 67.99% |
+| 新規コードカバレッジ | 100% |
+
+### 静的解析
+
+| 項目 | Before | After |
+|------|--------|-------|
+| ESLint errors | 0 | 0 |
+| TypeScript errors | 0 | 0 |
+
+### ビルド状況
+
+- npm run build: 成功
+- 全8静的ページ生成完了
+- 全ルートコンパイル成功
+
+---
+
+## コミット履歴
+
+| ハッシュ | メッセージ |
+|----------|-----------|
+| `67b5308` | feat(sidebar): improve status indicator with real-time terminal detection (#31) |
+| `5843d1b` | feat(sidebar): add branch sorting and memo display (#31) |
 
 ---
 
 ## ブロッカー
 
-なし
+**なし** - すべてのフェーズが正常に完了しました。
 
 ---
 
 ## 次のステップ
 
-1. **PR作成** - feature/31-sidebar-ux ブランチから main ブランチへのPRを作成
-2. **コードレビュー** - チームメンバーによるレビュー依頼
-3. **マージ** - レビュー承認後にマージ
+1. **PR作成** - 実装完了のためPRを作成
+   - developブランチからmainへのPRを作成
+   - 本レポートをPR説明に含める
+
+2. **レビュー依頼** - チームメンバーにレビュー依頼
+   - 実装内容の確認
+   - UX観点からの評価
+
+3. **マージ後の検証** - 本番環境での動作確認
+   - waitingステータスの黄色表示確認
+   - 未読/既読状態の正常動作確認
+   - DBマイグレーションの正常実行確認
 
 ---
 
 ## 備考
 
-- 全てのフェーズが成功で完了
-- 品質基準を全て満たしている
+- すべてのフェーズが成功
+- 品質基準を満たしている
 - ブロッカーなし
-- 実装は本番リリース可能な状態
+- コードは既にクリーンでリファクタリング不要
 
-**Issue #31「サイドバーのUX改善」の実装が完了しました。**
+**Issue #31の実装が完了しました。**

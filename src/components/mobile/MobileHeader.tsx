@@ -2,16 +2,19 @@
  * MobileHeader Component
  *
  * Mobile header for displaying worktree info and status
+ *
+ * SF1: Uses centralized status colors from @/config/status-colors
  */
 
 'use client';
 
 import { useMemo, memo } from 'react';
+import { MOBILE_STATUS_CONFIG, type WorktreeStatusType } from '@/config/status-colors';
 
 /**
  * Status type for worktree
  */
-export type WorktreeStatus = 'idle' | 'ready' | 'running' | 'waiting' | 'error';
+export type WorktreeStatus = WorktreeStatusType;
 
 /**
  * Props for MobileHeader component
@@ -65,39 +68,6 @@ const ICON_PATHS = {
   menu: 'M4 6h16M4 12h16M4 18h16',
 } as const;
 
-/**
- * Status indicator configuration
- */
-const STATUS_CONFIG: Record<
-  WorktreeStatus,
-  { className: string; label: string; type: 'dot' | 'spinner' }
-> = {
-  idle: {
-    className: 'bg-gray-400',
-    label: 'Idle',
-    type: 'dot',
-  },
-  ready: {
-    className: 'bg-green-500',
-    label: 'Ready',
-    type: 'dot',
-  },
-  running: {
-    className: 'border-blue-500',
-    label: 'Running',
-    type: 'spinner',
-  },
-  waiting: {
-    className: 'bg-green-500',
-    label: 'Waiting for response',
-    type: 'dot',
-  },
-  error: {
-    className: 'bg-red-500',
-    label: 'Error',
-    type: 'dot',
-  },
-};
 
 /**
  * MobileHeader - Header for mobile view
@@ -115,7 +85,7 @@ export function MobileHeader({
   /**
    * Status indicator configuration
    */
-  const statusConfig = useMemo(() => STATUS_CONFIG[status], [status]);
+  const statusConfig = useMemo(() => MOBILE_STATUS_CONFIG[status], [status]);
 
   return (
     <header

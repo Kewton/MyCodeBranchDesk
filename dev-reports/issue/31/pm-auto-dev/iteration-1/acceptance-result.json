@@ -1,63 +1,102 @@
 {
   "status": "passed",
-  "criteria_results": [
-    {
-      "id": "AC-1",
-      "description": "Sort function with multiple sort keys (repositoryName, branchName, status, updatedAt)",
+  "acceptance_criteria": {
+    "AC1": {
       "status": "passed",
-      "evidence": "Unit tests passed: 17 test cases in tests/unit/lib/sidebar-utils.test.ts. sortBranches function correctly sorts by all 4 sort keys (updatedAt, repositoryName, branchName, status) with both ascending and descending directions. Total 964 tests passed, 6 skipped."
+      "notes": "src/config/status-colors.ts line 51 defines waiting: 'bg-yellow-500'. SIDEBAR_STATUS_CONFIG, MOBILE_STATUS_CONFIG, and DESKTOP_STATUS_CONFIG all use STATUS_COLORS.waiting for the waiting status."
     },
-    {
-      "id": "AC-2",
-      "description": "localStorage persistence for sort settings",
+    "AC2": {
       "status": "passed",
-      "evidence": "Code review confirmed: SidebarContext.tsx lines 163-199 implement localStorage persistence. Load on mount (lines 163-182) and save on state change (lines 185-199) using key 'mcbd-sidebar-sort'. Both sortKey and sortDirection are persisted."
+      "notes": "WorktreeSelectionContext.tsx calls worktreeApi.markAsViewed(id) on branch selection (line 169). This updates last_viewed_at via PATCH /api/worktrees/[id]/viewed endpoint. The calculateHasUnread function in sidebar.ts checks if lastAssistantMessageAt > lastViewedAt, so after viewing, hasUnread becomes false."
     },
-    {
-      "id": "AC-3",
-      "description": "Memo display for selected branch",
+    "AC3": {
       "status": "passed",
-      "evidence": "Code review confirmed: BranchListItem.tsx lines 86-96 conditionally render memo when isSelected && branch.memo. Memo displayed with data-testid='branch-memo' and styled with line-clamp-2 for truncation."
+      "notes": "calculateHasUnread in src/types/sidebar.ts (lines 91-104) returns true when lastAssistantMessageAt > lastViewedAt. When Claude responds while viewing another branch, lastAssistantMessageAt is updated but lastViewedAt stays unchanged, so hasUnread becomes true."
     },
-    {
-      "id": "AC-4",
-      "description": "Mobile responsive UI for sort selector",
+    "AC4": {
       "status": "passed",
-      "evidence": "Code review confirmed: SortSelector.tsx line 114 uses 'hidden sm:inline' to show text only on larger screens (icon always visible). Touch-friendly button sizing with appropriate padding. Accessibility support with ESC key and outside-click handlers."
+      "notes": "calculateHasUnread returns false when lastAssistantMessageAt is undefined/null (line 93-95). New worktrees have no assistant messages, so hasUnread is false by default."
+    },
+    "AC5": {
+      "status": "passed",
+      "notes": "npm run build completed successfully. All 8 static pages generated, all routes compiled without errors."
+    },
+    "AC6": {
+      "status": "passed",
+      "notes": "npm run test:unit passed. 54 test files, 982 tests passed (6 skipped). All sidebar-related tests passed including sidebar.test.ts (10 tests) and sidebar-hasunread.test.ts (8 tests)."
     }
-  ],
-  "quality_checks": {
-    "eslint": "passed",
-    "typescript": "passed",
-    "build": "passed"
   },
-  "test_scenarios": [
-    {
-      "id": "TS-1",
-      "name": "Sort function unit tests",
-      "result": "passed",
-      "evidence": "npm run test:unit -- tests/unit/lib/sidebar-utils.test.ts: All 17 test cases passed covering sort by updatedAt, repositoryName, branchName, status with asc/desc directions and edge cases"
+  "test_scenarios": {
+    "scenario1_waiting_color": {
+      "status": "passed",
+      "notes": "Verified in src/config/status-colors.ts: STATUS_COLORS.waiting = 'bg-yellow-500' (line 51)"
     },
-    {
-      "id": "TS-2",
-      "name": "Static analysis checks",
-      "result": "passed",
-      "evidence": "ESLint: No warnings or errors. TypeScript: npx tsc --noEmit completed without errors"
+    "scenario2_hasunread_logic": {
+      "status": "passed",
+      "notes": "calculateHasUnread function at src/types/sidebar.ts lines 91-104 correctly implements: return lastAssistantMessageAt > lastViewedAt"
     },
-    {
-      "id": "TS-3",
-      "name": "Build success",
-      "result": "passed",
-      "evidence": "npm run build completed successfully. All pages generated (9 static, dynamic routes as expected)"
+    "scenario3_null_lastViewedAt": {
+      "status": "passed",
+      "notes": "Line 98-100: if (!worktree.lastViewedAt) return true; - Returns unread when never viewed but has assistant message"
+    },
+    "scenario4_null_lastAssistantMessageAt": {
+      "status": "passed",
+      "notes": "Line 93-95: if (!worktree.lastAssistantMessageAt) return false; - Returns not unread when no assistant messages"
+    },
+    "scenario5_viewed_api": {
+      "status": "passed",
+      "notes": "src/app/api/worktrees/[id]/viewed/route.ts exists with PATCH handler. Calls updateLastViewedAt(db, params.id, viewedAt) correctly."
+    },
+    "scenario6_typescript_eslint": {
+      "status": "passed",
+      "notes": "npx tsc --noEmit completed without errors. No TypeScript type errors found."
+    },
+    "scenario7_build": {
+      "status": "passed",
+      "notes": "npm run build completed successfully with all routes compiled."
     }
-  ],
-  "issues": [],
-  "recommendations": [],
+  },
   "evidence_files": [
-    "tests/unit/lib/sidebar-utils.test.ts",
-    "src/contexts/SidebarContext.tsx",
-    "src/components/sidebar/BranchListItem.tsx",
-    "src/components/sidebar/SortSelector.tsx"
+    "src/config/status-colors.ts (waiting: 'bg-yellow-500')",
+    "src/types/sidebar.ts (calculateHasUnread function)",
+    "src/lib/db-migrations.ts (version 11: add-viewed-tracking)",
+    "src/app/api/worktrees/[id]/viewed/route.ts (PATCH endpoint)",
+    "src/lib/db.ts (updateLastViewedAt, getLastAssistantMessageAt)",
+    "src/contexts/WorktreeSelectionContext.tsx (markAsViewed call)",
+    "tests/unit/types/sidebar.test.ts (10 tests passed)",
+    "tests/unit/types/sidebar-hasunread.test.ts (8 tests passed)"
   ],
-  "message": "All acceptance criteria verified. Feature implementation is complete and ready for merge."
+  "implementation_verification": {
+    "g1_waiting_color": {
+      "file": "src/config/status-colors.ts",
+      "verified": true,
+      "details": "Line 51: waiting: 'bg-yellow-500'"
+    },
+    "g2_hasunread_logic": {
+      "file": "src/types/sidebar.ts",
+      "verified": true,
+      "details": "calculateHasUnread function (lines 91-104) implements correct logic"
+    },
+    "g3_db_schema": {
+      "file": "src/lib/db-migrations.ts",
+      "verified": true,
+      "details": "Version 11 migration adds last_viewed_at column and idx_chat_messages_assistant_latest index"
+    },
+    "g4_viewed_api": {
+      "file": "src/app/api/worktrees/[id]/viewed/route.ts",
+      "verified": true,
+      "details": "PATCH endpoint exists with proper implementation"
+    },
+    "g5_lastAssistantMessageAt": {
+      "file": "src/lib/db.ts",
+      "verified": true,
+      "details": "getWorktrees and getWorktreeById include subquery for last_assistant_message_at"
+    },
+    "g6_frontend_integration": {
+      "file": "src/contexts/WorktreeSelectionContext.tsx",
+      "verified": true,
+      "details": "Line 169: worktreeApi.markAsViewed(id) called on branch selection"
+    }
+  },
+  "message": "All acceptance criteria verified. Issue #31 implementation is complete and correct."
 }

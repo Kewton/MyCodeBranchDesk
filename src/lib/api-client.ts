@@ -151,6 +151,16 @@ export const worktreeApi = {
   },
 
   /**
+   * Mark worktree as viewed (for unread tracking - Issue #31)
+   * Updates last_viewed_at timestamp to current time
+   */
+  async markAsViewed(id: string): Promise<{ success: boolean }> {
+    return fetchApi<{ success: boolean }>(`/api/worktrees/${id}/viewed`, {
+      method: 'PATCH',
+    });
+  },
+
+  /**
    * Get messages for a worktree, optionally filtered by CLI tool
    */
   async getMessages(id: string, cliTool?: 'claude' | 'codex' | 'gemini'): Promise<ChatMessage[]> {

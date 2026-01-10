@@ -11,7 +11,7 @@ import { initDatabase } from './db';
  * Current schema version
  * Increment this when adding new migrations
  */
-export const CURRENT_SCHEMA_VERSION = 10;
+export const CURRENT_SCHEMA_VERSION = 11;
 
 /**
  * Migration definition
@@ -462,6 +462,30 @@ const migrations: Migration[] = [
     down: (db) => {
       db.exec('DROP TABLE IF EXISTS worktree_memos');
       console.log('✓ Dropped worktree_memos table');
+    }
+  },
+  {
+    version: 11,
+    name: 'add-viewed-tracking',
+    up: (db) => {
+      // G3: Add last_viewed_at column to worktrees table
+      db.exec(`
+        ALTER TABLE worktrees ADD COLUMN last_viewed_at TEXT;
+      `);
+
+      // MF2: Add performance index for assistant message queries
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_chat_messages_assistant_latest
+        ON chat_messages(worktree_id, role, timestamp DESC);
+      `);
+
+      console.log('✓ Added last_viewed_at column to worktrees table');
+      console.log('✓ Created index for assistant message queries');
+    },
+    down: (db) => {
+      db.exec('DROP INDEX IF EXISTS idx_chat_messages_assistant_latest');
+      console.log('✓ Dropped idx_chat_messages_assistant_latest index');
+      // Note: SQLite doesn't support DROP COLUMN directly
     }
   }
 ];

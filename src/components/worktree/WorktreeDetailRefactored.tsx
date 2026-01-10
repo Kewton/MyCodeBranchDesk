@@ -26,6 +26,7 @@ import { TerminalDisplay } from '@/components/worktree/TerminalDisplay';
 import { HistoryPane } from '@/components/worktree/HistoryPane';
 import { PromptPanel } from '@/components/worktree/PromptPanel';
 import { MobileHeader, type WorktreeStatus } from '@/components/mobile/MobileHeader';
+import { DESKTOP_STATUS_CONFIG } from '@/config/status-colors';
 import { MobileTabBar, type MobileTab } from '@/components/mobile/MobileTabBar';
 import { MobilePromptSheet } from '@/components/mobile/MobilePromptSheet';
 import { ErrorBoundary } from '@/components/error/ErrorBoundary';
@@ -138,37 +139,7 @@ interface DesktopHeaderProps {
   onMenuClick: () => void;
 }
 
-/** Status indicator configuration for desktop header */
-const DESKTOP_STATUS_CONFIG: Record<
-  WorktreeStatus,
-  { className: string; label: string; type: 'dot' | 'spinner' }
-> = {
-  idle: {
-    className: 'bg-gray-400',
-    label: 'Idle - No active session',
-    type: 'dot',
-  },
-  ready: {
-    className: 'bg-green-500',
-    label: 'Ready - Waiting for input',
-    type: 'dot',
-  },
-  running: {
-    className: 'border-blue-500',
-    label: 'Running - Processing',
-    type: 'spinner',
-  },
-  waiting: {
-    className: 'bg-green-500',
-    label: 'Waiting - User input required',
-    type: 'dot',
-  },
-  error: {
-    className: 'bg-red-500',
-    label: 'Error',
-    type: 'dot',
-  },
-};
+/** Status indicator configuration is imported from @/config/status-colors (SF1) */
 
 /** Desktop header with hamburger menu, back button, worktree name, repository, status, and info button */
 const DesktopHeader = memo(function DesktopHeader({

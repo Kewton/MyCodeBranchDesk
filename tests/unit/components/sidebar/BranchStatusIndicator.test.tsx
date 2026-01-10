@@ -43,11 +43,11 @@ describe('BranchStatusIndicator', () => {
       expect(indicator.className).toMatch(/bg-gray-500|gray/);
     });
 
-    it('should have green color for running status', () => {
+    it('should have blue spinner for running status', () => {
       render(<BranchStatusIndicator status="running" />);
 
       const indicator = screen.getByTestId('status-indicator');
-      expect(indicator.className).toMatch(/bg-green-500|green/);
+      expect(indicator.className).toMatch(/border-blue-500|blue/);
     });
 
     it('should have yellow color for waiting status', () => {
@@ -57,41 +57,41 @@ describe('BranchStatusIndicator', () => {
       expect(indicator.className).toMatch(/bg-yellow-500|yellow|amber/);
     });
 
-    it('should have blue color for generating status', () => {
+    it('should have blue spinner for generating status', () => {
       render(<BranchStatusIndicator status="generating" />);
 
       const indicator = screen.getByTestId('status-indicator');
-      expect(indicator.className).toMatch(/bg-blue-500|blue/);
+      expect(indicator.className).toMatch(/border-blue-500|blue/);
     });
   });
 
   describe('Animation', () => {
-    it('should not animate for idle status', () => {
+    it('should not animate for idle status (dot)', () => {
       render(<BranchStatusIndicator status="idle" />);
 
       const indicator = screen.getByTestId('status-indicator');
-      expect(indicator.className).not.toMatch(/animate-pulse/);
+      expect(indicator.className).not.toMatch(/animate-spin/);
     });
 
-    it('should animate for running status', () => {
+    it('should spin for running status (spinner)', () => {
       render(<BranchStatusIndicator status="running" />);
 
       const indicator = screen.getByTestId('status-indicator');
-      expect(indicator.className).toMatch(/animate-pulse/);
+      expect(indicator.className).toMatch(/animate-spin/);
     });
 
-    it('should animate for waiting status', () => {
+    it('should not animate for waiting status (dot)', () => {
       render(<BranchStatusIndicator status="waiting" />);
 
       const indicator = screen.getByTestId('status-indicator');
-      expect(indicator.className).toMatch(/animate-pulse/);
+      expect(indicator.className).not.toMatch(/animate-spin/);
     });
 
-    it('should animate for generating status', () => {
+    it('should spin for generating status (spinner)', () => {
       render(<BranchStatusIndicator status="generating" />);
 
       const indicator = screen.getByTestId('status-indicator');
-      expect(indicator.className).toMatch(/animate-pulse/);
+      expect(indicator.className).toMatch(/animate-spin/);
     });
   });
 
@@ -143,12 +143,12 @@ describe('BranchStatusIndicator', () => {
       expect(indicator.getAttribute('aria-label')).toBe('Running');
     });
 
-    it('should display "Waiting" label for waiting status', () => {
+    it('should display "Waiting for response" label for waiting status', () => {
       render(<BranchStatusIndicator status="waiting" />);
 
       const indicator = screen.getByTestId('status-indicator');
-      expect(indicator.getAttribute('title')).toBe('Waiting');
-      expect(indicator.getAttribute('aria-label')).toBe('Waiting');
+      expect(indicator.getAttribute('title')).toBe('Waiting for response');
+      expect(indicator.getAttribute('aria-label')).toBe('Waiting for response');
     });
 
     it('should display "Generating" label for generating status', () => {
@@ -161,7 +161,7 @@ describe('BranchStatusIndicator', () => {
   });
 
   describe('All status types', () => {
-    const statusTypes: BranchStatus[] = ['idle', 'running', 'waiting', 'generating'];
+    const statusTypes: BranchStatus[] = ['idle', 'ready', 'running', 'waiting', 'generating'];
 
     statusTypes.forEach((status) => {
       it(`should render correctly for ${status} status`, () => {
@@ -169,7 +169,8 @@ describe('BranchStatusIndicator', () => {
 
         const indicator = screen.getByTestId('status-indicator');
         expect(indicator).toBeInTheDocument();
-        expect(indicator.className).toMatch(/bg-/);
+        // Dots use bg- class, spinners use border- class
+        expect(indicator.className).toMatch(/bg-|border-/);
       });
     });
   });

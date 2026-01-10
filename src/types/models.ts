@@ -34,6 +34,10 @@ export interface Worktree {
   };
   /** Last updated timestamp */
   updatedAt?: Date;
+  /** Timestamp when user last viewed this worktree (for unread tracking) */
+  lastViewedAt?: Date;
+  /** Timestamp of the most recent assistant message (for unread tracking) */
+  lastAssistantMessageAt?: Date;
   /** Whether a tmux session is currently running for this worktree */
   isSessionRunning?: boolean;
   /** Whether this worktree is waiting for Claude's response */

@@ -19,6 +19,7 @@ vi.mock('@/lib/api-client', () => ({
   worktreeApi: {
     getAll: vi.fn(),
     getById: vi.fn(),
+    markAsViewed: vi.fn().mockResolvedValue({ success: true }),
   },
 }));
 

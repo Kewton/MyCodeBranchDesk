@@ -3,12 +3,15 @@
  *
  * Displays a colored dot indicating the branch's current status.
  * Includes animation for active states.
+ *
+ * SF1: Uses centralized status colors from @/config/status-colors
  */
 
 'use client';
 
 import React, { memo } from 'react';
 import type { BranchStatus } from '@/types/sidebar';
+import { SIDEBAR_STATUS_CONFIG } from '@/config/status-colors';
 
 // ============================================================================
 // Types
@@ -19,48 +22,6 @@ export interface BranchStatusIndicatorProps {
   /** Current branch status */
   status: BranchStatus;
 }
-
-// ============================================================================
-// Configuration
-// ============================================================================
-
-/** Status configuration mapping */
-interface StatusConfig {
-  /** Tailwind background color class */
-  color: string;
-  /** Accessible label */
-  label: string;
-  /** Display type: 'dot' for colored circle, 'spinner' for spinning icon */
-  type: 'dot' | 'spinner';
-}
-
-const statusConfig: Record<BranchStatus, StatusConfig> = {
-  idle: {
-    color: 'bg-gray-500',
-    label: 'Idle',
-    type: 'dot',
-  },
-  ready: {
-    color: 'bg-green-500',
-    label: 'Ready',
-    type: 'dot',
-  },
-  running: {
-    color: 'border-blue-500',
-    label: 'Running',
-    type: 'spinner',
-  },
-  waiting: {
-    color: 'bg-green-500',
-    label: 'Waiting',
-    type: 'dot',
-  },
-  generating: {
-    color: 'border-blue-500',
-    label: 'Generating',
-    type: 'spinner',
-  },
-};
 
 // ============================================================================
 // Component
@@ -77,7 +38,7 @@ const statusConfig: Record<BranchStatus, StatusConfig> = {
 export const BranchStatusIndicator = memo(function BranchStatusIndicator({
   status,
 }: BranchStatusIndicatorProps) {
-  const config = statusConfig[status];
+  const config = SIDEBAR_STATUS_CONFIG[status];
 
   if (config.type === 'spinner') {
     return (
@@ -86,7 +47,7 @@ export const BranchStatusIndicator = memo(function BranchStatusIndicator({
         className={`
           w-3 h-3 rounded-full flex-shrink-0
           border-2 border-t-transparent
-          ${config.color}
+          ${config.className}
           animate-spin
         `}
         title={config.label}
@@ -100,7 +61,7 @@ export const BranchStatusIndicator = memo(function BranchStatusIndicator({
       data-testid="status-indicator"
       className={`
         w-3 h-3 rounded-full flex-shrink-0
-        ${config.color}
+        ${config.className}
       `}
       title={config.label}
       aria-label={config.label}
