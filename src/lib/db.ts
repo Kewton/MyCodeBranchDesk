@@ -347,12 +347,12 @@ export function upsertWorktree(
       path = excluded.path,
       repository_path = excluded.repository_path,
       repository_name = excluded.repository_name,
-      memo = excluded.memo,
-      last_user_message = excluded.last_user_message,
-      last_user_message_at = excluded.last_user_message_at,
-      last_message_summary = excluded.last_message_summary,
-      updated_at = excluded.updated_at,
-      cli_tool_id = excluded.cli_tool_id
+      memo = COALESCE(excluded.memo, worktrees.memo),
+      last_user_message = COALESCE(excluded.last_user_message, worktrees.last_user_message),
+      last_user_message_at = COALESCE(excluded.last_user_message_at, worktrees.last_user_message_at),
+      last_message_summary = COALESCE(excluded.last_message_summary, worktrees.last_message_summary),
+      updated_at = COALESCE(excluded.updated_at, worktrees.updated_at),
+      cli_tool_id = COALESCE(excluded.cli_tool_id, worktrees.cli_tool_id)
   `);
 
   stmt.run(
@@ -760,6 +760,57 @@ export function updatePromptData(
   `);
 
   stmt.run(JSON.stringify(promptData), messageId);
+}
+
+/**
+ * Mark all pending prompts as answered for a worktree/CLI tool
+ * This is called when we detect Claude has started processing (new response detected)
+ * which means any pending prompts must have been answered via terminal
+ */
+export function markPendingPromptsAsAnswered(
+  db: Database.Database,
+  worktreeId: string,
+  cliToolId: CLIToolType
+): number {
+  // Find all pending prompt messages for this worktree/CLI tool
+  const selectStmt = db.prepare(`
+    SELECT id, prompt_data
+    FROM chat_messages
+    WHERE worktree_id = ?
+      AND cli_tool_id = ?
+      AND message_type = 'prompt'
+      AND json_extract(prompt_data, '$.status') = 'pending'
+    ORDER BY timestamp DESC
+  `);
+
+  const rows = selectStmt.all(worktreeId, cliToolId) as { id: string; prompt_data: string }[];
+
+  if (rows.length === 0) {
+    return 0;
+  }
+
+  // Update each pending prompt to answered
+  const updateStmt = db.prepare(`
+    UPDATE chat_messages
+    SET prompt_data = ?
+    WHERE id = ?
+  `);
+
+  let updatedCount = 0;
+  for (const row of rows) {
+    try {
+      const promptData = JSON.parse(row.prompt_data);
+      promptData.status = 'answered';
+      promptData.answer = '(answered via terminal)';
+      promptData.answeredAt = new Date().toISOString();
+      updateStmt.run(JSON.stringify(promptData), row.id);
+      updatedCount++;
+    } catch {
+      // Skip if prompt_data is invalid JSON
+    }
+  }
+
+  return updatedCount;
 }
 
 /**

@@ -30,30 +30,35 @@ interface StatusConfig {
   color: string;
   /** Accessible label */
   label: string;
-  /** Whether to animate */
-  animate: boolean;
+  /** Display type: 'dot' for colored circle, 'spinner' for spinning icon */
+  type: 'dot' | 'spinner';
 }
 
 const statusConfig: Record<BranchStatus, StatusConfig> = {
   idle: {
     color: 'bg-gray-500',
     label: 'Idle',
-    animate: false,
+    type: 'dot',
+  },
+  ready: {
+    color: 'bg-green-500',
+    label: 'Ready',
+    type: 'dot',
   },
   running: {
-    color: 'bg-green-500',
+    color: 'border-blue-500',
     label: 'Running',
-    animate: true,
+    type: 'spinner',
   },
   waiting: {
-    color: 'bg-yellow-500',
+    color: 'bg-green-500',
     label: 'Waiting',
-    animate: true,
+    type: 'dot',
   },
   generating: {
-    color: 'bg-blue-500',
+    color: 'border-blue-500',
     label: 'Generating',
-    animate: true,
+    type: 'spinner',
   },
 };
 
@@ -62,7 +67,7 @@ const statusConfig: Record<BranchStatus, StatusConfig> = {
 // ============================================================================
 
 /**
- * BranchStatusIndicator displays a colored status dot
+ * BranchStatusIndicator displays a colored status dot or spinner
  *
  * @example
  * ```tsx
@@ -74,13 +79,28 @@ export const BranchStatusIndicator = memo(function BranchStatusIndicator({
 }: BranchStatusIndicatorProps) {
   const config = statusConfig[status];
 
+  if (config.type === 'spinner') {
+    return (
+      <span
+        data-testid="status-indicator"
+        className={`
+          w-3 h-3 rounded-full flex-shrink-0
+          border-2 border-t-transparent
+          ${config.color}
+          animate-spin
+        `}
+        title={config.label}
+        aria-label={config.label}
+      />
+    );
+  }
+
   return (
     <span
       data-testid="status-indicator"
       className={`
         w-3 h-3 rounded-full flex-shrink-0
         ${config.color}
-        ${config.animate ? 'animate-pulse' : ''}
       `}
       title={config.label}
       aria-label={config.label}

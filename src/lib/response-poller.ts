@@ -11,6 +11,7 @@ import {
   updateSessionState,
   getWorktreeById,
   clearInProgressMessageId,
+  markPendingPromptsAsAnswered,
 } from './db';
 import { broadcastMessage } from './ws-server';
 import { detectPrompt } from './prompt-detector';
@@ -531,6 +532,16 @@ async function checkForResponse(worktreeId: string, cliToolId: CLIToolType): Pro
 
     if (!result || !result.isComplete) {
       // No new output or response not yet complete
+      // But if Claude is processing (thinking), mark any pending prompts as answered
+      // This handles cases where user responded to prompts directly via terminal
+      const { thinkingPattern } = getCliToolPatterns(cliToolId);
+      const cleanOutput = stripAnsi(output);
+      if (thinkingPattern.test(cleanOutput)) {
+        const answeredCount = markPendingPromptsAsAnswered(db, worktreeId, cliToolId);
+        if (answeredCount > 0) {
+          console.log(`Marked ${answeredCount} pending prompt(s) as answered (thinking detected) for ${worktreeId}`);
+        }
+      }
       return false;
     }
 
@@ -594,6 +605,13 @@ async function checkForResponse(worktreeId: string, cliToolId: CLIToolType): Pro
     // Create Markdown log file for the conversation pair
     if (cleanedResponse) {
       await recordClaudeConversation(db, worktreeId, cleanedResponse, cliToolId);
+    }
+
+    // Mark any pending prompts as answered since Claude has started processing
+    // This handles cases where user responded to prompts directly via terminal
+    const answeredCount = markPendingPromptsAsAnswered(db, worktreeId, cliToolId);
+    if (answeredCount > 0) {
+      console.log(`Marked ${answeredCount} pending prompt(s) as answered for ${worktreeId}`);
     }
 
     // Create new CLI tool message in database

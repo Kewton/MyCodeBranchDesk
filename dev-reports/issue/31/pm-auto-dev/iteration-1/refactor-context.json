@@ -1,0 +1,35 @@
+{
+  "issue_number": 31,
+  "refactor_targets": [
+    "src/lib/sidebar-utils.ts",
+    "src/contexts/SidebarContext.tsx",
+    "src/components/sidebar/SortSelector.tsx",
+    "src/components/layout/Sidebar.tsx",
+    "src/components/sidebar/BranchListItem.tsx"
+  ],
+  "quality_metrics": {
+    "before_coverage": 100.0,
+    "eslint_errors": 0,
+    "typescript_errors": 0
+  },
+  "improvement_goals": [
+    "コードの可読性向上",
+    "重複コードの削除",
+    "命名の一貫性確認",
+    "不要なコメントやconsole.logの削除"
+  ],
+  "constraints": [
+    "テストが引き続きパスすること",
+    "ESLint/TypeScriptエラーが0件であること",
+    "ビルドが成功すること"
+  ],
+  "tdd_result": {
+    "status": "success",
+    "tests_passed": 17,
+    "coverage": 100.0
+  },
+  "acceptance_result": {
+    "status": "passed",
+    "all_criteria_passed": true
+  }
+}

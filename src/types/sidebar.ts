@@ -9,11 +9,12 @@ import type { Worktree } from '@/types/models';
 /**
  * Branch status in sidebar
  * - idle: Session not running
- * - running: Session running, processing
- * - waiting: Waiting for user input (prompt)
+ * - ready: Session running, waiting for user's new message (green dot)
+ * - running: Session running, processing user's request (spinner)
+ * - waiting: Waiting for user input on yes/no prompt (green dot)
  * - generating: AI is generating response
  */
-export type BranchStatus = 'idle' | 'running' | 'waiting' | 'generating';
+export type BranchStatus = 'idle' | 'ready' | 'running' | 'waiting' | 'generating';
 
 /**
  * Branch item for sidebar display
@@ -30,14 +31,20 @@ export interface SidebarBranchItem {
   status: BranchStatus;
   /** Whether there are unread messages/updates */
   hasUnread: boolean;
-  /** Last activity timestamp */
-  lastActivity?: Date;
+  /** Last activity timestamp (Date object or ISO string from API) */
+  lastActivity?: Date | string;
   /** User memo for this branch */
   memo?: string;
 }
 
 /**
  * Determine branch status from Worktree data
+ *
+ * Status priority:
+ * - waiting: Claude asked a yes/no prompt, waiting for user's answer (green dot)
+ * - running: Claude is actively processing user's request (spinner)
+ * - ready: Session running, waiting for user's new message (green dot)
+ * - idle: Session not running (gray dot)
  */
 function determineBranchStatus(worktree: Worktree): BranchStatus {
   // Check CLI-specific status first
@@ -46,8 +53,12 @@ function determineBranchStatus(worktree: Worktree): BranchStatus {
     if (claudeStatus.isWaitingForResponse) {
       return 'waiting';
     }
-    if (claudeStatus.isRunning) {
+    if (claudeStatus.isProcessing) {
       return 'running';
+    }
+    // Session running but not processing = ready (waiting for user to type new message)
+    if (claudeStatus.isRunning) {
+      return 'ready';
     }
   }
 
@@ -55,8 +66,12 @@ function determineBranchStatus(worktree: Worktree): BranchStatus {
   if (worktree.isWaitingForResponse) {
     return 'waiting';
   }
-  if (worktree.isSessionRunning) {
+  if (worktree.isProcessing) {
     return 'running';
+  }
+  // Session running but not processing = ready
+  if (worktree.isSessionRunning) {
+    return 'ready';
   }
 
   return 'idle';

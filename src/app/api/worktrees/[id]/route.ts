@@ -6,9 +6,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbInstance } from '@/lib/db-instance';
-import { getWorktreeById, updateWorktreeMemo, updateWorktreeLink, updateFavorite, updateStatus, updateCliToolId } from '@/lib/db';
+import { getWorktreeById, updateWorktreeMemo, updateWorktreeLink, updateFavorite, updateStatus, updateCliToolId, getMessages, markPendingPromptsAsAnswered } from '@/lib/db';
 import { CLIToolManager } from '@/lib/cli-tools/manager';
 import type { CLIToolType } from '@/lib/cli-tools/types';
+import { captureSessionOutput } from '@/lib/cli-session';
+import { detectThinking, stripAnsi } from '@/lib/cli-patterns';
+import { detectPrompt } from '@/lib/prompt-detector';
 
 export async function GET(
   request: NextRequest,
@@ -25,13 +28,108 @@ export async function GET(
       );
     }
 
+    // Check session status for all CLI tools (consistent with /api/worktrees)
     const manager = CLIToolManager.getInstance();
-    const cliToolId = worktree.cliToolId || 'claude';
-    const cliTool = manager.getTool(cliToolId);
-    const isRunning = await cliTool.isRunning(params.id);
+    const allCliTools: CLIToolType[] = ['claude', 'codex', 'gemini'];
+
+    const sessionStatusByCli: {
+      claude?: { isRunning: boolean; isWaitingForResponse: boolean; isProcessing: boolean };
+      codex?: { isRunning: boolean; isWaitingForResponse: boolean; isProcessing: boolean };
+      gemini?: { isRunning: boolean; isWaitingForResponse: boolean; isProcessing: boolean };
+    } = {};
+
+    let anyRunning = false;
+    let anyWaiting = false;
+    let anyProcessing = false;
+
+    for (const cliToolId of allCliTools) {
+      const cliTool = manager.getTool(cliToolId);
+      const isRunning = await cliTool.isRunning(params.id);
+
+      // Check status based on messages
+      // - isWaitingForResponse: There's ANY unanswered prompt (not just the last message)
+      // - isProcessing: Last message is from user AND no pending prompts
+      let isWaitingForResponse = false;
+      let isProcessing = false;
+      if (isRunning) {
+        // Check recent messages (up to 10) for any pending prompt
+        const messages = getMessages(db, params.id, undefined, 10, cliToolId);
+
+        // First, check if there's any pending prompt
+        const hasPendingPrompt = messages.some(
+          msg => msg.messageType === 'prompt' && msg.promptData?.status !== 'answered'
+        );
+
+        if (hasPendingPrompt) {
+          // Check if Claude is actually thinking (user answered prompt via terminal)
+          // If thinking is detected, mark prompts as answered and set isProcessing
+          try {
+            const output = await captureSessionOutput(params.id, cliToolId, 100);
+            const cleanOutput = stripAnsi(output);
+            if (detectThinking(cliToolId, cleanOutput)) {
+              // Claude is thinking - mark pending prompts as answered
+              markPendingPromptsAsAnswered(db, params.id, cliToolId);
+              isProcessing = true;
+            } else {
+              isWaitingForResponse = true;
+            }
+          } catch {
+            // If capture fails, assume waiting for response
+            isWaitingForResponse = true;
+          }
+        } else if (messages.length > 0) {
+          const lastMessage = messages[0];
+          // "processing" when last message is from user OR prompt was just answered
+          // (Claude is working on the user's request)
+          if (lastMessage.role === 'user' ||
+              (lastMessage.messageType === 'prompt' &&
+               lastMessage.promptData?.status === 'answered')) {
+            // But first check terminal - maybe Claude is showing a prompt that isn't captured yet
+            try {
+              const output = await captureSessionOutput(params.id, cliToolId, 100);
+              const cleanOutput = stripAnsi(output);
+              // Check for prompt in terminal (yes/no, multiple choice, etc.)
+              const promptDetection = detectPrompt(cleanOutput);
+              if (promptDetection.isPrompt) {
+                isWaitingForResponse = true;
+              } else if (detectThinking(cliToolId, cleanOutput)) {
+                isProcessing = true;
+              } else {
+                // Neither prompt nor thinking - check for input prompt (❯)
+                // If showing input prompt, Claude is ready for new message
+                const hasInputPrompt = /^[>❯]\s*$/m.test(cleanOutput);
+                if (!hasInputPrompt) {
+                  isProcessing = true;
+                }
+                // If hasInputPrompt, both isProcessing and isWaitingForResponse stay false → "ready"
+              }
+            } catch {
+              // If capture fails, assume processing
+              isProcessing = true;
+            }
+          }
+        }
+      }
+
+      sessionStatusByCli[cliToolId] = {
+        isRunning,
+        isWaitingForResponse,
+        isProcessing,
+      };
+
+      if (isRunning) anyRunning = true;
+      if (isWaitingForResponse) anyWaiting = true;
+      if (isProcessing) anyProcessing = true;
+    }
 
     return NextResponse.json(
-      { ...worktree, isSessionRunning: isRunning },
+      {
+        ...worktree,
+        isSessionRunning: anyRunning,
+        isWaitingForResponse: anyWaiting,
+        isProcessing: anyProcessing,
+        sessionStatusByCli,
+      },
       { status: 200 }
     );
   } catch (error) {

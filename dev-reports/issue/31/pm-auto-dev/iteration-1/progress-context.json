@@ -1,0 +1,51 @@
+{
+  "issue_number": 31,
+  "issue_title": "サイドバーのUX改善",
+  "iteration": 1,
+  "phase_results": {
+    "tdd": {
+      "status": "success",
+      "tests_total": 17,
+      "tests_passed": 17,
+      "tests_failed": 0,
+      "coverage": 100.0,
+      "files_created": [
+        "src/lib/sidebar-utils.ts",
+        "src/components/sidebar/SortSelector.tsx",
+        "tests/unit/lib/sidebar-utils.test.ts"
+      ],
+      "files_modified": [
+        "src/types/sidebar.ts",
+        "src/contexts/SidebarContext.tsx",
+        "src/components/layout/Sidebar.tsx",
+        "src/components/sidebar/BranchListItem.tsx"
+      ]
+    },
+    "acceptance": {
+      "status": "passed",
+      "criteria_passed": 4,
+      "criteria_failed": 0,
+      "quality_checks": {
+        "eslint": "passed",
+        "typescript": "passed",
+        "build": "passed"
+      }
+    },
+    "refactor": {
+      "status": "success",
+      "files_modified": 1,
+      "lines_reduced": 8,
+      "improvements": [
+        "Simplified direction handling logic in sortBranches function"
+      ]
+    }
+  },
+  "commits": [
+    "5843d1b: feat(sidebar): add branch sorting and memo display (#31)"
+  ],
+  "next_steps": [
+    "PR作成",
+    "コードレビュー",
+    "マージ"
+  ]
+}

@@ -38,11 +38,13 @@ export interface Worktree {
   isSessionRunning?: boolean;
   /** Whether this worktree is waiting for Claude's response */
   isWaitingForResponse?: boolean;
+  /** Whether Claude is actively processing a request (last message from user) */
+  isProcessing?: boolean;
   /** Session status per CLI tool */
   sessionStatusByCli?: {
-    claude?: { isRunning: boolean; isWaitingForResponse: boolean };
-    codex?: { isRunning: boolean; isWaitingForResponse: boolean };
-    gemini?: { isRunning: boolean; isWaitingForResponse: boolean };
+    claude?: { isRunning: boolean; isWaitingForResponse: boolean; isProcessing: boolean };
+    codex?: { isRunning: boolean; isWaitingForResponse: boolean; isProcessing: boolean };
+    gemini?: { isRunning: boolean; isWaitingForResponse: boolean; isProcessing: boolean };
   };
   /** Whether this worktree is marked as favorite */
   favorite?: boolean;

@@ -1,0 +1,64 @@
+{
+  "issue_number": 31,
+  "feature_summary": "サイドバーのUX改善 - ソート機能とメモ表示",
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "description": "ソート順を選択可能にする（リポジトリ名、ブランチ名、対応状況、更新日時）",
+      "test_method": "unit_test",
+      "verification": "sortBranches関数が各ソートキーで正しくソートする"
+    },
+    {
+      "id": "AC-2",
+      "description": "ソート設定がリロード後も維持される（localStorage永続化）",
+      "test_method": "code_review",
+      "verification": "SidebarContextでlocalStorage永続化が実装されている"
+    },
+    {
+      "id": "AC-3",
+      "description": "選択中ブランチにメモが表示される",
+      "test_method": "code_review",
+      "verification": "BranchListItemで選択時にmemoを表示する実装がある"
+    },
+    {
+      "id": "AC-4",
+      "description": "モバイルでも操作可能",
+      "test_method": "code_review",
+      "verification": "SortSelectorがモバイル対応のUI設計になっている"
+    }
+  ],
+  "test_scenarios": [
+    {
+      "id": "TS-1",
+      "name": "ソート機能の単体テスト",
+      "steps": [
+        "sortBranches関数のテストを実行",
+        "各ソートキー（updatedAt, repositoryName, branchName, status）のテスト結果を確認"
+      ],
+      "expected": "全テストがパスする"
+    },
+    {
+      "id": "TS-2",
+      "name": "静的解析チェック",
+      "steps": [
+        "ESLintを実行",
+        "TypeScriptの型チェックを実行"
+      ],
+      "expected": "エラー0件"
+    },
+    {
+      "id": "TS-3",
+      "name": "ビルド成功確認",
+      "steps": [
+        "npm run buildを実行"
+      ],
+      "expected": "ビルドが成功する"
+    }
+  ],
+  "tdd_result": {
+    "status": "success",
+    "tests_passed": 17,
+    "tests_failed": 0,
+    "coverage": 100.0
+  }
+}

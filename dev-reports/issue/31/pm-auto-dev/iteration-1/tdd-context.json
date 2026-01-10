@@ -1,0 +1,59 @@
+{
+  "issue_number": 31,
+  "issue_title": "サイドバーのUX改善",
+  "acceptance_criteria": [
+    "ソート順を選択可能にする（リポジトリ名、ブランチ名、対応状況、更新日時）",
+    "ソート設定がリロード後も維持される（localStorage永続化）",
+    "選択中ブランチにメモが表示される",
+    "モバイルでも操作可能"
+  ],
+  "implementation_tasks": [
+    {
+      "id": "1.1",
+      "name": "型定義・ユーティリティ実装",
+      "files": ["src/lib/sidebar-utils.ts", "src/types/sidebar.ts"],
+      "description": "SortKey型定義、sortBranches関数、statusPriority定数、SidebarBranchItemにmemoフィールド追加"
+    },
+    {
+      "id": "1.2",
+      "name": "SidebarContext拡張",
+      "files": ["src/contexts/SidebarContext.tsx"],
+      "description": "sortKey/sortDirection状態追加、setSortKey/setSortDirectionアクション追加、localStorage永続化"
+    },
+    {
+      "id": "1.3",
+      "name": "SortSelectorコンポーネント作成",
+      "files": ["src/components/sidebar/SortSelector.tsx"],
+      "description": "ドロップダウンUI実装、ソートオプション表示、aria属性、モバイル対応"
+    },
+    {
+      "id": "1.4",
+      "name": "Sidebar統合",
+      "files": ["src/components/layout/Sidebar.tsx"],
+      "description": "SortSelector配置、useMemoでソート結果メモ化、検索フィルタとの統合"
+    },
+    {
+      "id": "2.1",
+      "name": "toBranchItem拡張",
+      "files": ["src/types/sidebar.ts"],
+      "description": "toBranchItemでmemoを含める"
+    },
+    {
+      "id": "2.2",
+      "name": "BranchListItem拡張",
+      "files": ["src/components/sidebar/BranchListItem.tsx"],
+      "description": "選択時にメモ表示、truncate処理"
+    }
+  ],
+  "target_coverage": 80,
+  "test_files": [
+    "tests/unit/lib/sidebar-utils.test.ts",
+    "tests/unit/components/sidebar/BranchListItem.test.tsx"
+  ],
+  "design_decisions": {
+    "sort_method": "client-side",
+    "state_management": "SidebarContext + localStorage",
+    "status_types": ["idle", "running", "waiting"],
+    "memo_display": "selected branch only"
+  }
+}

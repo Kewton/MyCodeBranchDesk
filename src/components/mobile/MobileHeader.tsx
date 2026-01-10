@@ -11,7 +11,7 @@ import { useMemo, memo } from 'react';
 /**
  * Status type for worktree
  */
-export type WorktreeStatus = 'idle' | 'running' | 'waiting' | 'error';
+export type WorktreeStatus = 'idle' | 'ready' | 'running' | 'waiting' | 'error';
 
 /**
  * Props for MobileHeader component
@@ -19,6 +19,8 @@ export type WorktreeStatus = 'idle' | 'running' | 'waiting' | 'error';
 export interface MobileHeaderProps {
   /** Worktree name to display */
   worktreeName: string;
+  /** Repository name to display */
+  repositoryName?: string;
   /** Current status */
   status: WorktreeStatus;
   /** Optional callback for back button */
@@ -68,23 +70,32 @@ const ICON_PATHS = {
  */
 const STATUS_CONFIG: Record<
   WorktreeStatus,
-  { className: string; label: string }
+  { className: string; label: string; type: 'dot' | 'spinner' }
 > = {
   idle: {
     className: 'bg-gray-400',
     label: 'Idle',
+    type: 'dot',
+  },
+  ready: {
+    className: 'bg-green-500',
+    label: 'Ready',
+    type: 'dot',
   },
   running: {
-    className: 'bg-green-500 animate-pulse',
+    className: 'border-blue-500',
     label: 'Running',
+    type: 'spinner',
   },
   waiting: {
-    className: 'bg-yellow-500',
+    className: 'bg-green-500',
     label: 'Waiting for response',
+    type: 'dot',
   },
   error: {
     className: 'bg-red-500',
     label: 'Error',
+    type: 'dot',
   },
 };
 
@@ -96,6 +107,7 @@ const STATUS_CONFIG: Record<
  */
 export function MobileHeader({
   worktreeName,
+  repositoryName,
   status,
   onBackClick,
   onMenuClick,
@@ -126,24 +138,39 @@ export function MobileHeader({
           )}
         </div>
 
-        {/* Center section: Worktree name and status */}
+        {/* Center section: Worktree name, repository, and status */}
         <div className="flex-1 flex items-center justify-center min-w-0 px-2">
           {/* Status indicator */}
-          <span
-            data-testid="status-indicator"
-            aria-label={statusConfig.label}
-            className={`w-2 h-2 rounded-full mr-2 flex-shrink-0 ${statusConfig.className}`}
-          />
+          {statusConfig.type === 'spinner' ? (
+            <span
+              data-testid="status-indicator"
+              aria-label={statusConfig.label}
+              className={`w-2.5 h-2.5 rounded-full mr-2 flex-shrink-0 border-2 border-t-transparent animate-spin ${statusConfig.className}`}
+            />
+          ) : (
+            <span
+              data-testid="status-indicator"
+              aria-label={statusConfig.label}
+              className={`w-2.5 h-2.5 rounded-full mr-2 flex-shrink-0 ${statusConfig.className}`}
+            />
+          )}
 
-          {/* Worktree name */}
-          <h1
-            role="heading"
-            data-testid="worktree-name"
-            title={worktreeName}
-            className="text-sm font-medium text-gray-900 truncate text-center"
-          >
-            {worktreeName}
-          </h1>
+          {/* Worktree name and repository */}
+          <div className="flex flex-col items-center min-w-0">
+            <h1
+              role="heading"
+              data-testid="worktree-name"
+              title={worktreeName}
+              className="text-sm font-medium text-gray-900 truncate text-center leading-tight"
+            >
+              {worktreeName}
+            </h1>
+            {repositoryName && (
+              <span className="text-xs text-gray-500 truncate text-center">
+                {repositoryName}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Right section: Menu button or spacer */}

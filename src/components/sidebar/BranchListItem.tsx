@@ -83,8 +83,8 @@ export const BranchListItem = memo(function BranchListItem({
         )}
       </div>
 
-      {/* Memo display (only when selected and memo exists) */}
-      {isSelected && branch.memo && (
+      {/* Memo display (shown for all branches with memo) */}
+      {branch.memo && (
         <div
           data-testid="branch-memo"
           className="pl-6 pr-2 mt-1 text-left"

@@ -22,6 +22,13 @@ import type { Worktree } from '@/types/models';
 import { worktreeApi } from '@/lib/api-client';
 
 // ============================================================================
+// Constants
+// ============================================================================
+
+/** Polling interval for worktree status updates (ms) */
+const WORKTREE_POLLING_INTERVAL_MS = 5000;
+
+// ============================================================================
 // Types
 // ============================================================================
 
@@ -176,6 +183,22 @@ export function WorktreeSelectionProvider({ children }: WorktreeSelectionProvide
   useEffect(() => {
     fetchWorktrees();
   }, [fetchWorktrees]);
+
+  // Polling for worktree status updates
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      // Silent refresh (don't show loading state during polling)
+      worktreeApi.getAll()
+        .then((response) => {
+          dispatch({ type: 'SET_WORKTREES', worktrees: response.worktrees });
+        })
+        .catch((err) => {
+          console.error('[WorktreeSelectionContext] Polling error:', err);
+        });
+    }, WORKTREE_POLLING_INTERVAL_MS);
+
+    return () => clearInterval(intervalId);
+  }, []);
 
   const value: WorktreeSelectionContextValue = {
     selectedWorktreeId: state.selectedWorktreeId,

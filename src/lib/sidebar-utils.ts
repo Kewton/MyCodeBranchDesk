@@ -26,16 +26,18 @@ export type SortDirection = 'asc' | 'desc';
 
 /**
  * Priority order for branch statuses (lower number = higher priority)
- * - waiting: Highest priority (needs user attention)
+ * - waiting: Highest priority (needs user attention for yes/no prompt)
+ * - ready: Session active, waiting for user's new message
  * - running: Active processing
  * - generating: AI is working
  * - idle: No activity (lowest priority)
  */
 export const STATUS_PRIORITY: Record<BranchStatus, number> = {
   waiting: 0,
-  running: 1,
-  generating: 2,
-  idle: 3,
+  ready: 1,
+  running: 2,
+  generating: 3,
+  idle: 4,
 };
 
 // ============================================================================
@@ -69,8 +71,14 @@ export function sortBranches(
 
     switch (sortKey) {
       case 'updatedAt': {
-        const dateA = a.lastActivity?.getTime() ?? 0;
-        const dateB = b.lastActivity?.getTime() ?? 0;
+        // Handle both Date objects and ISO date strings from API
+        const getTimestamp = (date: Date | string | undefined): number => {
+          if (!date) return 0;
+          if (date instanceof Date) return date.getTime();
+          return new Date(date).getTime();
+        };
+        const dateA = getTimestamp(a.lastActivity);
+        const dateB = getTimestamp(b.lastActivity);
         comparison = dateB - dateA; // Default: newest first
         break;
       }
@@ -97,20 +105,11 @@ export function sortBranches(
       }
     }
 
-    // Handle direction
-    if (direction === 'asc') {
-      // For updatedAt, asc means oldest first (reverse the default)
-      if (sortKey === 'updatedAt') {
-        return -comparison;
-      }
-      return comparison;
-    } else {
-      // For updatedAt, desc means newest first (keep the default)
-      if (sortKey === 'updatedAt') {
-        return comparison;
-      }
-      return -comparison;
-    }
+    // Apply direction multiplier
+    // For updatedAt: desc = newest first (default), asc = oldest first
+    // For others: asc = A-Z/priority order (default), desc = Z-A/reverse priority
+    const isDefaultDirection = sortKey === 'updatedAt' ? direction === 'desc' : direction === 'asc';
+    return isDefaultDirection ? comparison : -comparison;
   });
 
   return sorted;
