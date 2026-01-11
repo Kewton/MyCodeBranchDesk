@@ -294,7 +294,78 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
     return Boolean(payload && 'message' in payload && payload.message);
   };
 
+  /**
+   * Update a single message in the messages array
+   * Used for message_updated events (e.g., Yes/No prompt answered)
+   * Issue #36: Prevents full reload and scroll reset
+   */
+  const handleMessageUpdate = useCallback((updatedMessage: ChatMessage) => {
+    // Guard: Validate message has required id
+    if (!updatedMessage?.id) {
+      console.warn('[WorktreeDetail] Invalid message update received: missing id', updatedMessage);
+      return;
+    }
+
+    console.log('[WorktreeDetail] Updating single message:', updatedMessage.id);
+    setMessages(prevMessages =>
+      prevMessages.map(msg =>
+        msg.id === updatedMessage.id ? updatedMessage : msg
+      )
+    );
+    // Note: No scroll change - existing message updated in place
+  }, []);
+
+  /**
+   * Add a new message to the messages array
+   * Used for message events (new assistant response)
+   * Issue #36: Prevents duplicate additions
+   */
+  const handleNewMessage = useCallback((newMessage: ChatMessage) => {
+    // Guard: Validate message has required id
+    if (!newMessage?.id) {
+      console.warn('[WorktreeDetail] Invalid new message received: missing id', newMessage);
+      return;
+    }
+
+    setMessages(prevMessages => {
+      // Duplicate check: Skip if message already exists
+      if (prevMessages.some(msg => msg.id === newMessage.id)) {
+        console.log('[WorktreeDetail] Duplicate message ignored:', newMessage.id);
+        return prevMessages;
+      }
+      console.log('[WorktreeDetail] Adding new message:', newMessage.id);
+      return [...prevMessages, newMessage];
+    });
+
+    // Show notification for new messages
+    setShowNewMessageNotification(true);
+    setTimeout(() => setShowNewMessageNotification(false), 3000);
+  }, []);
+
+  /**
+   * Handle Optimistic Update from MessageList
+   * Immediately updates message state when user clicks Yes/No button
+   */
+  const handleOptimisticUpdate = useCallback((updatedMessage: ChatMessage) => {
+    console.log('[WorktreeDetail] Optimistic update:', updatedMessage.id);
+    setMessages(prevMessages =>
+      prevMessages.map(msg =>
+        msg.id === updatedMessage.id ? updatedMessage : msg
+      )
+    );
+  }, []);
+
+  /**
+   * Handle Optimistic Rollback from MessageList
+   * Restores original state when API call fails
+   */
+  const handleOptimisticRollback = useCallback((originalMessages: ChatMessage[]) => {
+    console.log('[WorktreeDetail] Rolling back to original messages');
+    setMessages(originalMessages);
+  }, []);
+
   const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
+    // Handle session status changes
     if (isSessionStatusPayload(message.data) && message.data.worktreeId === worktreeId) {
       if (message.data.messagesCleared) {
         console.log('[WorktreeDetail] Session killed, clearing messages');
@@ -303,14 +374,39 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
         setPendingCliTool(null);
         setGeneratingContent('');
       }
+      return;
     }
 
+    // Handle broadcast messages
     if (message.type === 'broadcast' && message.worktreeId === worktreeId) {
+      const payload = message.data;
+
+      // Issue #36: message_updated - Update existing message (e.g., prompt answered)
+      // This prevents full reload and maintains scroll position
+      if (payload?.type === 'message_updated' && isChatPayload(payload)) {
+        console.log('[WorktreeDetail] Message updated event:', payload.message.id);
+        handleMessageUpdate(payload.message);
+        return;
+      }
+
+      // Issue #36: message - Add new message to array
+      // This prevents duplicate fetching
+      if (payload?.type === 'message' && isChatPayload(payload)) {
+        console.log('[WorktreeDetail] New message event:', payload.message.id);
+        setWaitingForResponse(false);
+        setPendingCliTool(null);
+        setGeneratingContent('');
+        handleNewMessage(payload.message);
+        return;
+      }
+
+      // Fallback: Unknown event type - fetch all messages
+      console.log('[WorktreeDetail] Unknown broadcast type, fetching all messages');
       setWaitingForResponse(false);
       setPendingCliTool(null);
       setGeneratingContent('');
-      const cliToolFromMessage = isChatPayload(message.data)
-        ? message.data.message.cliToolId as CLIToolType | undefined
+      const cliToolFromMessage = isChatPayload(payload)
+        ? payload.message.cliToolId as CLIToolType | undefined
         : undefined;
       const targetCliTool = isCliTab(activeTab)
         ? activeTab
@@ -319,7 +415,7 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
       setShowNewMessageNotification(true);
       setTimeout(() => setShowNewMessageNotification(false), 3000);
     }
-  }, [worktreeId, activeTab, fetchMessages, resolveActiveCliTool]);
+  }, [worktreeId, activeTab, fetchMessages, resolveActiveCliTool, handleMessageUpdate, handleNewMessage]);
 
   /**
    * WebSocket for real-time updates
@@ -617,6 +713,8 @@ export function WorktreeDetail({ worktreeId }: WorktreeDetailProps) {
               realtimeOutput={realtimeOutput}
               isThinking={isThinking}
               selectedCliTool={messageListCliTool}
+              onOptimisticUpdate={handleOptimisticUpdate}
+              onOptimisticRollback={handleOptimisticRollback}
             />
           </div>
 

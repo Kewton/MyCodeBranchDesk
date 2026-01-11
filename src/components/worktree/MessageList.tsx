@@ -26,20 +26,31 @@ export interface MessageListProps {
   realtimeOutput?: string;
   isThinking?: boolean;
   selectedCliTool?: string;
+  /** Issue #36: Callback for optimistic update when user clicks Yes/No */
+  onOptimisticUpdate?: (message: ChatMessage) => void;
+  /** Issue #36: Callback to rollback optimistic update on API failure */
+  onOptimisticRollback?: (messages: ChatMessage[]) => void;
 }
 
 /**
- * Message bubble component
+ * Message bubble props interface
  */
-function MessageBubble({
-  message,
-  onFilePathClick,
-  onPromptRespond
-}: {
+interface MessageBubbleProps {
   message: ChatMessage;
   onFilePathClick: (path: string) => void;
   onPromptRespond?: (messageId: string, answer: string) => void;
-}) {
+}
+
+/**
+ * Message bubble component (Memoized)
+ * Issue #36: React.memo prevents unnecessary re-renders when message updates occur
+ * Custom comparison function only compares id, content, and promptData status/answer
+ */
+const MessageBubble = React.memo(function MessageBubble({
+  message,
+  onFilePathClick,
+  onPromptRespond
+}: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const timestamp = format(new Date(message.timestamp), 'PPp', { locale: ja });
 
@@ -348,7 +359,16 @@ function MessageBubble({
       </div>
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  // Issue #36: Custom comparison function for React.memo
+  // Only re-render when these specific properties change
+  return (
+    prevProps.message.id === nextProps.message.id &&
+    prevProps.message.content === nextProps.message.content &&
+    prevProps.message.promptData?.status === nextProps.message.promptData?.status &&
+    prevProps.message.promptData?.answer === nextProps.message.promptData?.answer
+  );
+});
 
 /**
  * List of chat messages
@@ -368,6 +388,8 @@ export function MessageList({
   realtimeOutput = '',
   isThinking = false,
   selectedCliTool = 'claude',
+  onOptimisticUpdate,
+  onOptimisticRollback,
 }: MessageListProps) {
   const router = useRouter();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -406,22 +428,62 @@ export function MessageList({
   }, [router, worktreeId]);
 
   /**
-   * Handle prompt response
+   * Handle prompt response with Optimistic Update
+   * Issue #36: Immediately updates UI when user clicks Yes/No, rolls back on API failure
    */
-  const handlePromptResponse = async (messageId: string, answer: string) => {
-    const response = await fetch(`/api/worktrees/${worktreeId}/respond`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messageId, answer }),
-    });
+  const handlePromptResponse = useCallback(async (messageId: string, answer: string) => {
+    // 1. Store original messages for potential rollback
+    const originalMessages = messages;
+    const targetMessage = messages.find((msg) => msg.id === messageId);
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to send response');
+    // Validate target message
+    if (!targetMessage?.promptData) {
+      console.warn('[MessageList] Target message not found or has no promptData:', messageId);
+      return;
     }
 
-    // Message will be updated via WebSocket broadcast
-  };
+    // 2. Optimistic Update: Immediately update UI
+    const optimisticMessage: ChatMessage = {
+      ...targetMessage,
+      promptData: {
+        ...targetMessage.promptData,
+        status: 'answered' as const,
+        answer,
+        answeredAt: new Date().toISOString(),
+      },
+    };
+
+    // Notify parent component of optimistic update
+    if (onOptimisticUpdate) {
+      onOptimisticUpdate(optimisticMessage);
+    }
+
+    try {
+      // 3. API call
+      const response = await fetch(`/api/worktrees/${worktreeId}/respond`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId, answer }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to send response');
+      }
+
+      // Success: WebSocket will confirm the update (already optimistically applied)
+      console.log('[MessageList] Prompt response sent successfully:', messageId);
+
+    } catch (error) {
+      // 4. Rollback on failure
+      console.error('[MessageList] Failed to send prompt response:', error);
+      if (onOptimisticRollback) {
+        onOptimisticRollback(originalMessages);
+      }
+      // Re-throw to allow calling code to handle if needed
+      throw error;
+    }
+  }, [messages, worktreeId, onOptimisticUpdate, onOptimisticRollback]);
 
   if (loading) {
     return (
