@@ -216,7 +216,7 @@ export function MessageInput({ worktreeId, onMessageSent, cliToolId }: MessageIn
           placeholder={isMobile ? "Type your message..." : "Type your message... (/ for commands, Shift+Enter for line break)"}
           disabled={sending}
           rows={1}
-          className="flex-1 outline-none bg-transparent resize-none py-1 overflow-hidden"
+          className="flex-1 outline-none bg-transparent resize-none py-1 overflow-y-auto scrollbar-thin"
           style={{ minHeight: '24px', maxHeight: '160px' }}
         />
         <button
