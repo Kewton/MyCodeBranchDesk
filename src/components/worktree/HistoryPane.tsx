@@ -8,7 +8,7 @@
 
 'use client';
 
-import React, { useMemo, useCallback, memo } from 'react';
+import React, { useMemo, useCallback, memo, useRef, useLayoutEffect } from 'react';
 import type { ChatMessage } from '@/types/models';
 import { useConversationHistory } from '@/hooks/useConversationHistory';
 import { ConversationPairCard } from './ConversationPairCard';
@@ -136,6 +136,38 @@ export const HistoryPane = memo(function HistoryPane({
   // Using underscore prefix to indicate intentionally unused parameter
   void _worktreeId;
 
+  // Scroll container ref for position preservation
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // Store scroll position to restore after re-renders
+  const scrollPositionRef = useRef<number>(0);
+  // Track message count to detect meaningful changes
+  const prevMessageCountRef = useRef<number>(messages.length);
+
+  // Save scroll position before render
+  useLayoutEffect(() => {
+    const container = scrollContainerRef.current;
+    if (container) {
+      scrollPositionRef.current = container.scrollTop;
+    }
+  });
+
+  // Restore scroll position after render if message count unchanged
+  useLayoutEffect(() => {
+    const container = scrollContainerRef.current;
+    const prevCount = prevMessageCountRef.current;
+
+    // Only restore scroll if message count hasn't increased
+    // (new messages should allow natural scroll behavior)
+    if (container && messages.length === prevCount) {
+      requestAnimationFrame(() => {
+        container.scrollTop = scrollPositionRef.current;
+      });
+    }
+
+    // Update previous count for next render
+    prevMessageCountRef.current = messages.length;
+  }, [messages.length]);
+
   // Use conversation history hook for grouping and expand/collapse state
   const { pairs, isExpanded, toggleExpand } = useConversationHistory(messages);
 
@@ -178,6 +210,7 @@ export const HistoryPane = memo(function HistoryPane({
 
   return (
     <div
+      ref={scrollContainerRef}
       role="region"
       aria-label="Message history"
       className={containerClasses}
