@@ -4,6 +4,9 @@
  */
 
 import type { PromptData } from '@/types/models';
+import { createLogger } from './logger';
+
+const logger = createLogger('prompt-detector');
 
 /**
  * Prompt detection result
@@ -39,6 +42,8 @@ export interface PromptDetectionResult {
  * ```
  */
 export function detectPrompt(output: string): PromptDetectionResult {
+  logger.debug('detectPrompt:start', { outputLength: output.length });
+
   const lines = output.split('\n');
   const lastLines = lines.slice(-10).join('\n');
 
@@ -50,6 +55,11 @@ export function detectPrompt(output: string): PromptDetectionResult {
   //   3. Cancel
   const multipleChoiceResult = detectMultipleChoicePrompt(output);
   if (multipleChoiceResult.isPrompt) {
+    logger.info('detectPrompt:multipleChoice', {
+      isPrompt: true,
+      question: multipleChoiceResult.promptData?.question,
+      optionsCount: multipleChoiceResult.promptData?.options?.length,
+    });
     return multipleChoiceResult;
   }
 
@@ -145,6 +155,7 @@ export function detectPrompt(output: string): PromptDetectionResult {
   }
 
   // No prompt detected
+  logger.debug('detectPrompt:complete', { isPrompt: false });
   return {
     isPrompt: false,
     cleanContent: output.trim(),
