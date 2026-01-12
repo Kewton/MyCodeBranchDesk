@@ -51,6 +51,7 @@ export interface HistoryPaneProps {
 /**
  * Loading indicator component.
  * Displays animated dots while content is loading.
+ * Includes proper ARIA role and label for accessibility.
  */
 function LoadingIndicator() {
   return (
@@ -72,7 +73,8 @@ function LoadingIndicator() {
 
 /**
  * Empty state component.
- * Displays a friendly message when there are no messages.
+ * Displays a friendly message and icon when there are no messages.
+ * Provides visual feedback to users that the history is empty.
  */
 function EmptyState() {
   return (

@@ -20,6 +20,7 @@ import {
   type InfiniteMessagesError,
   createInfiniteMessagesError,
 } from '@/types/infinite-messages';
+import { groupMessagesIntoPairs } from '@/lib/conversation-grouper';
 
 /**
  * Options for useInfiniteMessages hook
@@ -62,50 +63,11 @@ export interface UseInfiniteMessagesReturn {
 }
 
 /**
- * Groups messages into conversation pairs
- */
-function groupIntoConversationPairs(messages: ChatMessage[]): ConversationPair[] {
-  const pairs: ConversationPair[] = [];
-  let currentPair: ConversationPair | null = null;
-
-  for (const message of messages) {
-    if (message.role === 'user') {
-      // Start a new pair
-      if (currentPair) {
-        pairs.push(currentPair);
-      }
-      currentPair = {
-        id: `pair-${message.id}`,
-        status: 'pending',
-        userMessage: message,
-        assistantMessages: [],
-      };
-    } else if (message.role === 'assistant') {
-      if (currentPair) {
-        currentPair.assistantMessages.push(message);
-        currentPair.status = 'completed';
-      } else {
-        // Orphan assistant message
-        pairs.push({
-          id: `pair-orphan-${message.id}`,
-          status: 'orphan',
-          userMessage: null,
-          assistantMessages: [message],
-        });
-      }
-    }
-  }
-
-  // Push the last pair if exists
-  if (currentPair) {
-    pairs.push(currentPair);
-  }
-
-  return pairs;
-}
-
-/**
- * Parse message timestamps from API response
+ * Parse message timestamps from API response.
+ * Converts timestamp strings from the API into Date objects.
+ *
+ * @param messages - Array of messages with string timestamps
+ * @returns Array of messages with Date objects for timestamps
  */
 function parseMessageTimestamps(messages: ChatMessage[]): ChatMessage[] {
   return messages.map((msg) => ({
@@ -300,10 +262,11 @@ export function useInfiniteMessages(
   }, []);
 
   /**
-   * Group messages into conversation pairs (memoized)
+   * Group messages into conversation pairs (memoized).
+   * Uses shared utility from conversation-grouper for consistency.
    */
   const conversationPairs = useMemo(
-    () => groupIntoConversationPairs(messages),
+    () => groupMessagesIntoPairs(messages),
     [messages]
   );
 
