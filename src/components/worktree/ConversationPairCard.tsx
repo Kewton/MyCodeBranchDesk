@@ -56,7 +56,12 @@ const COLLAPSED_MAX_LINES = 5;
 // ============================================================================
 
 /**
- * Parses content string into text and file path parts
+ * Parses content string into text and file path parts.
+ * Detects file paths matching the FILE_PATH_REGEX pattern and splits
+ * the content into alternating text and path segments.
+ *
+ * @param content - The raw message content to parse
+ * @returns Array of content parts, each marked as 'text' or 'path'
  */
 function parseContentParts(content: string): ContentPart[] {
   const matches = content.match(FILE_PATH_REGEX);
@@ -84,7 +89,11 @@ function parseContentParts(content: string): ContentPart[] {
 }
 
 /**
- * Get truncated content for collapsed view
+ * Get truncated content for collapsed view.
+ * Truncates content based on COLLAPSED_MAX_LINES and COLLAPSED_MAX_CHARS limits.
+ *
+ * @param content - The full message content
+ * @returns Object containing truncated text and whether truncation occurred
  */
 function getTruncatedContent(
   content: string
@@ -109,6 +118,10 @@ function getTruncatedContent(
 
 /**
  * Renders message content with clickable file paths.
+ * File paths matching the FILE_PATH_REGEX are converted to clickable buttons.
+ *
+ * @param props.content - The message content to render
+ * @param props.onFilePathClick - Callback invoked when a file path is clicked
  */
 const MessageContent = memo(function MessageContent({
   content,
@@ -146,7 +159,8 @@ const MessageContent = memo(function MessageContent({
 });
 
 /**
- * Pending indicator component
+ * Pending indicator component.
+ * Displays animated dots to indicate that a response is being awaited.
  */
 function PendingIndicator() {
   return (
@@ -171,7 +185,11 @@ function PendingIndicator() {
 }
 
 /**
- * User message section
+ * User message section.
+ * Displays a user message with timestamp and clickable file paths.
+ *
+ * @param props.message - The user's chat message
+ * @param props.onFilePathClick - Callback invoked when a file path is clicked
  */
 const UserMessageSection = memo(function UserMessageSection({
   message,
@@ -199,7 +217,14 @@ const UserMessageSection = memo(function UserMessageSection({
 });
 
 /**
- * Single assistant message with optional counter
+ * Single assistant message item with optional counter.
+ * Displays an individual assistant response with truncation support.
+ *
+ * @param props.message - The assistant's chat message
+ * @param props.index - Index of this message in the array (0-based)
+ * @param props.total - Total number of assistant messages in the pair
+ * @param props.isExpanded - Whether the message is expanded (showing full content)
+ * @param props.onFilePathClick - Callback invoked when a file path is clicked
  */
 const AssistantMessageItem = memo(function AssistantMessageItem({
   message,
@@ -237,7 +262,7 @@ const AssistantMessageItem = memo(function AssistantMessageItem({
           </span>
         )}
       </div>
-      <div className="text-sm text-gray-200 whitespace-pre-wrap break-words">
+      <div className="text-sm text-gray-200 whitespace-pre-wrap break-words [word-break:break-word] max-w-full overflow-x-hidden">
         <MessageContent content={displayContent} onFilePathClick={onFilePathClick} />
         {!isExpanded && isTruncated && (
           <span className="text-gray-500">...</span>
@@ -248,7 +273,12 @@ const AssistantMessageItem = memo(function AssistantMessageItem({
 });
 
 /**
- * Assistant messages section (handles multiple messages)
+ * Assistant messages section.
+ * Renders all assistant messages in a pair with dividers between them.
+ *
+ * @param props.messages - Array of assistant chat messages
+ * @param props.isExpanded - Whether messages are expanded (showing full content)
+ * @param props.onFilePathClick - Callback invoked when a file path is clicked
  */
 const AssistantMessagesSection = memo(function AssistantMessagesSection({
   messages,
@@ -283,7 +313,8 @@ const AssistantMessagesSection = memo(function AssistantMessagesSection({
 });
 
 /**
- * Orphan header for system messages
+ * Orphan header for system messages.
+ * Displays a warning indicator for assistant messages without user input.
  */
 function OrphanHeader() {
   return (

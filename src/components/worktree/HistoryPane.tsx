@@ -8,10 +8,21 @@
 
 'use client';
 
-import React, { useMemo, useCallback, memo } from 'react';
+import React, { useMemo, useCallback, memo, useRef, useLayoutEffect } from 'react';
 import type { ChatMessage } from '@/types/models';
 import { useConversationHistory } from '@/hooks/useConversationHistory';
 import { ConversationPairCard } from './ConversationPairCard';
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/**
+ * Height of the sticky header in pixels.
+ * Used for scroll position calculations and future reference.
+ * Note: sticky top-0 does not affect scrollTop calculation as content flows below naturally.
+ */
+export const STICKY_HEADER_HEIGHT = 48;
 
 // ============================================================================
 // Types
@@ -40,6 +51,7 @@ export interface HistoryPaneProps {
 /**
  * Loading indicator component.
  * Displays animated dots while content is loading.
+ * Includes proper ARIA role and label for accessibility.
  */
 function LoadingIndicator() {
   return (
@@ -61,7 +73,8 @@ function LoadingIndicator() {
 
 /**
  * Empty state component.
- * Displays a friendly message when there are no messages.
+ * Displays a friendly message and icon when there are no messages.
+ * Provides visual feedback to users that the history is empty.
  */
 function EmptyState() {
   return (
@@ -136,6 +149,40 @@ export const HistoryPane = memo(function HistoryPane({
   // Using underscore prefix to indicate intentionally unused parameter
   void _worktreeId;
 
+  // Scroll container ref for position preservation
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // Store scroll position to restore after re-renders
+  const scrollPositionRef = useRef<number>(0);
+  // Track message count to detect meaningful changes
+  const prevMessageCountRef = useRef<number>(messages.length);
+
+  // Save scroll position before render
+  useLayoutEffect(() => {
+    const container = scrollContainerRef.current;
+    if (container) {
+      scrollPositionRef.current = container.scrollTop;
+    }
+  });
+
+  // Restore scroll position after render if message count unchanged
+  useLayoutEffect(() => {
+    const container = scrollContainerRef.current;
+    const prevCount = prevMessageCountRef.current;
+
+    // Only restore scroll if message count hasn't increased
+    // (new messages should allow natural scroll behavior)
+    if (container && messages.length === prevCount) {
+      requestAnimationFrame(() => {
+        container.scrollTop = scrollPositionRef.current;
+        // Note: sticky header does not affect scrollTop calculation
+        // as content flows below the header naturally
+      });
+    }
+
+    // Update previous count for next render
+    prevMessageCountRef.current = messages.length;
+  }, [messages.length]);
+
   // Use conversation history hook for grouping and expand/collapse state
   const { pairs, isExpanded, toggleExpand } = useConversationHistory(messages);
 
@@ -178,6 +225,7 @@ export const HistoryPane = memo(function HistoryPane({
 
   return (
     <div
+      ref={scrollContainerRef}
       role="region"
       aria-label="Message history"
       className={containerClasses}

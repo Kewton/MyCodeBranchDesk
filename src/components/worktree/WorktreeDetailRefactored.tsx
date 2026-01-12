@@ -797,6 +797,9 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [fileViewerPath, setFileViewerPath] = useState<string | null>(null);
 
+  // Track if initial load has completed to prevent re-triggering
+  const initialLoadCompletedRef = useRef(false);
+
   // ========================================================================
   // API Fetch Functions
   // ========================================================================
@@ -921,13 +924,15 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
           throw new Error(`Failed to send prompt response: ${response.status}`);
         }
         actions.clearPrompt();
+        // Immediately fetch current output to update terminal without waiting for polling
+        await fetchCurrentOutput();
       } catch (err) {
         console.error('[WorktreeDetailRefactored] Error sending prompt response:', err);
       } finally {
         actions.setPromptAnswering(false);
       }
     },
-    [worktreeId, actions]
+    [worktreeId, actions, fetchCurrentOutput]
   );
 
   /** Handle prompt dismiss without response */
@@ -976,8 +981,13 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
   // Effects
   // ========================================================================
 
-  /** Initial data fetch on mount */
+  /** Initial data fetch on mount - runs only once */
   useEffect(() => {
+    // Skip if already loaded to prevent re-triggering on dependency changes
+    if (initialLoadCompletedRef.current) {
+      return;
+    }
+
     let isMounted = true;
 
     const loadInitialData = async () => {
@@ -990,6 +1000,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
       }
       if (isMounted) {
         setLoading(false);
+        initialLoadCompletedRef.current = true;
       }
     };
 
