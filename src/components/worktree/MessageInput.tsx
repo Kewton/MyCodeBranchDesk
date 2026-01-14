@@ -9,6 +9,7 @@ import React, { useState, FormEvent, useRef, useEffect } from 'react';
 import { worktreeApi, handleApiError } from '@/lib/api-client';
 import type { CLIToolType } from '@/lib/cli-tools/types';
 import { SlashCommandSelector } from './SlashCommandSelector';
+import { InterruptButton } from './InterruptButton';
 import { useSlashCommands } from '@/hooks/useSlashCommands';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import type { SlashCommand } from '@/types/slash-commands';
@@ -17,6 +18,7 @@ export interface MessageInputProps {
   worktreeId: string;
   onMessageSent?: (cliToolId: CLIToolType) => void;
   cliToolId?: CLIToolType;
+  isSessionRunning?: boolean;
 }
 
 /**
@@ -27,7 +29,7 @@ export interface MessageInputProps {
  * <MessageInput worktreeId="main" onMessageSent={handleRefresh} cliToolId="claude" />
  * ```
  */
-export function MessageInput({ worktreeId, onMessageSent, cliToolId }: MessageInputProps) {
+export function MessageInput({ worktreeId, onMessageSent, cliToolId, isSessionRunning = false }: MessageInputProps) {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -219,6 +221,14 @@ export function MessageInput({ worktreeId, onMessageSent, cliToolId }: MessageIn
           className="flex-1 outline-none bg-transparent resize-none py-1 overflow-y-auto scrollbar-thin"
           style={{ minHeight: '24px', maxHeight: '160px' }}
         />
+
+        {/* Interrupt Button - visible when session is running */}
+        <InterruptButton
+          worktreeId={worktreeId}
+          cliToolId={cliToolId || 'claude'}
+          disabled={!isSessionRunning}
+        />
+
         <button
           type="submit"
           disabled={!message.trim() || sending}

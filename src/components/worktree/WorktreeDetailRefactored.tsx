@@ -1143,6 +1143,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
               worktreeId={worktreeId}
               onMessageSent={handleMessageSent}
               cliToolId="claude"
+              isSessionRunning={state.terminal.isActive}
             />
           </div>
           {/* Prompt Panel - fixed overlay at bottom */}
@@ -1210,6 +1211,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
             worktreeId={worktreeId}
             onMessageSent={handleMessageSent}
             cliToolId="claude"
+            isSessionRunning={state.terminal.isActive}
           />
         </div>
 
