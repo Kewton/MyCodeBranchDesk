@@ -11,7 +11,11 @@ import { runMigrations } from '../db-migrations';
 import { upsertWorktree, getMessages, updateSessionState, getSessionState } from '../db';
 
 // The module we're testing - will be created
-import { savePendingAssistantResponse, cleanCliResponse } from '../assistant-response-saver';
+import {
+  savePendingAssistantResponse,
+  cleanCliResponse,
+  extractAssistantResponseBeforeLastPrompt,
+} from '../assistant-response-saver';
 
 // Mock cli-session module
 vi.mock('../cli-session', () => ({
@@ -54,6 +58,173 @@ describe('assistant-response-saver', () => {
 
   afterEach(() => {
     testDb.close();
+  });
+
+  /**
+   * Issue #54: extractAssistantResponseBeforeLastPrompt tests
+   *
+   * This function is the key fix for Issue #54 Problem 4:
+   * - cleanClaudeResponse() extracts AFTER the last prompt (for response-poller)
+   * - extractAssistantResponseBeforeLastPrompt() extracts BEFORE the last prompt (for savePendingAssistantResponse)
+   *
+   * Scenario:
+   * tmuxバッファの状態（ユーザーがメッセージBを送信した時点）:
+   * ─────────────────────────────────────
+   * ❯ メッセージA（前回のユーザー入力）
+   * [前回のassistant応答 - 保存したい内容]
+   * ───
+   * ❯ メッセージB（今回のユーザー入力）  ← 最後のプロンプト
+   * [Claude処理中...]
+   * ─────────────────────────────────────
+   *
+   * We want to extract the content BEFORE ❯ メッセージB
+   */
+  describe('extractAssistantResponseBeforeLastPrompt', () => {
+    describe('claude', () => {
+      it('should extract response BEFORE the last user prompt', () => {
+        // This is the main Issue #54 fix scenario
+        const output = `❯ First message
+Assistant response to first message
+This is the content we want to capture
+───
+❯ Second message
+`;
+        const result = extractAssistantResponseBeforeLastPrompt(output, 'claude');
+
+        // Should extract content BEFORE "❯ Second message"
+        expect(result).toContain('Assistant response to first message');
+        expect(result).toContain('This is the content we want to capture');
+        // Should NOT include the new user message
+        expect(result).not.toContain('Second message');
+      });
+
+      it('should return all content when no user prompt exists', () => {
+        const output = `Assistant response text
+More response content`;
+        const result = extractAssistantResponseBeforeLastPrompt(output, 'claude');
+
+        expect(result).toContain('Assistant response text');
+        expect(result).toContain('More response content');
+      });
+
+      it('should return empty string for empty input', () => {
+        const result = extractAssistantResponseBeforeLastPrompt('', 'claude');
+        expect(result).toBe('');
+      });
+
+      it('should return empty string when output only contains the new prompt', () => {
+        // Edge case: only the new user message, no previous assistant response
+        const output = `❯ New message
+`;
+        const result = extractAssistantResponseBeforeLastPrompt(output, 'claude');
+
+        // No content before the prompt
+        expect(result).toBe('');
+      });
+
+      it('should filter out Claude skip patterns (banners, separators)', () => {
+        const output = `╭───────────────────────────────────╮
+│ Claude Code v1.0.0               │
+╰───────────────────────────────────╯
+Welcome back!
+Tips for getting started
+? for shortcuts
+───────────────────────────────────
+Actual assistant response content
+More useful content
+───────────────────────────────────
+❯ New user message
+`;
+        const result = extractAssistantResponseBeforeLastPrompt(output, 'claude');
+
+        // Should filter out banner elements
+        expect(result).not.toContain('Claude Code v');
+        expect(result).not.toContain('Welcome back');
+        expect(result).not.toContain('Tips for getting started');
+        expect(result).not.toContain('╭');
+        expect(result).not.toContain('╯');
+        // Should keep actual response content
+        expect(result).toContain('Actual assistant response content');
+        expect(result).toContain('More useful content');
+      });
+
+      it('should filter out export and hook commands', () => {
+        const output = `export CLAUDE_HOOKS_test='value'
+/usr/local/bin/claude
+Actual response here
+───
+❯ New message
+`;
+        const result = extractAssistantResponseBeforeLastPrompt(output, 'claude');
+
+        expect(result).not.toContain('export CLAUDE_HOOKS');
+        expect(result).not.toContain('/bin/claude');
+        expect(result).toContain('Actual response here');
+      });
+
+      it('should handle ANSI escape codes', () => {
+        // ANSI code for bold text: \x1b[1m ... \x1b[0m
+        const output = `\x1b[1mBold text\x1b[0m normal text
+Response content
+───
+❯ New message
+`;
+        const result = extractAssistantResponseBeforeLastPrompt(output, 'claude');
+
+        // Should strip ANSI codes and extract content
+        expect(result).toContain('Response content');
+        // ANSI codes should be removed
+        expect(result).not.toContain('\x1b');
+      });
+
+      it('should handle multiple prompts and extract before the last one', () => {
+        const output = `❯ First message
+First response
+───
+❯ Second message
+Second response
+───
+❯ Third message
+`;
+        const result = extractAssistantResponseBeforeLastPrompt(output, 'claude');
+
+        // Should extract everything before "❯ Third message"
+        expect(result).toContain('First response');
+        expect(result).toContain('Second response');
+        expect(result).not.toContain('Third message');
+      });
+
+      it('should handle legacy > prompt character', () => {
+        const output = `> First message
+Assistant response
+───
+> Second message
+`;
+        // Note: The current implementation uses ❯, but we should verify behavior
+        // with legacy > character
+        const result = extractAssistantResponseBeforeLastPrompt(output, 'claude');
+
+        // The function uses ❯ pattern, so > won't be detected as user prompt
+        // This is expected behavior - legacy > is handled differently
+        expect(result).toBeDefined();
+      });
+    });
+
+    describe('non-claude tools', () => {
+      it('should return trimmed output for codex', () => {
+        const output = '  Codex response content  ';
+        const result = extractAssistantResponseBeforeLastPrompt(output, 'codex');
+
+        expect(result).toBe('Codex response content');
+      });
+
+      it('should return trimmed output for gemini', () => {
+        const output = '  Gemini response content  ';
+        const result = extractAssistantResponseBeforeLastPrompt(output, 'gemini');
+
+        expect(result).toBe('Gemini response content');
+      });
+    });
   });
 
   describe('cleanCliResponse', () => {
@@ -323,6 +494,52 @@ export CLAUDE_HOOKS_completion_hook='...'
       // Assert: still saves response (treats lastCapturedLine as 0)
       expect(result).not.toBeNull();
       expect(result?.role).toBe('assistant');
+    });
+
+    /**
+     * Issue #54 Key Fix Test
+     * This test verifies that savePendingAssistantResponse correctly extracts
+     * the assistant response BEFORE the new user prompt (not after it).
+     *
+     * Scenario:
+     * User sends message B -> tmux buffer contains:
+     *   ❯ Message A (previous user input)
+     *   [Previous assistant response - SHOULD BE SAVED]
+     *   ───
+     *   ❯ Message B (new user input)
+     *   [Claude processing...]
+     *
+     * Expected: Save "Previous assistant response" (content before ❯ Message B)
+     */
+    it('should extract and save response BEFORE the last user prompt (Issue #54 fix)', async () => {
+      // Setup
+      updateSessionState(testDb, 'test-worktree', 'claude', 0);
+
+      // Simulate tmux output when user sends a new message
+      // The new message (❯ New message) should trigger saving the PREVIOUS assistant response
+      const mockOutput = `❯ Previous question
+This is the assistant response we want to save
+This content should be captured
+───
+❯ New message from user
+`;
+
+      mockCaptureSessionOutput.mockResolvedValue(mockOutput);
+
+      const userTimestamp = new Date();
+      const result = await savePendingAssistantResponse(
+        testDb,
+        'test-worktree',
+        'claude',
+        userTimestamp
+      );
+
+      // Assert: should save the response BEFORE "❯ New message from user"
+      expect(result).not.toBeNull();
+      expect(result?.content).toContain('This is the assistant response we want to save');
+      expect(result?.content).toContain('This content should be captured');
+      // Should NOT include the new user message
+      expect(result?.content).not.toContain('New message from user');
     });
 
     it('should work with gemini CLI tool', async () => {
