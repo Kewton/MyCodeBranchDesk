@@ -5,10 +5,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbInstance } from '@/lib/db-instance';
-import { getWorktreeById, createMessage, updateLastUserMessage, updateSessionState, clearInProgressMessageId } from '@/lib/db';
+import { getWorktreeById, createMessage, updateLastUserMessage, clearInProgressMessageId } from '@/lib/db';
 import { CLIToolManager } from '@/lib/cli-tools/manager';
 import type { CLIToolType } from '@/lib/cli-tools/types';
 import { startPolling } from '@/lib/response-poller';
+import { savePendingAssistantResponse } from '@/lib/assistant-response-saver';
 
 interface SendMessageRequest {
   content: string;
@@ -84,6 +85,19 @@ export async function POST(
       }
     }
 
+    // Generate timestamp for user message BEFORE saving pending response
+    // This ensures timestamp ordering: assistantResponse < userMessage
+    const userMessageTimestamp = new Date();
+
+    // [Issue #53] Save any pending assistant response before new user message
+    // This captures the CLI tool's response to the previous user message
+    try {
+      await savePendingAssistantResponse(db, params.id, cliToolId, userMessageTimestamp);
+    } catch (error) {
+      // Log but don't fail - user message should still be saved
+      console.error(`[send] Failed to save pending assistant response:`, error);
+    }
+
     // Send message to CLI tool
     try {
       await cliTool.sendMessage(params.id, body.content);
@@ -97,24 +111,22 @@ export async function POST(
     }
 
     // Create user message in database with CLI tool ID
-    const timestamp = new Date();
+    // Use the pre-generated timestamp for consistency
     const message = createMessage(db, {
       worktreeId: params.id,
       role: 'user',
       content: body.content,
       messageType: 'normal',
-      timestamp,
+      timestamp: userMessageTimestamp,
       cliToolId,
     });
 
     // Update last user message for worktree
-    updateLastUserMessage(db, params.id, body.content, timestamp);
+    updateLastUserMessage(db, params.id, body.content, userMessageTimestamp);
 
-    // Reset session state for the new conversation
-    // This ensures the poller starts fresh and doesn't skip the new response
-    updateSessionState(db, params.id, cliToolId, 0);
+    // Clear in-progress message ID (session state is managed by savePendingAssistantResponse)
     clearInProgressMessageId(db, params.id, cliToolId);
-    console.log(`✓ Reset session state for ${params.id} (${cliToolId})`);
+    console.log(`✓ Cleared in-progress message for ${params.id} (${cliToolId})`);
 
     // Start polling for CLI tool's response
     startPolling(params.id, cliToolId);
