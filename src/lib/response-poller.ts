@@ -77,36 +77,30 @@ export function cleanClaudeResponse(response: string): string {
   const responseLines = lines.slice(startIndex);
 
   // Patterns to remove (Claude-specific setup commands and UI elements)
+  // IMPORTANT: These patterns should NOT match legitimate Claude response content
+  // Lines starting with ⏺ (Claude output marker) are typically valid content
   const skipPatterns = [
     /CLAUDE_HOOKS_/,  // Any CLAUDE_HOOKS reference
     /\/bin\/claude/,  // Claude binary path (any variant)
     /^claude\s*$/,  // Just "claude" on a line
-    /@.*\s+%/,  // Shell prompt (any user@host followed by %)
-    /feature-issue-\d+/,  // Worktree indicator
-    /worktreeId/,  // Curl command JSON parts
-    /localhost/,  // Localhost references
-    /192\.168\./,  // IP address parts
-    /:3000/,  // Port references
-    /done'/,  // Any line containing done' (from claude-done')
-    /api\/hooks/,  // API hooks
-    /curl.*POST/,  // Curl commands
-    /Content-Type/,  // HTTP headers
-    /export\s+/,  // Export commands
+    /@.*\s+%\s*$/,  // Shell prompt (any user@host followed by % at end of line)
+    /^[^⏺]*curl.*POST/,  // Curl POST commands (not starting with ⏺)
+    /^[^⏺]*Content-Type/,  // HTTP headers (not in Claude output)
+    /^[^⏺]*export\s+CLAUDE_/,  // Claude environment exports only
     /^\s*$/,  // Empty lines
-    // Claude Code banner patterns
+    // Claude Code banner patterns (only match pure banner elements)
     /^[╭╮╰╯│─\s]+$/,  // Box drawing characters only (with spaces)
-    /[│╭╮╰╯].*[│╭╮╰╯]/,  // Lines with box drawing on both sides (banner rows)
+    /^[│╭╮╰╯].*[│╭╮╰╯]$/,  // Lines with box drawing on both sides (banner rows)
     /Claude Code v[\d.]+/,  // Version info
-    /Tips for getting started/,  // Tips header
-    /Welcome back/,  // Welcome message
+    /^Tips for getting started/,  // Tips header (at line start)
+    /^Welcome back/,  // Welcome message (at line start)
     /Run \/init to create/,  // Init instruction
-    /Recent activity/,  // Activity header
-    /No recent activity/,  // No activity message
+    /^Recent activity/,  // Activity header (at line start)
+    /^No recent activity/,  // No activity message (at line start)
     /▐▛███▜▌|▝▜█████▛▘|▘▘ ▝▝/,  // ASCII art logo
-    /Opus \d+\.\d+|Claude Max/,  // Model info
+    /^\s*Opus \d+\.\d+\s*·\s*Claude Max/,  // Model info in banner format
     /\.com's Organization/,  // Organization info
-    /~\/share\/work/,  // Directory path in banner
-    /\?\s*for shortcuts/,  // Shortcuts hint
+    /\?\s*for shortcuts\s*$/,  // Shortcuts hint at end of line
     /^─{10,}$/,  // Separator lines
     /^❯\s*$/,  // Empty prompt lines
   ];

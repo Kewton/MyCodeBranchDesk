@@ -1020,13 +1020,13 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
       : IDLE_POLLING_INTERVAL_MS;
 
     const pollData = async () => {
-      await Promise.all([fetchCurrentOutput(), fetchWorktree()]);
+      await Promise.all([fetchCurrentOutput(), fetchWorktree(), fetchMessages()]);
     };
 
     const intervalId = setInterval(pollData, pollingInterval);
 
     return () => clearInterval(intervalId);
-  }, [loading, error, fetchCurrentOutput, fetchWorktree, state.terminal.isActive]);
+  }, [loading, error, fetchCurrentOutput, fetchWorktree, fetchMessages, state.terminal.isActive]);
 
   /** Sync layout mode with viewport size */
   useEffect(() => {
