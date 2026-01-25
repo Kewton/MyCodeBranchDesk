@@ -25,10 +25,13 @@ let commandsCache: SlashCommand[] | null = null;
 
 /**
  * Get the commands directory path
+ *
+ * @param basePath - Optional base path. If not provided, uses process.cwd()
  */
-function getCommandsDir(): string {
-  // Use process.cwd() to get the project root
-  return path.join(process.cwd(), '.claude', 'commands');
+function getCommandsDir(basePath?: string): string {
+  // Use provided basePath or default to process.cwd()
+  const root = basePath || process.cwd();
+  return path.join(root, '.claude', 'commands');
 }
 
 /**
@@ -58,10 +61,11 @@ function parseCommandFile(filePath: string): SlashCommand | null {
 /**
  * Load all slash commands from .claude/commands/*.md
  *
+ * @param basePath - Optional base path. If not provided, uses process.cwd()
  * @returns Promise resolving to array of SlashCommand objects
  */
-export async function loadSlashCommands(): Promise<SlashCommand[]> {
-  const commandsDir = getCommandsDir();
+export async function loadSlashCommands(basePath?: string): Promise<SlashCommand[]> {
+  const commandsDir = getCommandsDir(basePath);
 
   // Check if directory exists
   if (!fs.existsSync(commandsDir)) {
@@ -94,10 +98,15 @@ export async function loadSlashCommands(): Promise<SlashCommand[]> {
 /**
  * Get commands grouped by category
  *
+ * @param basePath - Optional base path for loading worktree-specific commands
  * @returns Promise resolving to array of SlashCommandGroup objects
  */
-export async function getSlashCommandGroups(): Promise<SlashCommandGroup[]> {
-  const commands = commandsCache || (await loadSlashCommands());
+export async function getSlashCommandGroups(basePath?: string): Promise<SlashCommandGroup[]> {
+  // If basePath is provided, always load fresh (for worktree-specific commands)
+  // Otherwise, use cache for MCBD commands
+  const commands = basePath
+    ? await loadSlashCommands(basePath)
+    : commandsCache || (await loadSlashCommands());
 
   // Group by category
   const groupMap = new Map<SlashCommandCategory, SlashCommand[]>();

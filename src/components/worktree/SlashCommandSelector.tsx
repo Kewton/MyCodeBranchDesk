@@ -24,6 +24,8 @@ export interface SlashCommandSelectorProps {
   isMobile?: boolean;
   /** Position for desktop dropdown */
   position?: { top: number; left: number };
+  /** Callback for free input mode (Issue #56) */
+  onFreeInput?: () => void;
 }
 
 /**
@@ -49,6 +51,7 @@ export function SlashCommandSelector({
   onClose,
   isMobile = false,
   position,
+  onFreeInput,
 }: SlashCommandSelectorProps) {
   const [filter, setFilter] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState(0);
@@ -196,6 +199,23 @@ export function SlashCommandSelector({
             />
           </div>
 
+          {/* Free input button (Issue #56) */}
+          {onFreeInput && (
+            <button
+              type="button"
+              data-testid="free-input-button"
+              onClick={onFreeInput}
+              className="w-full px-4 py-3 text-left border-b border-gray-100 flex items-center gap-2 hover:bg-blue-50 transition-colors"
+            >
+              <span className="text-blue-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </span>
+              <span className="text-gray-600">Enter custom command...</span>
+            </button>
+          )}
+
           {/* Command list */}
           <SlashCommandList
             groups={filteredGroups}
@@ -226,6 +246,23 @@ export function SlashCommandSelector({
           className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
       </div>
+
+      {/* Free input button (Issue #56) */}
+      {onFreeInput && (
+        <button
+          type="button"
+          data-testid="free-input-button"
+          onClick={onFreeInput}
+          className="w-full px-3 py-2 text-left border-b border-gray-100 flex items-center gap-2 hover:bg-blue-50 transition-colors text-sm"
+        >
+          <span className="text-blue-600">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </span>
+          <span className="text-gray-600">Enter custom command...</span>
+        </button>
+      )}
 
       {/* Command list */}
       <SlashCommandList

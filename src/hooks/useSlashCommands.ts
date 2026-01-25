@@ -7,7 +7,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { slashCommandApi, handleApiError } from '@/lib/api-client';
+import { handleApiError } from '@/lib/api-client';
 import type { SlashCommand, SlashCommandGroup } from '@/types/slash-commands';
 
 /**
@@ -35,6 +35,7 @@ export interface UseSlashCommandsResult {
 /**
  * Hook for loading and filtering slash commands
  *
+ * @param worktreeId - Optional worktree ID for loading worktree-specific commands (Issue #56)
  * @returns UseSlashCommandsResult with commands data and controls
  *
  * @example
@@ -59,7 +60,7 @@ export interface UseSlashCommandsResult {
  * }
  * ```
  */
-export function useSlashCommands(): UseSlashCommandsResult {
+export function useSlashCommands(worktreeId?: string): UseSlashCommandsResult {
   const [groups, setGroups] = useState<SlashCommandGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -67,20 +68,31 @@ export function useSlashCommands(): UseSlashCommandsResult {
 
   /**
    * Fetch commands from API
+   * If worktreeId is provided, fetches worktree-specific commands (Issue #56)
    */
   const fetchCommands = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await slashCommandApi.getAll();
-      setGroups(response.groups);
+
+      // Use worktree-specific API if worktreeId is provided
+      const endpoint = worktreeId
+        ? `/api/worktrees/${worktreeId}/slash-commands`
+        : '/api/slash-commands';
+
+      const response = await fetch(endpoint);
+      if (!response.ok) {
+        throw new Error(`HTTP error ${response.status}`);
+      }
+      const data = await response.json();
+      setGroups(data.groups);
     } catch (err) {
       setError(handleApiError(err));
       setGroups([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [worktreeId]);
 
   /**
    * Load commands on mount

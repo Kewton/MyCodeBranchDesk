@@ -130,6 +130,19 @@ export function MessageInput({ worktreeId, onMessageSent, cliToolId, isSessionRu
   };
 
   /**
+   * Handle free input mode (Issue #56)
+   * Closes selector and prefills '/' for custom command entry
+   */
+  const handleFreeInput = () => {
+    setShowCommandSelector(false);
+    setMessage('/');
+    // Focus textarea with a small delay to ensure selector is closed
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 50);
+  };
+
+  /**
    * Handle message input change
    */
   const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -255,6 +268,7 @@ export function MessageInput({ worktreeId, onMessageSent, cliToolId, isSessionRu
         onSelect={handleCommandSelect}
         onClose={handleCommandCancel}
         isMobile={isMobile}
+        onFreeInput={handleFreeInput}
       />
     </div>
   );
