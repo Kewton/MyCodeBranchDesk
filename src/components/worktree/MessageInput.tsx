@@ -42,7 +42,7 @@ export function MessageInput({ worktreeId, onMessageSent, cliToolId, isSessionRu
 
   // Hooks for slash command functionality
   const isMobile = useIsMobile();
-  const { groups } = useSlashCommands();
+  const { groups } = useSlashCommands(worktreeId);
 
   /**
    * Auto-resize textarea based on content
