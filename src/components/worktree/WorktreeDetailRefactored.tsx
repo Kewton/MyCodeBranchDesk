@@ -1189,7 +1189,6 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
           </div>
           {/* Auto Yes Toggle */}
           <AutoYesToggle
-            worktreeId={worktreeId}
             enabled={autoYesEnabled}
             expiresAt={autoYesExpiresAt}
             onToggle={handleAutoYesToggle}

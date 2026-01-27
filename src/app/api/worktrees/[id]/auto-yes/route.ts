@@ -6,27 +6,39 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbInstance } from '@/lib/db-instance';
 import { getWorktreeById } from '@/lib/db';
-import { getAutoYesState, setAutoYesEnabled } from '@/lib/auto-yes-manager';
+import { getAutoYesState, setAutoYesEnabled, type AutoYesState } from '@/lib/auto-yes-manager';
+
+/** Build the JSON response shape from an AutoYesState */
+function buildAutoYesResponse(state: AutoYesState | null): { enabled: boolean; expiresAt: number | null } {
+  return {
+    enabled: state?.enabled ?? false,
+    expiresAt: state?.enabled ? state.expiresAt : null,
+  };
+}
+
+/** Validate that the worktree exists; returns 404 response if not found */
+function validateWorktreeExists(worktreeId: string): NextResponse | null {
+  const db = getDbInstance();
+  const worktree = getWorktreeById(db, worktreeId);
+  if (!worktree) {
+    return NextResponse.json(
+      { error: `Worktree '${worktreeId}' not found` },
+      { status: 404 }
+    );
+  }
+  return null;
+}
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const db = getDbInstance();
-    const worktree = getWorktreeById(db, params.id);
-    if (!worktree) {
-      return NextResponse.json(
-        { error: `Worktree '${params.id}' not found` },
-        { status: 404 }
-      );
-    }
+    const notFound = validateWorktreeExists(params.id);
+    if (notFound) return notFound;
 
     const state = getAutoYesState(params.id);
-    return NextResponse.json({
-      enabled: state?.enabled ?? false,
-      expiresAt: state?.enabled ? state.expiresAt : null,
-    });
+    return NextResponse.json(buildAutoYesResponse(state));
   } catch (error: unknown) {
     console.error('Error getting auto-yes state:', error);
     return NextResponse.json(
@@ -41,14 +53,8 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const db = getDbInstance();
-    const worktree = getWorktreeById(db, params.id);
-    if (!worktree) {
-      return NextResponse.json(
-        { error: `Worktree '${params.id}' not found` },
-        { status: 404 }
-      );
-    }
+    const notFound = validateWorktreeExists(params.id);
+    if (notFound) return notFound;
 
     const body = await request.json();
     if (typeof body.enabled !== 'boolean') {
@@ -59,10 +65,7 @@ export async function POST(
     }
 
     const state = setAutoYesEnabled(params.id, body.enabled);
-    return NextResponse.json({
-      enabled: state.enabled,
-      expiresAt: state.enabled ? state.expiresAt : null,
-    });
+    return NextResponse.json(buildAutoYesResponse(state));
   } catch (error: unknown) {
     console.error('Error setting auto-yes state:', error);
     return NextResponse.json(

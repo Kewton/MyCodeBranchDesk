@@ -11,8 +11,6 @@ import React, { memo, useEffect, useState, useCallback } from 'react';
 
 /** Props for AutoYesToggle component */
 export interface AutoYesToggleProps {
-  /** Worktree ID */
-  worktreeId: string;
   /** Whether auto-yes is currently enabled */
   enabled: boolean;
   /** Expiration timestamp (ms since epoch) */
