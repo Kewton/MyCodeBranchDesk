@@ -1247,7 +1247,10 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
           />
         </div>
 
-        <main className="flex-1 pt-[5.25rem] pb-28 overflow-hidden">
+        <main
+          className="flex-1 pt-[5.25rem] pb-32 overflow-hidden"
+          style={{ paddingBottom: 'calc(8rem + env(safe-area-inset-bottom, 0px))' }}
+        >
           <MobileContent
             activeTab={activeTab}
             worktreeId={worktreeId}
@@ -1263,7 +1266,10 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
         </main>
 
         {/* Message Input - fixed above tab bar */}
-        <div className="fixed bottom-16 left-0 right-0 border-t border-gray-200 bg-white p-2 z-30">
+        <div
+          className="fixed left-0 right-0 border-t border-gray-200 bg-white p-2 z-30"
+          style={{ bottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }}
+        >
           <MessageInput
             worktreeId={worktreeId}
             onMessageSent={handleMessageSent}
