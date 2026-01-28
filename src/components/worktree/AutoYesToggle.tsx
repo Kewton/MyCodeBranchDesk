@@ -8,6 +8,7 @@
 'use client';
 
 import React, { memo, useEffect, useState, useCallback } from 'react';
+import { AutoYesConfirmDialog } from './AutoYesConfirmDialog';
 
 /** Props for AutoYesToggle component */
 export interface AutoYesToggleProps {
@@ -40,6 +41,7 @@ export const AutoYesToggle = memo(function AutoYesToggle({
   const [timeRemaining, setTimeRemaining] = useState<string>('');
   const [notification, setNotification] = useState<string | null>(null);
   const [toggling, setToggling] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   // Countdown timer
   useEffect(() => {
@@ -66,14 +68,26 @@ export const AutoYesToggle = memo(function AutoYesToggle({
     return () => clearTimeout(timeout);
   }, [lastAutoResponse]);
 
-  const handleToggle = useCallback(async () => {
-    setToggling(true);
-    try {
-      await onToggle(!enabled);
-    } finally {
-      setToggling(false);
+  const handleToggle = useCallback(() => {
+    if (enabled) {
+      // OFF: execute directly
+      setToggling(true);
+      onToggle(false).finally(() => setToggling(false));
+    } else {
+      // ON: show confirmation dialog
+      setShowConfirmDialog(true);
     }
   }, [enabled, onToggle]);
+
+  const handleConfirm = useCallback(() => {
+    setShowConfirmDialog(false);
+    setToggling(true);
+    onToggle(true).finally(() => setToggling(false));
+  }, [onToggle]);
+
+  const handleCancel = useCallback(() => {
+    setShowConfirmDialog(false);
+  }, []);
 
   return (
     <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 border-b border-gray-200">
@@ -110,6 +124,12 @@ export const AutoYesToggle = memo(function AutoYesToggle({
           {notification}
         </span>
       )}
+
+      <AutoYesConfirmDialog
+        isOpen={showConfirmDialog}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </div>
   );
 });
