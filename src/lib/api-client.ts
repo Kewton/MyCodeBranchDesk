@@ -101,12 +101,12 @@ export const worktreeApi = {
   },
 
   /**
-   * Update worktree memo
+   * Update worktree description
    */
-  async updateMemo(id: string, memo: string): Promise<Worktree> {
+  async updateDescription(id: string, description: string): Promise<Worktree> {
     return fetchApi<Worktree>(`/api/worktrees/${id}`, {
       method: 'PATCH',
-      body: JSON.stringify({ memo }),
+      body: JSON.stringify({ description }),
     });
   },
 
@@ -225,6 +225,44 @@ export const worktreeApi = {
 };
 
 /**
+ * Delete repository response type
+ */
+export interface DeleteRepositoryResponse {
+  success: boolean;
+  deletedWorktreeCount: number;
+  deletedWorktreeIds: string[];
+  warnings?: string[];
+}
+
+/**
+ * Clone job start response type
+ * Issue #71: Clone URL registration feature
+ */
+export interface CloneStartResponse {
+  success: true;
+  jobId: string;
+  status: 'pending';
+  message: string;
+}
+
+/**
+ * Clone job status response type
+ * Issue #71: Clone URL registration feature
+ */
+export interface CloneStatusResponse {
+  success: true;
+  jobId: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  progress: number;
+  repositoryId?: string;
+  error?: {
+    category: string;
+    code: string;
+    message: string;
+  };
+}
+
+/**
  * Repository API client
  */
 export const repositoryApi = {
@@ -257,6 +295,45 @@ export const repositoryApi = {
     return fetchApi('/api/repositories/sync', {
       method: 'POST',
     });
+  },
+
+  /**
+   * Delete a repository and all its worktrees
+   * Issue #69: Repository delete feature
+   *
+   * @param repositoryPath - Path of the repository to delete
+   * @returns Delete result with count and any warnings
+   */
+  async delete(repositoryPath: string): Promise<DeleteRepositoryResponse> {
+    return fetchApi<DeleteRepositoryResponse>('/api/repositories', {
+      method: 'DELETE',
+      body: JSON.stringify({ repositoryPath }),
+    });
+  },
+
+  /**
+   * Start a clone job for a remote repository
+   * Issue #71: Clone URL registration feature
+   *
+   * @param cloneUrl - Git clone URL (HTTPS or SSH)
+   * @returns Clone job response with job ID
+   */
+  async clone(cloneUrl: string): Promise<CloneStartResponse> {
+    return fetchApi<CloneStartResponse>('/api/repositories/clone', {
+      method: 'POST',
+      body: JSON.stringify({ cloneUrl }),
+    });
+  },
+
+  /**
+   * Get the status of a clone job
+   * Issue #71: Clone URL registration feature
+   *
+   * @param jobId - Clone job ID
+   * @returns Clone job status
+   */
+  async getCloneStatus(jobId: string): Promise<CloneStatusResponse> {
+    return fetchApi<CloneStatusResponse>(`/api/repositories/clone/${jobId}`);
   },
 };
 
