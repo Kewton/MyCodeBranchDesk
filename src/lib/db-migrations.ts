@@ -11,7 +11,7 @@ import { initDatabase } from './db';
  * Current schema version
  * Increment this when adding new migrations
  */
-export const CURRENT_SCHEMA_VERSION = 13;
+export const CURRENT_SCHEMA_VERSION = 14;
 
 /**
  * Migration definition
@@ -559,6 +559,89 @@ const migrations: Migration[] = [
 
       console.log('✓ Rolled back: Renamed worktrees.description column back to memo');
     }
+  },
+  {
+    version: 14,
+    name: 'add-repositories-and-clone-jobs-tables',
+    up: (db) => {
+      // Issue #71: Clone URL registration feature
+      // Create repositories table for managing cloned repositories
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS repositories (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          path TEXT NOT NULL UNIQUE,
+          enabled INTEGER NOT NULL DEFAULT 1,
+          clone_url TEXT,
+          normalized_clone_url TEXT,
+          clone_source TEXT CHECK(clone_source IN ('local', 'https', 'ssh')) DEFAULT 'local',
+          is_env_managed INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+      `);
+
+      // Create unique index on normalized_clone_url for duplicate prevention
+      // NULL values are allowed (for local repos without clone URL)
+      db.exec(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_repositories_normalized_clone_url
+        ON repositories(normalized_clone_url)
+        WHERE normalized_clone_url IS NOT NULL;
+      `);
+
+      // Create index on path for fast lookups
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_repositories_path
+        ON repositories(path);
+      `);
+
+      // Create clone_jobs table for tracking clone operations
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS clone_jobs (
+          id TEXT PRIMARY KEY,
+          clone_url TEXT NOT NULL,
+          normalized_clone_url TEXT NOT NULL,
+          target_path TEXT NOT NULL,
+          repository_id TEXT,
+          status TEXT NOT NULL CHECK(status IN ('pending', 'running', 'completed', 'failed', 'cancelled')) DEFAULT 'pending',
+          pid INTEGER,
+          progress INTEGER NOT NULL DEFAULT 0,
+          error_category TEXT,
+          error_code TEXT,
+          error_message TEXT,
+          started_at INTEGER,
+          completed_at INTEGER,
+          created_at INTEGER NOT NULL,
+
+          FOREIGN KEY (repository_id) REFERENCES repositories(id) ON DELETE SET NULL
+        );
+      `);
+
+      // Create index on clone_jobs.status for querying active jobs
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_clone_jobs_status
+        ON clone_jobs(status);
+      `);
+
+      // Create index on clone_jobs.normalized_clone_url for duplicate prevention
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_clone_jobs_normalized_clone_url
+        ON clone_jobs(normalized_clone_url);
+      `);
+
+      console.log('✓ Created repositories table');
+      console.log('✓ Created clone_jobs table');
+      console.log('✓ Created indexes for repositories and clone_jobs');
+    },
+    down: (db) => {
+      db.exec('DROP INDEX IF EXISTS idx_clone_jobs_normalized_clone_url');
+      db.exec('DROP INDEX IF EXISTS idx_clone_jobs_status');
+      db.exec('DROP TABLE IF EXISTS clone_jobs');
+      db.exec('DROP INDEX IF EXISTS idx_repositories_path');
+      db.exec('DROP INDEX IF EXISTS idx_repositories_normalized_clone_url');
+      db.exec('DROP TABLE IF EXISTS repositories');
+      console.log('✓ Dropped repositories and clone_jobs tables');
+    }
   }
 ];
 
@@ -796,7 +879,7 @@ export function validateSchema(db: Database.Database): boolean {
     `).all() as Array<{ name: string }>;
 
     const tableNames = tables.map(t => t.name);
-    const requiredTables = ['worktrees', 'chat_messages', 'session_states', 'schema_version', 'worktree_memos', 'external_apps'];
+    const requiredTables = ['worktrees', 'chat_messages', 'session_states', 'schema_version', 'worktree_memos', 'external_apps', 'repositories', 'clone_jobs'];
 
     const missingTables = requiredTables.filter(t => !tableNames.includes(t));
 
