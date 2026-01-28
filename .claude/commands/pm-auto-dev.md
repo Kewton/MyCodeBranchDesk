@@ -38,7 +38,8 @@ Issue開発（TDD実装 → 受入テスト → リファクタリング → 進
 - [ ] Phase 2: TDD実装 (イテレーション 0/3)
 - [ ] Phase 3: 受入テスト
 - [ ] Phase 4: リファクタリング
-- [ ] Phase 5: 進捗報告
+- [ ] Phase 5: ドキュメント最新化
+- [ ] Phase 6: 進捗報告
 ```
 
 ---
@@ -178,9 +179,42 @@ Output file: dev-reports/issue/{issue_number}/pm-auto-dev/iteration-1/refactor-r
 
 ---
 
-### Phase 5: 進捗報告
+### Phase 5: ドキュメント最新化
 
-#### 5-1. 進捗レポートコンテキストファイル作成
+実装・リファクタリングの結果を踏まえ、関連ドキュメントを最新の状態に更新します。
+
+#### 5-1. 更新対象の特定
+
+以下の観点でドキュメントの更新要否を判断：
+
+- **README.md**: 機能一覧・スクリーンショットの更新が必要か
+- **CLAUDE.md**: プロジェクト構成・モジュール一覧の更新が必要か
+- **docs/architecture.md**: アーキテクチャ変更があるか
+- **docs/UI_UX_GUIDE.md**: UI変更があるか
+- **docs/user-guide/**: ユーザー向け手順の追加・変更が必要か
+- **docs/features/**: 機能詳細ドキュメントの追加・変更が必要か
+- **JSDoc / コード内コメント**: 新規・変更した公開APIのドキュメント
+
+#### 5-2. ドキュメント更新の実施
+
+変更内容に応じて該当ドキュメントを更新します。以下のルールに従うこと：
+
+1. **新機能追加時**: 該当機能の説明をドキュメントに追記
+2. **既存機能変更時**: 既存の記述を最新の動作に合わせて修正
+3. **設定・環境変数追加時**: `.env.example` および `docs/DEPLOYMENT.md` を更新
+4. **API変更時**: 関連するAPIドキュメントを更新
+5. **ファイル構成変更時**: `CLAUDE.md` のファイル構成セクションを更新
+
+#### 5-3. 更新確認
+
+- 更新したドキュメントの一覧をログに記録
+- ドキュメントに記載のコマンド例が正しく動作するか確認（該当する場合）
+
+---
+
+### Phase 6: 進捗報告
+
+#### 6-1. 進捗レポートコンテキストファイル作成
 
 **ファイルパス**: `dev-reports/issue/{issue_number}/pm-auto-dev/iteration-1/progress-context.json`
 
@@ -203,7 +237,7 @@ Output file: dev-reports/issue/{issue_number}/pm-auto-dev/iteration-1/refactor-r
 }
 ```
 
-#### 5-2. 進捗レポートサブエージェント呼び出し
+#### 6-2. 進捗レポートサブエージェント呼び出し
 
 ```
 Use progress-report-agent to generate progress report for Issue #{issue_number} iteration 1.
@@ -241,7 +275,8 @@ dev-reports/issue/{issue_number}/
 - Phase 2: TDD実装成功（カバレッジ80%以上、静的解析エラー0件）
 - Phase 3: 受入テスト成功（全シナリオ合格）
 - Phase 4: リファクタリング完了
-- Phase 5: 進捗レポート作成完了
+- Phase 5: 関連ドキュメントの最新化完了
+- Phase 6: 進捗レポート作成完了
 
 ---
 
@@ -266,7 +301,10 @@ Phase 3: 受入テスト成功
 Phase 4: リファクタリング成功
   - カバレッジ: 85% → 88%
 
-Phase 5: 進捗レポート作成完了
+Phase 5: ドキュメント最新化完了
+  - 更新: README.md, CLAUDE.md
+
+Phase 6: 進捗レポート作成完了
 
 Issue #166 の開発が完了しました！
 ```
