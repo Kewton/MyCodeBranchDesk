@@ -1,4 +1,4 @@
-# MyCodeBranchDesk
+# CommandMate
 
 > 「入力待ちを見逃さない、開発の相棒。」
 > 「軽量。その場で完結。Claude Codeを、どこからでも動かす。」
@@ -23,8 +23,8 @@ Claude Code での開発経験があり、本業の傍らで個人開発を続�
 ## 主な機能
 
 - **入力待ち/未確認検知** — サイドバーでリアルタイムにステータス表示（idle/ready/running/waiting）
-- **ブラウザから指示送信** — スマホ・PCどちらからでもチャットUIで操作
-- **チャット履歴・メモ** — ブランチごとの会話履歴を保持、メモ機能付き
+- **ブラウザから指示送信** — スマホ・PCどちらからでもメッセージUIで操作
+- **実行履歴・メモ** — ブランチごとの会話履歴を保持、メモ機能付き
 - **Markdownログビューア** — Claude の詳細出力をMarkdownで閲覧
 - **ファイルビュー** — ワークツリー内のファイルをブラウザから確認
 - **Auto Yes モード** — 確認ダイアログ付きで自動承認を制御
@@ -33,7 +33,7 @@ Claude Code での開発経験があり、本業の傍らで個人開発を続�
 - **Claude Code 特化** — Claude Code セッションの管理に最適化
 - **レスポンシブUI** — デスクトップは2カラム、モバイルはタブベースで最適表示
 
-### ワークツリー詳細画面（チャット・ターミナル）
+### ワークツリー詳細画面（Message / Console / History）
 
 | PC表示 | スマホ（History） | スマホ（Terminal） |
 |--------|-------------------|-------------------|
@@ -54,10 +54,10 @@ Claude Code での開発経験があり、本業の傍らで個人開発を続�
 ### セットアップ
 
 ```bash
-git clone https://github.com/Kewton/MyCodeBranchDesk.git
-cd MyCodeBranchDesk
+git clone https://github.com/Kewton/CommandMate.git
+cd CommandMate
 npm install
-cp .env.example .env   # MCBD_ROOT_DIR を編集
+cp .env.example .env   # CM_ROOT_DIR を編集
 npm run db:init
 npm run build
 npm start
@@ -65,7 +65,9 @@ npm start
 
 ブラウザで http://localhost:3000 にアクセスしてください。
 
-スマホから利用する場合は `.env` で `MCBD_BIND=0.0.0.0` と `MCBD_AUTH_TOKEN` を設定し、同一LAN内から `http://<PCのIP>:3000` にアクセスします。
+スマホから利用する場合は `.env` で `CM_BIND=0.0.0.0` と `CM_AUTH_TOKEN` を設定し、同一LAN内から `http://<PCのIP>:3000` にアクセスします。
+
+> **Note**: 旧名称の環境変数（`MCBD_*`）も後方互換性のためサポートされていますが、新名称（`CM_*`）の使用を推奨します。
 
 ## FAQ
 
@@ -94,6 +96,7 @@ A: 現時点では個人利用を想定しています。複数人での同時�
 | [コンセプト](./docs/concept.md) | ビジョンと解決する課題 |
 | [アーキテクチャ](./docs/architecture.md) | システム設計 |
 | [デプロイガイド](./docs/DEPLOYMENT.md) | 本番環境構築手順 |
+| [移行ガイド](./docs/migration-to-commandmate.md) | MyCodeBranchDesk からの移行手順 |
 | [UI/UXガイド](./docs/UI_UX_GUIDE.md) | UI実装の詳細 |
 | [クイックスタート](./docs/user-guide/quick-start.md) | Claude Codeコマンドの使い方 |
 | [Trust & Safety](./docs/TRUST_AND_SAFETY.md) | セキュリティと権限の考え方 |

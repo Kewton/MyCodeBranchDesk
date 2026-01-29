@@ -1,6 +1,6 @@
-# MyCodeBranchDesk デプロイメントガイド
+# CommandMate デプロイメントガイド
 
-本ドキュメントは、MyCodeBranchDesk をプロダクション環境にデプロイする手順を説明します。
+本ドキュメントは、CommandMate をプロダクション環境にデプロイする手順を説明します。
 
 ## 目次
 
@@ -26,8 +26,8 @@
 ### 1. リポジトリのクローン
 
 ```bash
-git clone https://github.com/kewton/MyCodeBranchDesk.git
-cd MyCodeBranchDesk
+git clone https://github.com/kewton/CommandMate.git
+cd CommandMate
 ```
 
 ### 2. 依存関係のインストール
@@ -47,15 +47,17 @@ cp .env.production.example .env
 `.env` ファイルを編集して、以下の値を設定します：
 
 ```env
-MCBD_ROOT_DIR=/path/to/your/worktrees
-MCBD_PORT=3000
-MCBD_BIND=0.0.0.0
-MCBD_AUTH_TOKEN=$(openssl rand -hex 32)
-DATABASE_PATH=/path/to/production/data/db.sqlite
+CM_ROOT_DIR=/path/to/your/worktrees
+CM_PORT=3000
+CM_BIND=0.0.0.0
+CM_AUTH_TOKEN=$(openssl rand -hex 32)
+CM_DB_PATH=/path/to/production/data/cm.db
 NODE_ENV=production
 ```
 
-**重要**: `MCBD_AUTH_TOKEN` は必ず安全なランダム値を設定してください。
+**重要**: `CM_AUTH_TOKEN` は必ず安全なランダム値を設定してください。
+
+> **Note**: 旧名称の環境変数（`MCBD_*`）も後方互換性のためサポートされていますが、新名称（`CM_*`）の使用を推奨します。
 
 ### 4. データベースの初期化
 
@@ -75,16 +77,20 @@ npm run build
 
 | 変数名 | 説明 | 例 |
 |--------|------|-----|
-| `MCBD_ROOT_DIR` | ワークツリーのルートディレクトリ | `/home/user/projects` |
-| `MCBD_BIND` | バインドアドレス（本番は `0.0.0.0`） | `0.0.0.0` |
-| `MCBD_AUTH_TOKEN` | API認証トークン（本番必須） | `abc123...` |
+| `CM_ROOT_DIR` | ワークツリーのルートディレクトリ | `/home/user/projects` |
+| `CM_BIND` | バインドアドレス（本番は `0.0.0.0`） | `0.0.0.0` |
+| `CM_AUTH_TOKEN` | API認証トークン（本番必須） | `abc123...` |
 
 ### オプション変数
 
 | 変数名 | 説明 | デフォルト |
 |--------|------|-----------|
-| `MCBD_PORT` | サーバーポート | `3000` |
-| `DATABASE_PATH` | SQLiteデータベースのパス | `./data/db.sqlite` |
+| `CM_PORT` | サーバーポート | `3000` |
+| `CM_DB_PATH` | SQLiteデータベースのパス | `./data/cm.db` |
+| `CM_LOG_LEVEL` | ログレベル | `info` |
+| `CM_LOG_FORMAT` | ログフォーマット | `json` |
+
+> **Note**: 旧名称（`MCBD_*`）も後方互換性のためサポートされています。詳細は `.env.example` を参照してください。
 
 ## ビルドとデプロイ
 
@@ -107,7 +113,7 @@ PM2を使用したデプロイ例：
 npm install -g pm2
 
 # アプリケーションの起動
-pm2 start npm --name "mycodebranch-desk" -- start
+pm2 start npm --name "commandmate" -- start
 
 # 自動起動の設定
 pm2 startup
@@ -117,28 +123,28 @@ pm2 save
 pm2 status
 
 # ログ確認
-pm2 logs mycodebranch-desk
+pm2 logs commandmate
 
 # 再起動
-pm2 restart mycodebranch-desk
+pm2 restart commandmate
 
 # 停止
-pm2 stop mycodebranch-desk
+pm2 stop commandmate
 ```
 
 ### Systemdサービス（オプション）
 
-`/etc/systemd/system/mycodebranch-desk.service`:
+`/etc/systemd/system/commandmate.service`:
 
 ```ini
 [Unit]
-Description=MyCodeBranchDesk
+Description=CommandMate
 After=network.target
 
 [Service]
 Type=simple
 User=your-user
-WorkingDirectory=/path/to/MyCodeBranchDesk
+WorkingDirectory=/path/to/CommandMate
 Environment=NODE_ENV=production
 ExecStart=/usr/bin/npm start
 Restart=on-failure
@@ -150,9 +156,9 @@ WantedBy=multi-user.target
 起動:
 
 ```bash
-sudo systemctl enable mycodebranch-desk
-sudo systemctl start mycodebranch-desk
-sudo systemctl status mycodebranch-desk
+sudo systemctl enable commandmate
+sudo systemctl start commandmate
+sudo systemctl status commandmate
 ```
 
 ## セキュリティ
@@ -272,10 +278,10 @@ npm run db:reset
 
 ```bash
 # PM2使用時
-pm2 logs mycodebranch-desk
+pm2 logs commandmate
 
 # Systemd使用時
-sudo journalctl -u mycodebranch-desk -f
+sudo journalctl -u commandmate -f
 ```
 
 ### パーミッションエラー
@@ -299,10 +305,10 @@ npm install
 npm run build
 
 # PM2使用時
-pm2 restart mycodebranch-desk
+pm2 restart commandmate
 
 # Systemd使用時
-sudo systemctl restart mycodebranch-desk
+sudo systemctl restart commandmate
 ```
 
 ## バックアップ
@@ -335,7 +341,7 @@ pm2 monit
 
 問題が発生した場合:
 
-1. [GitHub Issues](https://github.com/kewton/MyCodeBranchDesk/issues)
+1. [GitHub Issues](https://github.com/kewton/CommandMate/issues)
 2. ログファイルの確認
 3. 環境変数の確認
 

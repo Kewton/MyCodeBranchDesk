@@ -7,9 +7,9 @@
 ## プロジェクト概要
 
 ### 基本情報
-- **プロジェクト名**: MyCodeBranchDesk
+- **プロジェクト名**: CommandMate
 - **説明**: Git worktree管理とClaude CLI/tmuxセッション統合ツール
-- **リポジトリ**: https://github.com/Kewton/MyCodeBranchDesk
+- **リポジトリ**: https://github.com/Kewton/CommandMate
 
 ### 技術スタック
 | カテゴリ | 技術 |
@@ -113,6 +113,7 @@ src/
 
 | モジュール | 説明 |
 |-----------|------|
+| `src/lib/env.ts` | 環境変数取得・フォールバック処理 |
 | `src/config/status-colors.ts` | ステータス色の一元管理 |
 | `src/lib/cli-patterns.ts` | CLIツール別パターン定義 |
 | `src/lib/prompt-detector.ts` | プロンプト検出ロジック |
@@ -207,7 +208,9 @@ npm run db:reset      # DBリセット
 | `/acceptance-test` | 受け入れテスト |
 | `/issue-create` | Issue一括作成 |
 | `/issue-split` | Issue分割計画 |
-| `/architecture-review` | アーキテクチャレビュー |
+| `/architecture-review` | アーキテクチャレビュー（サブエージェント対応） |
+| `/apply-review` | レビュー指摘事項の実装反映 |
+| `/multi-stage-review` | 4段階レビュー（通常→整合性→影響分析→セキュリティ） |
 | `/design-policy` | 設計方針策定 |
 
 ### 利用可能なエージェント
@@ -219,10 +222,32 @@ npm run db:reset      # DBリセット
 | `investigation-agent` | バグ調査専門 |
 | `acceptance-test-agent` | 受入テスト |
 | `refactoring-agent` | リファクタリング |
+| `architecture-review-agent` | アーキテクチャレビュー |
+| `apply-review-agent` | レビュー指摘反映 |
 
 ---
 
 ## 最近の実装機能
+
+### Issue #77: 設定・コード内の名称置換（CommandMateリネーム Phase 3）
+- **設定ファイル更新**: `.env.example`を新名称（CM_*）に更新、旧名称はコメントアウトで残存
+- **package.json変更**: `name`を`mycodebranch-desk`から`commandmate`に変更
+- **Env interface更新**: `src/lib/env.ts`のプロパティ名を`CM_*`に統一
+- **シェルスクリプト更新**: 10ファイルをCommandMateブランディングとフォールバック対応
+- **TypeScriptスクリプト更新**: 5ファイルのDBパスを`cm.db`に変更
+- **テストコード修正**: 環境変数参照を`CM_*`に更新、E2Eテストのスキップ解除
+- **CHANGELOG更新**: 破壊的変更を記録
+- 詳細: [設計書](./dev-reports/design/issue-77-rename-phase3-design-policy.md)
+
+### Issue #76: 環境変数フォールバック（CommandMateリネーム Phase 1）
+- **フォールバック機能**: 新名称`CM_*`と旧名称`MCBD_*`の両方をサポート
+- **対象環境変数**: 8種類（ROOT_DIR, PORT, BIND, AUTH_TOKEN, LOG_LEVEL, LOG_FORMAT, LOG_DIR, DB_PATH）
+- **クライアント側**: `NEXT_PUBLIC_CM_AUTH_TOKEN` / `NEXT_PUBLIC_MCBD_AUTH_TOKEN`のフォールバック
+- **Deprecation警告**: 旧名称使用時にログ出力（同一キー1回のみ）
+- **セキュリティ**: `CM_AUTH_TOKEN`マスキングパターンを`logger.ts`に追加
+- **コアモジュール**: `src/lib/env.ts`に`getEnvWithFallback()`, `getEnvByKey()`関数追加
+- **CHANGELOG**: Keep a Changelogフォーマットで新規作成
+- 詳細: [設計書](./dev-reports/design/issue-76-env-fallback-design-policy.md)
 
 ### Issue #71: クローンURL登録機能
 - **クローンAPI**: `POST /api/repositories/clone` エンドポイント（非同期ジョブ）
@@ -264,6 +289,7 @@ npm run db:reset      # DBリセット
 
 - [README.md](./README.md) - プロジェクト概要
 - [アーキテクチャ](./docs/architecture.md) - システム設計
+- [移行ガイド](./docs/migration-to-commandmate.md) - MyCodeBranchDesk からの移行手順
 - [クイックスタートガイド](./docs/user-guide/quick-start.md) - 5分で始める開発フロー
 - [コマンド利用ガイド](./docs/user-guide/commands-guide.md) - コマンドの詳細
 - [エージェント利用ガイド](./docs/user-guide/agents-guide.md) - エージェントの詳細
