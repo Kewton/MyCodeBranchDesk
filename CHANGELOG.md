@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Preflight check script `scripts/preflight-check.sh` for dependency validation (Issue #92)
+  - Checks Node.js (v20+), npm, tmux, git, openssl
+  - Claude CLI check with warning (optional)
+  - Help option (`-h`/`--help`)
+- Interactive environment setup script `scripts/setup-env.sh` (Issue #92)
+  - Generates `.env` with CM_* variables
+  - Auto-generates auth token for external access
+  - Backs up existing `.env` to `.env.backup.{timestamp}`
+  - Help option (`-h`/`--help`)
+
+### Changed
+- `scripts/build-and-start.sh` now includes database initialization (Issue #92)
+  - Creates data directory
+  - Runs `npm run db:init` before build
+  - Help option (`-h`/`--help`)
+- `scripts/setup.sh` now uses preflight-check.sh, setup-env.sh, and build-and-start.sh (Issue #92)
+  - Integrated dependency checking
+  - Interactive environment configuration
+  - Streamlined 4-step setup process (preflight → npm install → env → build & start)
+  - Application starts automatically after setup
+- `.env.production.example` updated to use CM_* variables (Issue #92)
+  - Migrated from MCBD_* to CM_* format
+  - Added logging configuration options
+  - Added legacy support documentation
+- Updated README.md Quick Start with simplified setup (Issue #92)
+- Updated docs/DEPLOYMENT.md with new setup scripts (Issue #92)
+- Updated docs/internal/PRODUCTION_CHECKLIST.md with CM_* variables (Issue #92)
+
 ## [0.1.0] - 2026-01-30
 
 ### Changed

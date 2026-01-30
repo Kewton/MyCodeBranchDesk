@@ -15,57 +15,94 @@
 
 ## 前提条件
 
-- Node.js 20.x 以上
-- npm または yarn
-- Git
-- tmux（ワークツリーのtmuxセッション管理用）
-- Claude CLI（オプション）
+以下のツールがインストールされている必要があります：
+
+| ツール | バージョン | 必須 | 確認コマンド |
+|--------|----------|------|------------|
+| Node.js | v20+ | ✓ | `node -v` |
+| npm | - | ✓ | `npm -v` |
+| Git | - | ✓ | `git --version` |
+| tmux | - | ✓ | `tmux -V` |
+| openssl | - | ✓ | `openssl version` |
+| Claude CLI | - | △ | `claude --version` |
+
+> **Tip**: `./scripts/preflight-check.sh` で依存関係を一括確認できます。
 
 ## セットアップ手順
 
-### 1. リポジトリのクローン
+### 自動セットアップ（推奨）
+
+```bash
+git clone https://github.com/kewton/CommandMate.git
+cd CommandMate
+./scripts/setup.sh  # 依存チェック、環境設定、ビルド、起動まで自動実行
+```
+
+`setup.sh` は以下を自動実行します：
+1. 依存関係のチェック（`preflight-check.sh`）
+2. npm 依存関係のインストール
+3. 対話式環境設定（`setup-env.sh`）
+4. データベース初期化、ビルド、起動（`build-and-start.sh --daemon`）
+
+### 手動セットアップ
+
+カスタマイズが必要な場合は、手動でセットアップできます：
+
+#### 1. リポジトリのクローン
 
 ```bash
 git clone https://github.com/kewton/CommandMate.git
 cd CommandMate
 ```
 
-### 2. 依存関係のインストール
+#### 2. 依存関係のチェック
+
+```bash
+./scripts/preflight-check.sh
+```
+
+#### 3. npm 依存関係のインストール
 
 ```bash
 npm install
 ```
 
-### 3. 環境変数の設定
+#### 4. 環境変数の設定
 
-プロダクション環境用の `.env` ファイルを作成します：
+**対話式設定（推奨）**:
+
+```bash
+./scripts/setup-env.sh
+```
+
+対話式で以下を設定できます：
+- `CM_ROOT_DIR`: ワークツリーのルートディレクトリ
+- `CM_PORT`: サーバーポート（デフォルト: 3000）
+- `CM_BIND`: バインドアドレス（外部アクセス有効時は 0.0.0.0）
+- `CM_AUTH_TOKEN`: 認証トークン（外部アクセス有効時に自動生成）
+
+**手動設定**:
 
 ```bash
 cp .env.production.example .env
+# .env を編集
 ```
 
-`.env` ファイルを編集して、以下の値を設定します：
+**重要**: `CM_AUTH_TOKEN` は必ず安全なランダム値を設定してください：
 
-```env
-CM_ROOT_DIR=/path/to/your/worktrees
-CM_PORT=3000
-CM_BIND=0.0.0.0
-CM_AUTH_TOKEN=$(openssl rand -hex 32)
-CM_DB_PATH=/path/to/production/data/cm.db
-NODE_ENV=production
+```bash
+openssl rand -hex 32
 ```
-
-**重要**: `CM_AUTH_TOKEN` は必ず安全なランダム値を設定してください。
 
 > **Note**: 旧名称の環境変数（`MCBD_*`）も後方互換性のためサポートされていますが、新名称（`CM_*`）の使用を推奨します。
 
-### 4. データベースの初期化
+#### 5. データベースの初期化
 
 ```bash
 npm run db:init
 ```
 
-### 5. ビルド
+#### 6. ビルド
 
 ```bash
 npm run build

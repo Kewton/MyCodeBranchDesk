@@ -48,24 +48,35 @@ Claude Code での開発経験があり、本業の傍らで個人開発を続�
 ### 前提条件
 
 - macOS / Linux（tmux 依存のため Windows は非対応）
-- Node.js v20+、git、tmux
+- Node.js v20+、npm、git、tmux、openssl
 - Claude CLI（CLAUDE_HOOKS_STOP 対応）
+
+> **Tip**: `./scripts/preflight-check.sh` で依存関係を確認できます。
 
 ### セットアップ
 
 ```bash
 git clone https://github.com/Kewton/CommandMate.git
 cd CommandMate
+./scripts/setup.sh  # 依存チェック、環境設定、ビルド、起動まで自動実行
+```
+
+ブラウザで http://localhost:3000 にアクセスしてください。
+
+### 手動セットアップ（カスタマイズしたい場合）
+
+```bash
+git clone https://github.com/Kewton/CommandMate.git
+cd CommandMate
+./scripts/preflight-check.sh          # 依存チェック
 npm install
-cp .env.example .env   # CM_ROOT_DIR を編集
+./scripts/setup-env.sh                # 対話式で .env を生成
 npm run db:init
 npm run build
 npm start
 ```
 
-ブラウザで http://localhost:3000 にアクセスしてください。
-
-スマホから利用する場合は `.env` で `CM_BIND=0.0.0.0` と `CM_AUTH_TOKEN` を設定し、同一LAN内から `http://<PCのIP>:3000` にアクセスします。
+スマホから利用する場合は `./scripts/setup-env.sh` で外部アクセスを有効にすると、`CM_BIND=0.0.0.0` と `CM_AUTH_TOKEN` が自動設定されます。同一LAN内から `http://<PCのIP>:3000` にアクセスします。
 
 > **Note**: 旧名称の環境変数（`MCBD_*`）も後方互換性のためサポートされていますが、新名称（`CM_*`）の使用を推奨します。
 
