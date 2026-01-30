@@ -7,27 +7,32 @@
 ### 1. 環境設定
 
 - [ ] `.env` ファイルが作成され、適切な値が設定されている
-- [ ] `MCBD_ROOT_DIR` がワークツリーのルートディレクトリを正しく指している
-- [ ] `MCBD_BIND=0.0.0.0` が設定されている（外部アクセスを許可する場合）
-- [ ] `MCBD_AUTH_TOKEN` が安全なランダム値に設定されている（必須）
+- [ ] `CM_ROOT_DIR` がワークツリーのルートディレクトリを正しく指している
+- [ ] `CM_BIND=0.0.0.0` が設定されている（外部アクセスを許可する場合）
+- [ ] `CM_AUTH_TOKEN` が安全なランダム値に設定されている（必須）
   ```bash
   # トークン生成コマンド
   openssl rand -hex 32
   ```
-- [ ] `DATABASE_PATH` が適切な場所を指している
+- [ ] `CM_DB_PATH` が適切な場所を指している
 - [ ] `NODE_ENV=production` が設定されている
 - [ ] `.env` ファイルが `.gitignore` に含まれている（セキュリティ）
 
 ### 2. システム要件
 
+- [ ] 依存関係チェックが成功する
+  ```bash
+  ./scripts/preflight-check.sh
+  ```
 - [ ] Node.js 20.x 以上がインストールされている
   ```bash
   node -v
   ```
-- [ ] npm または yarn がインストールされている
+- [ ] npm がインストールされている
 - [ ] Git がインストールされている
 - [ ] tmux がインストールされている
-- [ ] Claude CLI (Claude Code) がインストールされている
+- [ ] openssl がインストールされている
+- [ ] Claude CLI (Claude Code) がインストールされている（オプション）
   ```bash
   claude --version
   ```
@@ -82,7 +87,7 @@
 
 ### 6. セキュリティ
 
-- [ ] 認証トークンが設定されている（`MCBD_AUTH_TOKEN`）
+- [ ] 認証トークンが設定されている（`CM_AUTH_TOKEN`）
 - [ ] トークンが `.env` ファイルに保存され、Git に含まれていない
 - [ ] ファイアウォールが適切に設定されている
   ```bash
@@ -119,8 +124,8 @@
 - [ ] Systemd サービスファイルが作成されている
 - [ ] サービスが有効化されている
   ```bash
-  sudo systemctl enable mycodebranch-desk
-  sudo systemctl start mycodebranch-desk
+  sudo systemctl enable commandmate
+  sudo systemctl start commandmate
   ```
 
 ### 8. モニタリングとログ
@@ -263,7 +268,7 @@
 
 ### 認証エラー
 
-- [ ] `MCBD_AUTH_TOKEN` が設定されているか確認
+- [ ] `CM_AUTH_TOKEN` が設定されているか確認
 - [ ] クライアント側で正しいトークンを使用しているか確認
 
 ## 📊 本番環境の監視
