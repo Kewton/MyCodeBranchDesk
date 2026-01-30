@@ -137,6 +137,9 @@ export function useContextMenu(): UseContextMenuReturn {
 
   /**
    * Handle ESC key to close menu
+   * [NOTE] This is intentionally duplicated with ContextMenu.tsx for defensive programming.
+   * The hook handles ESC when menu state changes, while ContextMenu handles it when rendered.
+   * This ensures ESC works even if there's a timing issue between state and rendering.
    */
   useEffect(() => {
     if (!menuState.isOpen) return;

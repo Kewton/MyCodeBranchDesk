@@ -12,6 +12,7 @@
  * [SF-001] Business logic delegated to file-operations.ts
  * [SF-002] Path validation using isPathSafe()
  * [SEC-SF-002] Error responses without absolute paths
+ * [REFACTOR] DRY: Centralized error code to HTTP status mapping
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -31,6 +32,42 @@ import { validateContent, isEditableExtension } from '@/config/editable-extensio
 import { extname } from 'path';
 
 /**
+ * [DRY] Centralized mapping of error codes to HTTP status codes
+ * Eliminates duplicate statusMap definitions across handlers
+ */
+const ERROR_CODE_TO_HTTP_STATUS: Record<string, number> = {
+  FILE_NOT_FOUND: 404,
+  WORKTREE_NOT_FOUND: 404,
+  PERMISSION_DENIED: 403,
+  NOT_EDITABLE: 403,
+  PROTECTED_DIRECTORY: 403,
+  INVALID_PATH: 400,
+  INVALID_REQUEST: 400,
+  INVALID_NAME: 400,
+  INVALID_CONTENT: 400,
+  DIRECTORY_NOT_EMPTY: 400,
+  DELETE_LIMIT_EXCEEDED: 400,
+  FILE_EXISTS: 409,
+  DISK_FULL: 507,
+  INTERNAL_ERROR: 500,
+};
+
+/**
+ * [DRY] Helper function to create error response with appropriate HTTP status
+ */
+function createErrorResponse(
+  code: string,
+  message: string,
+  defaultStatus: number = 500
+): NextResponse {
+  const status = ERROR_CODE_TO_HTTP_STATUS[code] ?? defaultStatus;
+  return NextResponse.json(
+    { success: false, error: { code, message } },
+    { status }
+  );
+}
+
+/**
  * Helper function to get worktree and validate path
  */
 async function getWorktreeAndValidatePath(
@@ -45,10 +82,7 @@ async function getWorktreeAndValidatePath(
 
   if (!worktree) {
     return {
-      error: NextResponse.json(
-        { success: false, error: { code: 'WORKTREE_NOT_FOUND', message: 'Worktree not found' } },
-        { status: 404 }
-      ),
+      error: createErrorResponse('WORKTREE_NOT_FOUND', 'Worktree not found'),
     };
   }
 
@@ -58,10 +92,7 @@ async function getWorktreeAndValidatePath(
   // [SF-002] Use isPathSafe for path validation
   if (!isPathSafe(normalizedPath, worktree.path)) {
     return {
-      error: NextResponse.json(
-        { success: false, error: { code: 'INVALID_PATH', message: 'Invalid file path' } },
-        { status: 400 }
-      ),
+      error: createErrorResponse('INVALID_PATH', 'Invalid file path'),
     };
   }
 
@@ -86,16 +117,9 @@ export async function GET(
     const fileResult = await readFileContent(worktree.path, relativePath);
 
     if (!fileResult.success) {
-      const statusMap: Record<string, number> = {
-        FILE_NOT_FOUND: 404,
-        PERMISSION_DENIED: 403,
-        INVALID_PATH: 400,
-        INTERNAL_ERROR: 500,
-      };
-      const status = statusMap[fileResult.error?.code || 'INTERNAL_ERROR'] || 500;
-      return NextResponse.json(
-        { success: false, error: fileResult.error },
-        { status }
+      return createErrorResponse(
+        fileResult.error?.code || 'INTERNAL_ERROR',
+        fileResult.error?.message || 'Failed to read file'
       );
     }
 
@@ -110,10 +134,7 @@ export async function GET(
     });
   } catch (error: unknown) {
     console.error('Error reading file:', error);
-    return NextResponse.json(
-      { success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to read file' } },
-      { status: 500 }
-    );
+    return createErrorResponse('INTERNAL_ERROR', 'Failed to read file');
   }
 }
 
@@ -135,46 +156,29 @@ export async function PUT(
 
     // Check if file is editable
     if (!isEditableFile(relativePath)) {
-      return NextResponse.json(
-        { success: false, error: { code: 'NOT_EDITABLE', message: 'File type is not editable' } },
-        { status: 403 }
-      );
+      return createErrorResponse('NOT_EDITABLE', 'File type is not editable');
     }
 
     const body = await request.json();
     const { content } = body;
 
     if (content === undefined) {
-      return NextResponse.json(
-        { success: false, error: { code: 'INVALID_REQUEST', message: 'Content is required' } },
-        { status: 400 }
-      );
+      return createErrorResponse('INVALID_REQUEST', 'Content is required');
     }
 
     // [SEC-SF-001] Validate content
     const ext = extname(relativePath).toLowerCase();
     const contentValidation = validateContent(ext, content);
     if (!contentValidation.valid) {
-      return NextResponse.json(
-        { success: false, error: { code: 'INVALID_CONTENT', message: contentValidation.error } },
-        { status: 400 }
-      );
+      return createErrorResponse('INVALID_CONTENT', contentValidation.error || 'Invalid content');
     }
 
     const updateResult = await updateFileContent(worktree.path, relativePath, content);
 
     if (!updateResult.success) {
-      const statusMap: Record<string, number> = {
-        FILE_NOT_FOUND: 404,
-        PERMISSION_DENIED: 403,
-        INVALID_PATH: 400,
-        DISK_FULL: 507,
-        INTERNAL_ERROR: 500,
-      };
-      const status = statusMap[updateResult.error?.code || 'INTERNAL_ERROR'] || 500;
-      return NextResponse.json(
-        { success: false, error: updateResult.error },
-        { status }
+      return createErrorResponse(
+        updateResult.error?.code || 'INTERNAL_ERROR',
+        updateResult.error?.message || 'Failed to update file'
       );
     }
 
@@ -184,10 +188,7 @@ export async function PUT(
     });
   } catch (error: unknown) {
     console.error('Error updating file:', error);
-    return NextResponse.json(
-      { success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to update file' } },
-      { status: 500 }
-    );
+    return createErrorResponse('INTERNAL_ERROR', 'Failed to update file');
   }
 }
 
@@ -211,10 +212,7 @@ export async function POST(
     const { type, content } = body;
 
     if (!type || !['file', 'directory'].includes(type)) {
-      return NextResponse.json(
-        { success: false, error: { code: 'INVALID_REQUEST', message: 'Type must be "file" or "directory"' } },
-        { status: 400 }
-      );
+      return createErrorResponse('INVALID_REQUEST', 'Type must be "file" or "directory"');
     }
 
     // For files, validate content if provided
@@ -223,10 +221,7 @@ export async function POST(
       if (isEditableExtension(ext)) {
         const contentValidation = validateContent(ext, content);
         if (!contentValidation.valid) {
-          return NextResponse.json(
-            { success: false, error: { code: 'INVALID_CONTENT', message: contentValidation.error } },
-            { status: 400 }
-          );
+          return createErrorResponse('INVALID_CONTENT', contentValidation.error || 'Invalid content');
         }
       }
     }
@@ -234,17 +229,9 @@ export async function POST(
     const createResult = await createFileOrDirectory(worktree.path, relativePath, type, content);
 
     if (!createResult.success) {
-      const statusMap: Record<string, number> = {
-        FILE_EXISTS: 409,
-        PERMISSION_DENIED: 403,
-        INVALID_PATH: 400,
-        DISK_FULL: 507,
-        INTERNAL_ERROR: 500,
-      };
-      const status = statusMap[createResult.error?.code || 'INTERNAL_ERROR'] || 500;
-      return NextResponse.json(
-        { success: false, error: createResult.error },
-        { status }
+      return createErrorResponse(
+        createResult.error?.code || 'INTERNAL_ERROR',
+        createResult.error?.message || 'Failed to create file/directory'
       );
     }
 
@@ -254,10 +241,7 @@ export async function POST(
     );
   } catch (error: unknown) {
     console.error('Error creating file/directory:', error);
-    return NextResponse.json(
-      { success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to create file/directory' } },
-      { status: 500 }
-    );
+    return createErrorResponse('INTERNAL_ERROR', 'Failed to create file/directory');
   }
 }
 
@@ -284,29 +268,16 @@ export async function DELETE(
     const deleteResult = await deleteFileOrDirectory(worktree.path, relativePath, recursive);
 
     if (!deleteResult.success) {
-      const statusMap: Record<string, number> = {
-        FILE_NOT_FOUND: 404,
-        PERMISSION_DENIED: 403,
-        INVALID_PATH: 400,
-        DIRECTORY_NOT_EMPTY: 400,
-        PROTECTED_DIRECTORY: 403,
-        DELETE_LIMIT_EXCEEDED: 400,
-        INTERNAL_ERROR: 500,
-      };
-      const status = statusMap[deleteResult.error?.code || 'INTERNAL_ERROR'] || 500;
-      return NextResponse.json(
-        { success: false, error: deleteResult.error },
-        { status }
+      return createErrorResponse(
+        deleteResult.error?.code || 'INTERNAL_ERROR',
+        deleteResult.error?.message || 'Failed to delete file/directory'
       );
     }
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     console.error('Error deleting file/directory:', error);
-    return NextResponse.json(
-      { success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to delete file/directory' } },
-      { status: 500 }
-    );
+    return createErrorResponse('INTERNAL_ERROR', 'Failed to delete file/directory');
   }
 }
 
@@ -330,34 +301,19 @@ export async function PATCH(
     const { action, newName } = body;
 
     if (action !== 'rename') {
-      return NextResponse.json(
-        { success: false, error: { code: 'INVALID_REQUEST', message: 'Unknown action. Supported: "rename"' } },
-        { status: 400 }
-      );
+      return createErrorResponse('INVALID_REQUEST', 'Unknown action. Supported: "rename"');
     }
 
     if (!newName || typeof newName !== 'string') {
-      return NextResponse.json(
-        { success: false, error: { code: 'INVALID_REQUEST', message: 'newName is required' } },
-        { status: 400 }
-      );
+      return createErrorResponse('INVALID_REQUEST', 'newName is required');
     }
 
     const renameResult = await renameFileOrDirectory(worktree.path, relativePath, newName);
 
     if (!renameResult.success) {
-      const statusMap: Record<string, number> = {
-        FILE_NOT_FOUND: 404,
-        PERMISSION_DENIED: 403,
-        INVALID_PATH: 400,
-        INVALID_NAME: 400,
-        FILE_EXISTS: 409,
-        INTERNAL_ERROR: 500,
-      };
-      const status = statusMap[renameResult.error?.code || 'INTERNAL_ERROR'] || 500;
-      return NextResponse.json(
-        { success: false, error: renameResult.error },
-        { status }
+      return createErrorResponse(
+        renameResult.error?.code || 'INTERNAL_ERROR',
+        renameResult.error?.message || 'Failed to rename file/directory'
       );
     }
 
@@ -367,9 +323,6 @@ export async function PATCH(
     });
   } catch (error: unknown) {
     console.error('Error renaming file/directory:', error);
-    return NextResponse.json(
-      { success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to rename file/directory' } },
-      { status: 500 }
-    );
+    return createErrorResponse('INTERNAL_ERROR', 'Failed to rename file/directory');
   }
 }

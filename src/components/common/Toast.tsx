@@ -69,22 +69,23 @@ function getToastStyles(type: ToastType): {
 
 /**
  * Get icon component based on type
+ * [REFACTOR] Performance: Accepts iconColor as prop to avoid duplicate getToastStyles call
  */
-function ToastIcon({ type }: { type: ToastType }) {
-  const styles = getToastStyles(type);
+function ToastIcon({ type, iconColor }: { type: ToastType; iconColor: string }) {
+  const iconClass = `h-5 w-5 ${iconColor}`;
 
   switch (type) {
     case 'success':
       return (
         <CheckCircle
-          className={`h-5 w-5 ${styles.iconColor}`}
+          className={iconClass}
           data-testid="toast-icon-success"
         />
       );
     case 'error':
       return (
         <XCircle
-          className={`h-5 w-5 ${styles.iconColor}`}
+          className={iconClass}
           data-testid="toast-icon-error"
         />
       );
@@ -92,7 +93,7 @@ function ToastIcon({ type }: { type: ToastType }) {
     default:
       return (
         <Info
-          className={`h-5 w-5 ${styles.iconColor}`}
+          className={iconClass}
           data-testid="toast-icon-info"
         />
       );
@@ -159,7 +160,7 @@ export function Toast({
         animate-slide-in
       `}
     >
-      <ToastIcon type={type} />
+      <ToastIcon type={type} iconColor={styles.iconColor} />
       <p className="flex-1 text-sm font-medium">{message}</p>
       <button
         data-testid="toast-close-button"
