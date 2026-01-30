@@ -99,11 +99,13 @@ src/
 ├── app/           # Next.js App Router
 │   └── api/       # APIルート
 ├── components/    # UIコンポーネント
+│   ├── common/    # 再利用可能な共通UIコンポーネント（Toast等）
 │   ├── sidebar/   # サイドバー関連
 │   ├── mobile/    # モバイル専用
 │   └── worktree/  # ワークツリー詳細
-├── config/        # 設定（ステータス色など）
+├── config/        # 設定（ステータス色、編集可能拡張子など）
 ├── contexts/      # React Context
+├── hooks/         # カスタムフック（useContextMenu等）
 ├── lib/           # ユーティリティ・ビジネスロジック
 │   └── cli-tools/ # CLIツール抽象化層
 └── types/         # 型定義
@@ -124,6 +126,12 @@ src/
 | `src/lib/db-repository.ts` | リポジトリDB操作関数群 |
 | `src/types/sidebar.ts` | サイドバーステータス判定 |
 | `src/types/clone.ts` | クローン関連型定義（CloneJob, CloneError等） |
+| `src/lib/file-operations.ts` | ファイル操作（読取/更新/作成/削除/リネーム） |
+| `src/lib/utils.ts` | 汎用ユーティリティ関数（debounce等） |
+| `src/config/editable-extensions.ts` | 編集可能ファイル拡張子設定 |
+| `src/config/file-operations.ts` | 再帰削除の安全設定 |
+| `src/types/markdown-editor.ts` | マークダウンエディタ関連型定義 |
+| `src/hooks/useContextMenu.ts` | コンテキストメニュー状態管理フック |
 
 ---
 
@@ -238,6 +246,21 @@ npm run db:reset      # DBリセット
 ---
 
 ## 最近の実装機能
+
+### Issue #49: マークダウンエディタとビューワー
+- **マークダウンエディタ**: GUIからマークダウンファイルの作成・編集・保存が可能
+- **リアルタイムプレビュー**: 分割ビュー / エディタのみ / プレビューのみの3モード切替
+- **ファイル操作API**: PUT（更新）/ POST（作成）/ DELETE（削除）/ PATCH（リネーム）
+- **右クリックメニュー**: FileTreeViewで新規ファイル/ディレクトリ作成、リネーム、削除
+- **セキュリティ対策**: XSS保護（rehype-sanitize）、パストラバーサル防止（isPathSafe）、再帰削除の安全ガード
+- **主要コンポーネント**:
+  - `src/components/worktree/MarkdownEditor.tsx` - エディタ本体
+  - `src/components/worktree/ContextMenu.tsx` - 右クリックメニュー
+  - `src/components/common/Toast.tsx` - 通知コンポーネント
+  - `src/lib/file-operations.ts` - ファイル操作ビジネスロジック
+  - `src/hooks/useContextMenu.ts` - コンテキストメニュー状態管理
+- **対応拡張子**: .md（編集可能拡張子は`src/config/editable-extensions.ts`で管理）
+- 詳細: [設計書](./dev-reports/design/issue-49-markdown-editor-design-policy.md)
 
 ### Issue #77: 設定・コード内の名称置換（CommandMateリネーム Phase 3）
 - **設定ファイル更新**: `.env.example`を新名称（CM_*）に更新、旧名称はコメントアウトで残存
