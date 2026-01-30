@@ -146,6 +146,140 @@
       "commits": [
         "d96d827: feat(ui): add Toast component and markdown-editor types (Phase 2)"
       ]
+    },
+    "phase3": {
+      "name": "Phase 3 - マークダウンエディタ",
+      "status": "completed",
+      "unit_tests": {
+        "total": 32,
+        "passed": 32,
+        "failed": 0,
+        "breakdown": {
+          "rendering": 5,
+          "view_mode_switching": 3,
+          "save_operations": 6,
+          "unsaved_changes_warning": 3,
+          "large_file_warning": 2,
+          "local_storage_persistence": 5,
+          "debounce_preview": 1,
+          "xss_prevention": 4,
+          "close_callback": 3
+        }
+      },
+      "files_changed": [
+        "src/components/worktree/MarkdownEditor.tsx",
+        "tests/unit/components/MarkdownEditor.test.tsx",
+        "package.json",
+        "package-lock.json"
+      ],
+      "dependencies_added": [
+        "rehype-sanitize@^6.0.0"
+      ],
+      "tasks_completed": [
+        {
+          "id": "3.1",
+          "name": "MarkdownEditorコンポーネント作成",
+          "output": "src/components/worktree/MarkdownEditor.tsx",
+          "description": "split/editor/preview表示モード、デバウンスプレビュー（300ms）、手動保存（Ctrl/Cmd+S、ボタン）、未保存警告（beforeunload）、大容量ファイル警告（>500KB）、rehype-sanitizeによるXSS保護",
+          "status": "completed"
+        },
+        {
+          "id": "3.2",
+          "name": "MarkdownEditorテスト作成",
+          "output": "tests/unit/components/MarkdownEditor.test.tsx",
+          "tests": 32,
+          "status": "completed"
+        },
+        {
+          "id": "3.3",
+          "name": "ローカルストレージ永続化テスト",
+          "output": "tests/unit/components/MarkdownEditor.test.tsx (included)",
+          "tests": 5,
+          "status": "completed"
+        }
+      ],
+      "commits": [
+        "7e77ade: feat(editor): add MarkdownEditor component with XSS protection"
+      ],
+      "security_implemented": {
+        "SEC-MF-001_xss_protection": true,
+        "rehype_sanitize_integrated": true,
+        "dangerouslySetInnerHTML_avoided": true
+      }
+    },
+    "phase4": {
+      "name": "Phase 4 - ファイルツリー拡張",
+      "status": "completed",
+      "unit_tests": {
+        "total": 34,
+        "passed": 34,
+        "failed": 0,
+        "breakdown": {
+          "useContextMenu_initial_state": 2,
+          "useContextMenu_openMenu": 3,
+          "useContextMenu_closeMenu": 1,
+          "useContextMenu_resetMenu": 1,
+          "useContextMenu_callback_stability": 3,
+          "useContextMenu_click_outside": 2,
+          "useContextMenu_esc_key": 2,
+          "ContextMenu_rendering": 4,
+          "ContextMenu_file_items": 2,
+          "ContextMenu_directory_items": 1,
+          "ContextMenu_clicks": 5,
+          "ContextMenu_accessibility": 3,
+          "ContextMenu_styling": 2,
+          "ContextMenu_icons": 1,
+          "ContextMenu_edge_cases": 2
+        }
+      },
+      "files_changed": [
+        "src/hooks/useContextMenu.ts",
+        "src/components/worktree/ContextMenu.tsx",
+        "src/components/worktree/FileTreeView.tsx",
+        "src/components/worktree/WorktreeDetailRefactored.tsx",
+        "tests/unit/hooks/useContextMenu.test.ts",
+        "tests/unit/components/ContextMenu.test.tsx"
+      ],
+      "tasks_completed": [
+        {
+          "id": "4.1",
+          "name": "useContextMenuフック作成",
+          "output": "src/hooks/useContextMenu.ts",
+          "description": "右クリックメニューの位置・表示状態管理、クリック外閉じ、ESC閉じ、安定したコールバック参照（React.memo互換）",
+          "tests": 14,
+          "status": "completed"
+        },
+        {
+          "id": "4.2",
+          "name": "ContextMenuコンポーネント作成",
+          "output": "src/components/worktree/ContextMenu.tsx",
+          "description": "メニュー項目: New File, New Directory, Rename, Delete。ファイル/ディレクトリで表示項目切替、キーボードナビゲーション対応、アクセシビリティ対応",
+          "tests": 20,
+          "status": "completed"
+        },
+        {
+          "id": "4.3",
+          "name": "FileTreeView右クリックメニュー統合",
+          "output": "src/components/worktree/FileTreeView.tsx",
+          "description": "contextmenuイベント追加、ContextMenu/useContextMenu統合、onNewFile/onNewDirectory/onRename/onDeleteコールバック追加",
+          "status": "completed"
+        },
+        {
+          "id": "4.4",
+          "name": "WorktreeDetailRefactored統合",
+          "output": "src/components/worktree/WorktreeDetailRefactored.tsx",
+          "description": "mdファイル選択時にMarkdownEditor表示、editorFilePath状態追加、FileViewerとの競合回避 [Stage 3 SF-004]",
+          "status": "completed"
+        }
+      ],
+      "design_compliance": {
+        "Stage_2_SF-003_ContextMenu_separation": true,
+        "Stage_3_SF-001_useContextMenu_separation": true,
+        "Stage_3_SF-004_editorFilePath_state": true
+      },
+      "commits": [
+        "494834d: feat(file-tree): add context menu and MarkdownEditor integration (Phase 4)"
+      ]
     }
   },
   "static_analysis": {
@@ -153,7 +287,7 @@
     "typescript_errors": 0
   },
   "security_checklist": {
-    "xss": "N/A (Phase 3で対応予定 - rehype-sanitize統合)",
+    "xss": "rehype-sanitize統合完了 [SEC-MF-001]",
     "path_traversal": "isPathSafe()一貫使用、互換性テスト完了",
     "recursive_delete": ".git/.github/node_modules保護、MAX_RECURSIVE_DELETE_FILES: 100",
     "rename_validation": "ディレクトリセパレータ、..チェック実装",
@@ -163,7 +297,9 @@
   "total_tests": {
     "phase1": 148,
     "phase2": 25,
-    "combined": 173
+    "phase3": 32,
+    "phase4": 34,
+    "combined": 239
   },
-  "message": "Phase 2 TDD実装完了。Toast.tsx(成功/エラー/情報表示、自動消去3秒、useToastフック)、型定義ファイル(markdown-editor.ts)作成。全25テストパス。ESLint/TypeScriptエラー0件。"
+  "message": "Phase 4 TDD実装完了。useContextMenuフック（クリック外閉じ、ESC閉じ、安定コールバック）、ContextMenuコンポーネント（ファイル/ディレクトリ別メニュー項目、キーボードナビゲーション、アクセシビリティ）、FileTreeView右クリック統合、WorktreeDetailRefactoredにMarkdownEditor統合（editorFilePath状態でFileViewerとの競合回避）完了。全34テストパス。ESLint/TypeScriptエラー0件。設計書Stage 2 SF-003、Stage 3 SF-001、SF-004対応完了。"
 }
