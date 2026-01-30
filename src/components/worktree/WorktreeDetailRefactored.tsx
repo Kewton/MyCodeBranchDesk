@@ -713,6 +713,7 @@ interface MobileContentProps {
   onNewDirectory: (parentPath: string) => void;
   onRename: (path: string) => void;
   onDelete: (path: string) => void;
+  refreshTrigger: number;
 }
 
 /** Renders content based on active mobile tab */
@@ -731,6 +732,7 @@ const MobileContent = memo(function MobileContent({
   onNewDirectory,
   onRename,
   onDelete,
+  refreshTrigger,
 }: MobileContentProps) {
   switch (activeTab) {
     case 'terminal':
@@ -765,6 +767,7 @@ const MobileContent = memo(function MobileContent({
             onNewDirectory={onNewDirectory}
             onRename={onRename}
             onDelete={onDelete}
+            refreshTrigger={refreshTrigger}
             className="h-full"
           />
         </ErrorBoundary>
@@ -819,6 +822,8 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
   const [editorFilePath, setEditorFilePath] = useState<string | null>(null);
   const [autoYesEnabled, setAutoYesEnabled] = useState(false);
   const [autoYesExpiresAt, setAutoYesExpiresAt] = useState<number | null>(null);
+  // Trigger to refresh FileTreeView after file operations
+  const [fileTreeRefresh, setFileTreeRefresh] = useState(0);
 
   // Track if initial load has completed to prevent re-triggering
   const initialLoadCompletedRef = useRef(false);
@@ -1062,7 +1067,8 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
       if (!response.ok) {
         throw new Error('Failed to create file');
       }
-      // File created successfully - FileTreeView will refresh on next poll
+      // File created successfully - trigger FileTreeView refresh
+      setFileTreeRefresh(prev => prev + 1);
     } catch (err) {
       console.error('[WorktreeDetailRefactored] Failed to create file:', err);
       window.alert('ファイルの作成に失敗しました');
@@ -1088,7 +1094,8 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
       if (!response.ok) {
         throw new Error('Failed to create directory');
       }
-      // Directory created successfully - FileTreeView will refresh on next poll
+      // Directory created successfully - trigger FileTreeView refresh
+      setFileTreeRefresh(prev => prev + 1);
     } catch (err) {
       console.error('[WorktreeDetailRefactored] Failed to create directory:', err);
       window.alert('ディレクトリの作成に失敗しました');
@@ -1113,7 +1120,8 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
       if (!response.ok) {
         throw new Error('Failed to rename');
       }
-      // Renamed successfully - FileTreeView will refresh on next poll
+      // Renamed successfully - trigger FileTreeView refresh
+      setFileTreeRefresh(prev => prev + 1);
     } catch (err) {
       console.error('[WorktreeDetailRefactored] Failed to rename:', err);
       window.alert('リネームに失敗しました');
@@ -1139,7 +1147,8 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
       if (editorFilePath === path || editorFilePath?.startsWith(`${path}/`)) {
         setEditorFilePath(null);
       }
-      // FileTreeView will refresh on next poll
+      // Trigger FileTreeView refresh
+      setFileTreeRefresh(prev => prev + 1);
     } catch (err) {
       console.error('[WorktreeDetailRefactored] Failed to delete:', err);
       window.alert('削除に失敗しました');
@@ -1302,6 +1311,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
                           onNewDirectory={handleNewDirectory}
                           onRename={handleRename}
                           onDelete={handleDelete}
+                          refreshTrigger={fileTreeRefresh}
                           className="h-full"
                         />
                       </ErrorBoundary>
@@ -1436,6 +1446,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
             onNewDirectory={handleNewDirectory}
             onRename={handleRename}
             onDelete={handleDelete}
+            refreshTrigger={fileTreeRefresh}
           />
         </main>
 

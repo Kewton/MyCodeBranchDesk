@@ -40,6 +40,8 @@ export interface FileTreeViewProps {
   onDelete?: (path: string) => void;
   /** Additional CSS classes */
   className?: string;
+  /** Trigger to refresh the tree (increment to refresh) */
+  refreshTrigger?: number;
 }
 
 interface TreeNodeProps {
@@ -326,12 +328,13 @@ export const FileTreeView = memo(function FileTreeView({
   onRename,
   onDelete,
   className = '',
+  refreshTrigger = 0,
 }: FileTreeViewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rootItems, setRootItems] = useState<TreeItem[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [cache] = useState<Map<string, TreeItem[]>>(() => new Map());
+  const [cache, setCache] = useState<Map<string, TreeItem[]>>(() => new Map());
 
   // Context menu state (separated for rendering optimization)
   const { menuState, openMenu, closeMenu } = useContextMenu();
@@ -362,7 +365,7 @@ export const FileTreeView = memo(function FileTreeView({
   );
 
   /**
-   * Load root directory on mount
+   * Load root directory on mount or when refreshTrigger changes
    */
   useEffect(() => {
     let mounted = true;
@@ -370,6 +373,8 @@ export const FileTreeView = memo(function FileTreeView({
     const loadRoot = async () => {
       setLoading(true);
       setError(null);
+      // Clear cache on refresh to ensure fresh data
+      setCache(new Map());
 
       try {
         const data = await fetchDirectory();
@@ -392,7 +397,7 @@ export const FileTreeView = memo(function FileTreeView({
     return () => {
       mounted = false;
     };
-  }, [fetchDirectory]);
+  }, [fetchDirectory, refreshTrigger]);
 
   /**
    * Load children for a directory
