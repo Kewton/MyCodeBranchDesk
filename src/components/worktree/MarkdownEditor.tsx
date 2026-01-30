@@ -12,6 +12,7 @@
  * - Maximize/fullscreen mode (Ctrl/Cmd+Shift+F, ESC to exit)
  * - Resizable split view with PaneResizer
  * - Mobile-responsive with tab switching UI
+ * - Mermaid diagram rendering [Issue #100]
  *
  * @module components/worktree/MarkdownEditor
  */
@@ -34,6 +35,7 @@ import { Save, X, Columns, FileText, Eye, AlertTriangle, Maximize2, Minimize2 } 
 import { debounce } from '@/lib/utils';
 import { ToastContainer, useToast } from '@/components/common/Toast';
 import { PaneResizer } from '@/components/worktree/PaneResizer';
+import { MermaidCodeBlock } from '@/components/worktree/MermaidCodeBlock';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useFullscreen } from '@/hooks/useFullscreen';
 import { useLocalStorageState } from '@/hooks/useLocalStorageState';
@@ -752,6 +754,9 @@ export function MarkdownEditor({
                     rehypeSanitize, // [SEC-MF-001] XSS protection
                     rehypeHighlight,
                   ]}
+                  components={{
+                    code: MermaidCodeBlock, // [Issue #100] mermaid diagram support
+                  }}
                 >
                   {previewContent}
                 </ReactMarkdown>
@@ -777,6 +782,9 @@ export function MarkdownEditor({
                   rehypeSanitize, // [SEC-MF-001] XSS protection
                   rehypeHighlight,
                 ]}
+                components={{
+                  code: MermaidCodeBlock, // [Issue #100] mermaid diagram support
+                }}
               >
                 {previewContent}
               </ReactMarkdown>

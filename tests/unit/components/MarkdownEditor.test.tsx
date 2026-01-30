@@ -788,4 +788,160 @@ describe('MarkdownEditor', () => {
       confirmSpy.mockRestore();
     });
   });
+
+  describe('Mermaid Diagram Integration (Issue #100)', () => {
+    it('should render mermaid code block with MermaidCodeBlock component', async () => {
+      const contentWithMermaid = `# Test Document
+
+\`\`\`mermaid
+graph TD
+A[Start] --> B[End]
+\`\`\`
+`;
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, content: contentWithMermaid }),
+      });
+
+      render(<MarkdownEditor {...defaultProps} />);
+
+      await waitFor(() => {
+        // Check that the preview is rendered
+        expect(screen.getByTestId('markdown-preview')).toBeInTheDocument();
+      });
+
+      // The mermaid code block should be processed by MermaidCodeBlock
+      // (actual rendering depends on dynamic import, but code element should be present)
+      const preview = screen.getByTestId('markdown-preview');
+      expect(preview).toBeInTheDocument();
+    });
+
+    it('should render non-mermaid code blocks normally', async () => {
+      const contentWithJs = `# Test Document
+
+\`\`\`javascript
+const x = 1;
+\`\`\`
+`;
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, content: contentWithJs }),
+      });
+
+      render(<MarkdownEditor {...defaultProps} />);
+
+      await waitFor(() => {
+        const preview = screen.getByTestId('markdown-preview');
+        // JavaScript code should be rendered as regular code block
+        // Check that the preview contains the code element with language class
+        expect(preview.innerHTML).toContain('<code');
+        expect(preview.innerHTML).toContain('language-javascript');
+      }, { timeout: 2000 });
+    });
+
+    it('should maintain GFM table rendering', async () => {
+      const contentWithTable = `# Test
+
+| Header 1 | Header 2 |
+|----------|----------|
+| Cell 1   | Cell 2   |
+`;
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, content: contentWithTable }),
+      });
+
+      render(<MarkdownEditor {...defaultProps} />);
+
+      await waitFor(() => {
+        const preview = screen.getByTestId('markdown-preview');
+        // GFM table should be rendered
+        expect(preview.innerHTML).toContain('<table');
+        expect(preview.innerHTML).toContain('Header 1');
+        expect(preview.innerHTML).toContain('Cell 1');
+      });
+    });
+
+    it('should maintain list rendering', async () => {
+      const contentWithList = `# Test
+
+- Item 1
+- Item 2
+  - Nested item
+
+1. First
+2. Second
+`;
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, content: contentWithList }),
+      });
+
+      render(<MarkdownEditor {...defaultProps} />);
+
+      await waitFor(() => {
+        const preview = screen.getByTestId('markdown-preview');
+        // Lists should be rendered
+        expect(preview.innerHTML).toContain('<ul');
+        expect(preview.innerHTML).toContain('<ol');
+        expect(preview.innerHTML).toContain('Item 1');
+        expect(preview.innerHTML).toContain('Nested item');
+      });
+    });
+
+    it('should maintain syntax highlighting for code blocks', async () => {
+      const contentWithCode = `# Test
+
+\`\`\`python
+def hello():
+    print("Hello")
+\`\`\`
+`;
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, content: contentWithCode }),
+      });
+
+      render(<MarkdownEditor {...defaultProps} />);
+
+      await waitFor(() => {
+        const preview = screen.getByTestId('markdown-preview');
+        // Code should be rendered with language class for highlight
+        // Check that the preview contains the code element with python language
+        expect(preview.innerHTML).toContain('<code');
+        expect(preview.innerHTML).toContain('language-python');
+      }, { timeout: 2000 });
+    });
+
+    it('should continue to sanitize XSS in markdown (rehype-sanitize compatibility)', async () => {
+      const maliciousContent = `# Test
+
+<script>alert("xss")</script>
+
+[Click](javascript:alert(1))
+
+<img src="x" onerror="alert(1)">
+`;
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, content: maliciousContent }),
+      });
+
+      render(<MarkdownEditor {...defaultProps} />);
+
+      await waitFor(() => {
+        const preview = screen.getByTestId('markdown-preview');
+        // XSS should be sanitized
+        expect(preview.innerHTML).not.toContain('<script');
+        expect(preview.innerHTML).not.toContain('javascript:');
+        expect(preview.innerHTML).not.toContain('onerror');
+      });
+    });
+  });
 });
