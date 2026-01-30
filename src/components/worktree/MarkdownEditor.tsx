@@ -43,6 +43,7 @@ import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 import { useVirtualKeyboard } from '@/hooks/useVirtualKeyboard';
 import { Z_INDEX } from '@/config/z-index';
 import type { EditorProps, ViewMode } from '@/types/markdown-editor';
+import type { Components } from 'react-markdown';
 import {
   VIEW_MODE_STRATEGIES,
   LOCAL_STORAGE_KEY,
@@ -463,6 +464,34 @@ export function MarkdownEditor({
     return undefined;
   }, [isKeyboardVisible, keyboardHeight]);
 
+  // Memoized ReactMarkdown components configuration (DRY principle)
+  const markdownComponents: Partial<Components> = useMemo(
+    () => ({
+      code: MermaidCodeBlock, // [Issue #100] mermaid diagram support
+    }),
+    []
+  );
+
+  /**
+   * Memoized ReactMarkdown element to avoid duplication (DRY principle)
+   * Used in both mobile and desktop preview panes
+   */
+  const markdownPreview = useMemo(
+    () => (
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[
+          rehypeSanitize, // [SEC-MF-001] XSS protection
+          rehypeHighlight,
+        ]}
+        components={markdownComponents}
+      >
+        {previewContent}
+      </ReactMarkdown>
+    ),
+    [previewContent, markdownComponents]
+  );
+
   // Render loading state
   if (isLoading) {
     return (
@@ -748,18 +777,7 @@ export function MarkdownEditor({
                 data-testid="markdown-preview"
                 className="flex-1 p-4 overflow-y-auto prose prose-sm max-w-none"
               >
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[
-                    rehypeSanitize, // [SEC-MF-001] XSS protection
-                    rehypeHighlight,
-                  ]}
-                  components={{
-                    code: MermaidCodeBlock, // [Issue #100] mermaid diagram support
-                  }}
-                >
-                  {previewContent}
-                </ReactMarkdown>
+                {markdownPreview}
               </div>
             </div>
           )
@@ -776,18 +794,7 @@ export function MarkdownEditor({
               data-testid="markdown-preview"
               className="flex-1 p-4 overflow-y-auto prose prose-sm max-w-none"
             >
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                rehypePlugins={[
-                  rehypeSanitize, // [SEC-MF-001] XSS protection
-                  rehypeHighlight,
-                ]}
-                components={{
-                  code: MermaidCodeBlock, // [Issue #100] mermaid diagram support
-                }}
-              >
-                {previewContent}
-              </ReactMarkdown>
+              {markdownPreview}
             </div>
           </div>
         )}
