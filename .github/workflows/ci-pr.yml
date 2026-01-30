@@ -65,6 +65,9 @@ jobs:
 
       - name: Run unit tests
         run: npm run test:unit
+        env:
+          CI: 'true'
+          NODE_OPTIONS: '--max-old-space-size=6144'
 
   build:
     name: Build

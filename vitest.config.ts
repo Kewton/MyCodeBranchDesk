@@ -8,6 +8,9 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     setupFiles: ['./tests/setup.ts'],
+    // CI環境ではメモリ使用量を抑えるため同時実行を制限
+    maxConcurrency: process.env.CI === 'true' ? 1 : 10,
+    fileParallelism: process.env.CI !== 'true',
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

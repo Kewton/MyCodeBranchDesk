@@ -132,9 +132,15 @@ src/
 | `src/config/file-operations.ts` | 再帰削除の安全設定 |
 | `src/types/markdown-editor.ts` | マークダウンエディタ関連型定義 |
 | `src/hooks/useContextMenu.ts` | コンテキストメニュー状態管理フック |
+| `src/hooks/useFullscreen.ts` | Fullscreen API ラッパー（CSSフォールバック対応） |
+| `src/hooks/useLocalStorageState.ts` | localStorage永続化フック（バリデーション対応） |
+| `src/config/z-index.ts` | z-index値の一元管理 |
 | `src/config/uploadable-extensions.ts` | アップロード可能拡張子・MIMEタイプ・マジックバイト検証 |
 | `src/config/image-extensions.ts` | 画像ファイル拡張子・マジックバイト・SVG XSS検証 |
+| `src/config/mermaid-config.ts` | mermaid設定定数（securityLevel='strict'） |
 | `src/components/worktree/ImageViewer.tsx` | 画像表示コンポーネント |
+| `src/components/worktree/MermaidDiagram.tsx` | mermaidダイアグラム描画コンポーネント |
+| `src/components/worktree/MermaidCodeBlock.tsx` | mermaidコードブロックラッパー |
 
 ---
 
@@ -250,6 +256,26 @@ npm run db:reset      # DBリセット
 
 ## 最近の実装機能
 
+### Issue #100: Mermaidダイアグラム描画機能
+- **ダイアグラム描画**: マークダウンプレビューでmermaidコードブロックをSVGダイアグラムとして描画
+- **対応ダイアグラム**: フローチャート、シーケンス図、ER図、ガントチャート、状態遷移図など（mermaid.js対応全種）
+- **セキュリティ対策**:
+  - `securityLevel='strict'`設定（XSS防止）
+  - mermaid内部DOMPurifyによるサニタイズ
+  - scriptタグ・イベントハンドラ・危険なURLスキーム除去
+  - securityLevel検証フェイルセーフ機構
+  - Issue #95 SVG XSS対策との整合性確保
+- **SSR対応**: `next/dynamic`による遅延読み込み（`ssr: false`）
+- **エラーハンドリング**: 構文エラー時のエラーメッセージ表示（UIクラッシュ防止）
+- **ローディングUI**: Loader2スピナー付き
+- **主要コンポーネント**:
+  - `src/config/mermaid-config.ts` - mermaid設定定数（securityLevel, startOnLoad, theme）
+  - `src/components/worktree/MermaidDiagram.tsx` - mermaid描画コンポーネント
+  - `src/components/worktree/MermaidCodeBlock.tsx` - コードブロックラッパー（動的import）
+  - `src/components/worktree/MarkdownEditor.tsx` - ReactMarkdown components prop統合
+- **テスト**: XSS回帰テスト、セキュリティ設定検証テスト、Issue #95整合性テスト
+- 詳細: [設計書](./dev-reports/design/issue-100-mermaid-diagram-design-policy.md)
+
 ### Issue #95: 画像ファイルビューワ
 - **画像表示**: FileTreeViewで選択した画像ファイルをビューワ領域に表示
 - **対応ファイル形式**: PNG, JPG/JPEG, GIF, WebP, SVG
@@ -292,6 +318,19 @@ npm run db:reset      # DBリセット
   - `src/config/uploadable-extensions.ts` - アップロード可能拡張子・検証ロジック
   - `src/app/api/worktrees/[id]/upload/[...path]/route.ts` - アップロードAPIエンドポイント
 - 詳細: [設計書](./dev-reports/design/issue-94-file-upload-design-policy.md)
+
+### Issue #99: マークダウンエディタ表示機能改善
+- **最大化機能**: エディタを画面全体に最大化表示（Ctrl/Cmd+Shift+F、ESCで解除）
+- **リサイズ機能**: Split View時にドラッグでエディタ/プレビュー比率を変更（ダブルクリックで50:50リセット）
+- **モバイル対応**: 縦向き時はタブ切替UI、スワイプダウンで最大化解除
+- **状態永続化**: リサイズ比率と最大化状態をlocalStorageに保存・復元
+- **Fullscreen API**: CSSフォールバック対応（iOS Safari等）
+- **主要コンポーネント**:
+  - `src/hooks/useFullscreen.ts` - Fullscreen API ラッパー
+  - `src/hooks/useLocalStorageState.ts` - localStorage永続化フック
+  - `src/config/z-index.ts` - z-index値の一元管理
+  - `src/components/worktree/PaneResizer.tsx` - onDoubleClick, minRatio props追加
+- 詳細: [設計書](./dev-reports/design/issue-99-markdown-editor-display-improvement-design-policy.md)
 
 ### Issue #49: マークダウンエディタとビューワー
 - **マークダウンエディタ**: GUIからマークダウンファイルの作成・編集・保存が可能
