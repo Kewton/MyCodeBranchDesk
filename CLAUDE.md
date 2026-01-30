@@ -132,6 +132,9 @@ src/
 | `src/config/file-operations.ts` | 再帰削除の安全設定 |
 | `src/types/markdown-editor.ts` | マークダウンエディタ関連型定義 |
 | `src/hooks/useContextMenu.ts` | コンテキストメニュー状態管理フック |
+| `src/config/uploadable-extensions.ts` | アップロード可能拡張子・MIMEタイプ・マジックバイト検証 |
+| `src/config/image-extensions.ts` | 画像ファイル拡張子・マジックバイト・SVG XSS検証 |
+| `src/components/worktree/ImageViewer.tsx` | 画像表示コンポーネント |
 
 ---
 
@@ -246,6 +249,49 @@ npm run db:reset      # DBリセット
 ---
 
 ## 最近の実装機能
+
+### Issue #95: 画像ファイルビューワ
+- **画像表示**: FileTreeViewで選択した画像ファイルをビューワ領域に表示
+- **対応ファイル形式**: PNG, JPG/JPEG, GIF, WebP, SVG
+- **表示制約**: 最大幅100%、最大高さ500px（アスペクト比維持）
+- **ファイルサイズ制限**: 最大5MB
+- **セキュリティ対策**:
+  - マジックバイト検証（PNG, JPEG, GIF, WebP）
+  - WebP完全検証（RIFFヘッダー+WEBPシグネチャ）
+  - SVG XSS対策（5項目）:
+    - scriptタグ拒否
+    - イベントハンドラ属性（on*）拒否
+    - javascript:/data:/vbscript:スキーム拒否
+    - foreignObject要素拒否
+  - パストラバーサル防止（isPathSafe()）
+- **API拡張**: GET `/api/worktrees/:id/files/:path` が画像ファイルをBase64 data URIで返却
+- **レスポンス拡張**: `isImage`, `mimeType` フィールド追加
+- **主要コンポーネント**:
+  - `src/config/image-extensions.ts` - 画像拡張子・マジックバイト・SVG XSS検証ロジック
+  - `src/components/worktree/ImageViewer.tsx` - 画像表示コンポーネント
+  - `src/components/worktree/FileViewer.tsx` - 画像/テキスト条件分岐
+  - `src/types/models.ts` - FileContent interface（isImage, mimeType追加）
+- 詳細: [設計書](./dev-reports/design/issue-95-image-viewer-design-policy.md)
+
+### Issue #94: ファイルアップロード機能
+- **ファイルアップロード**: FileTreeViewで指定したディレクトリにファイルをアップロード可能
+- **対応ファイル形式**: 画像（.png, .jpg, .jpeg, .gif, .webp）、テキスト（.txt, .log）、マークダウン（.md）、CSV（.csv）、設定（.json, .yaml, .yml）
+- **ファイルサイズ制限**: 1ファイルあたり最大5MB
+- **セキュリティ対策**:
+  - マジックバイト検証（拡張子偽装防止）
+  - MIMEタイプ検証
+  - パストラバーサル防止（isPathSafe()）
+  - ファイル名検証（制御文字、OS禁止文字）
+  - SVG除外（XSSリスク回避）
+  - YAML危険タグ検出
+  - JSON構文検証
+- **アップロードAPI**: `POST /api/worktrees/:id/upload/:path`（multipart/form-data）
+- **UIトリガー**: 右クリックメニューから「ファイルをアップロード」選択
+- **フィードバック**: Toast通知（成功/エラー）、ファイルツリー自動更新
+- **主要コンポーネント**:
+  - `src/config/uploadable-extensions.ts` - アップロード可能拡張子・検証ロジック
+  - `src/app/api/worktrees/[id]/upload/[...path]/route.ts` - アップロードAPIエンドポイント
+- 詳細: [設計書](./dev-reports/design/issue-94-file-upload-design-policy.md)
 
 ### Issue #49: マークダウンエディタとビューワー
 - **マークダウンエディタ**: GUIからマークダウンファイルの作成・編集・保存が可能

@@ -18,7 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbInstance } from '@/lib/db-instance';
 import { getWorktreeById } from '@/lib/db';
-import { normalize } from 'path';
+import { normalize, join } from 'path';
 import { isPathSafe } from '@/lib/path-validator';
 import {
   readFileContent,
@@ -29,11 +29,18 @@ import {
   isEditableFile,
 } from '@/lib/file-operations';
 import { validateContent, isEditableExtension } from '@/config/editable-extensions';
+import {
+  isImageExtension,
+  validateImageContent,
+  getMimeTypeByExtension,
+} from '@/config/image-extensions';
 import { extname } from 'path';
+import { readFile } from 'fs/promises';
 
 /**
  * [DRY] Centralized mapping of error codes to HTTP status codes
  * Eliminates duplicate statusMap definitions across handlers
+ * [CONS-001] Extended with upload-specific error codes
  */
 const ERROR_CODE_TO_HTTP_STATUS: Record<string, number> = {
   FILE_NOT_FOUND: 404,
@@ -50,6 +57,13 @@ const ERROR_CODE_TO_HTTP_STATUS: Record<string, number> = {
   FILE_EXISTS: 409,
   DISK_FULL: 507,
   INTERNAL_ERROR: 500,
+  // Upload-specific error codes [CONS-001]
+  INVALID_EXTENSION: 400,
+  INVALID_MIME_TYPE: 400,
+  INVALID_MAGIC_BYTES: 400,
+  FILE_TOO_LARGE: 413,
+  INVALID_FILENAME: 400,
+  INVALID_FILE_CONTENT: 400,
 };
 
 /**
@@ -101,7 +115,14 @@ async function getWorktreeAndValidatePath(
 
 /**
  * GET /api/worktrees/:id/files/:path
- * Read file content
+ * Read file content (text or image)
+ *
+ * Image file handling:
+ * 1. Check if extension is in IMAGE_EXTENSIONS
+ * 2. Validate file size (5MB limit)
+ * 3. Validate magic bytes (for binary formats)
+ * 4. Validate SVG content (XSS prevention)
+ * 5. Return Base64 data URI with isImage: true
  */
 export async function GET(
   request: NextRequest,
@@ -114,6 +135,58 @@ export async function GET(
     }
 
     const { worktree, relativePath } = result;
+    const extension = relativePath.split('.').pop() || '';
+    const ext = extname(relativePath).toLowerCase();
+
+    // Check if this is an image file
+    if (isImageExtension(ext)) {
+      // Read file as binary for image processing
+      const absolutePath = join(worktree.path, relativePath);
+
+      try {
+        // Read file as binary (will throw ENOENT if not found)
+        const fileBuffer = await readFile(absolutePath);
+
+        // Validate image content (size, magic bytes, SVG security)
+        const validation = validateImageContent(ext, fileBuffer);
+        if (!validation.valid) {
+          // Map validation errors to appropriate error codes
+          if (validation.error?.includes('5MB')) {
+            return createErrorResponse('FILE_TOO_LARGE', validation.error);
+          }
+          if (validation.error?.includes('magic bytes')) {
+            return createErrorResponse('INVALID_MAGIC_BYTES', validation.error);
+          }
+          // SVG security errors
+          return createErrorResponse('INVALID_FILE_CONTENT', validation.error || 'Invalid image content');
+        }
+
+        // [DRY] Get MIME type using centralized helper
+        const mimeType = getMimeTypeByExtension(ext);
+
+        // Convert to Base64 data URI
+        const base64 = fileBuffer.toString('base64');
+        const dataUri = `data:${mimeType};base64,${base64}`;
+
+        return NextResponse.json({
+          success: true,
+          path: relativePath,
+          content: dataUri,
+          extension,
+          worktreePath: worktree.path,
+          isImage: true,
+          mimeType,
+        });
+      } catch (err: unknown) {
+        // File not found or read error
+        if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+          return createErrorResponse('FILE_NOT_FOUND', 'File not found');
+        }
+        throw err;
+      }
+    }
+
+    // Non-image file: use existing text file reading logic
     const fileResult = await readFileContent(worktree.path, relativePath);
 
     if (!fileResult.success) {
@@ -122,8 +195,6 @@ export async function GET(
         fileResult.error?.message || 'Failed to read file'
       );
     }
-
-    const extension = relativePath.split('.').pop() || '';
 
     return NextResponse.json({
       success: true,
