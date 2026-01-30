@@ -32,7 +32,7 @@ import { validateContent, isEditableExtension } from '@/config/editable-extensio
 import {
   isImageExtension,
   validateImageContent,
-  IMAGE_EXTENSION_VALIDATORS,
+  getMimeTypeByExtension,
 } from '@/config/image-extensions';
 import { extname } from 'path';
 import { readFile } from 'fs/promises';
@@ -161,11 +161,8 @@ export async function GET(
           return createErrorResponse('INVALID_FILE_CONTENT', validation.error || 'Invalid image content');
         }
 
-        // Get MIME type from validator
-        const validator = IMAGE_EXTENSION_VALIDATORS.find(
-          v => v.extension === ext || v.extension === '.' + extension.toLowerCase()
-        );
-        const mimeType = validator?.mimeType || 'application/octet-stream';
+        // [DRY] Get MIME type using centralized helper
+        const mimeType = getMimeTypeByExtension(ext);
 
         // Convert to Base64 data URI
         const base64 = fileBuffer.toString('base64');

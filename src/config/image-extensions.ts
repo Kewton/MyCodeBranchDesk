@@ -95,6 +95,33 @@ export interface ImageValidationResult {
 }
 
 /**
+ * [DRY] Normalize file extension to include leading dot and lowercase
+ * Extracted to avoid code duplication across validation functions
+ *
+ * @param ext - File extension with or without leading dot
+ * @returns Normalized extension with leading dot in lowercase (e.g., '.png')
+ */
+export function normalizeExtension(ext: string): string {
+  if (!ext) return '';
+  return ext.startsWith('.') ? ext.toLowerCase() : '.' + ext.toLowerCase();
+}
+
+/**
+ * [DRY] Get MIME type for an image extension
+ * Centralized MIME type lookup to avoid duplication
+ *
+ * @param ext - File extension with or without leading dot
+ * @returns MIME type string, or 'application/octet-stream' if not found
+ */
+export function getMimeTypeByExtension(ext: string): string {
+  const normalizedExt = normalizeExtension(ext);
+  const validator = IMAGE_EXTENSION_VALIDATORS.find(
+    v => v.extension === normalizedExt
+  );
+  return validator?.mimeType || 'application/octet-stream';
+}
+
+/**
  * Check if a file extension is a supported image format
  * [SF-003] Handles dot normalization for API compatibility
  *
@@ -103,14 +130,14 @@ export interface ImageValidationResult {
  */
 export function isImageExtension(ext: string): boolean {
   if (!ext) return false;
-  // Normalize: add dot if missing, convert to lowercase
-  const normalizedExt = ext.startsWith('.') ? ext.toLowerCase() : '.' + ext.toLowerCase();
+  const normalizedExt = normalizeExtension(ext);
   return IMAGE_EXTENSIONS.includes(normalizedExt);
 }
 
 /**
  * Validate image file magic bytes
  * [SF-003] Handles dot normalization
+ * [DRY] Uses normalizeExtension helper
  *
  * @param extension - File extension with or without leading dot
  * @param buffer - File content buffer
@@ -120,10 +147,7 @@ export function validateImageMagicBytes(
   extension: string,
   buffer: Buffer
 ): boolean {
-  // Normalize extension
-  const normalizedExt = extension.startsWith('.')
-    ? extension.toLowerCase()
-    : '.' + extension.toLowerCase();
+  const normalizedExt = normalizeExtension(extension);
 
   const validator = IMAGE_EXTENSION_VALIDATORS.find(
     v => v.extension === normalizedExt
@@ -222,6 +246,7 @@ export function validateSvgContent(content: string): ImageValidationResult {
 /**
  * Validate image content comprehensively
  * [SF-002] Combines size, magic bytes, and SVG security validation
+ * [DRY] Uses normalizeExtension helper
  *
  * @param extension - File extension with or without leading dot
  * @param buffer - File content buffer
@@ -239,10 +264,7 @@ export function validateImageContent(
     };
   }
 
-  // Normalize extension
-  const normalizedExt = extension.startsWith('.')
-    ? extension.toLowerCase()
-    : '.' + extension.toLowerCase();
+  const normalizedExt = normalizeExtension(extension);
 
   // SVG requires special validation (text-based, XSS concerns)
   if (normalizedExt === '.svg') {

@@ -16,6 +16,8 @@ import {
   IMAGE_EXTENSIONS,
   IMAGE_MAX_SIZE_BYTES,
   IMAGE_EXTENSION_VALIDATORS,
+  normalizeExtension,
+  getMimeTypeByExtension,
   isImageExtension,
   validateImageMagicBytes,
   validateWebPMagicBytes,
@@ -47,6 +49,55 @@ describe('IMAGE_EXTENSIONS', () => {
 describe('IMAGE_MAX_SIZE_BYTES', () => {
   it('should be 5MB', () => {
     expect(IMAGE_MAX_SIZE_BYTES).toBe(5 * 1024 * 1024);
+  });
+});
+
+describe('normalizeExtension (DRY helper)', () => {
+  it('should add leading dot if missing', () => {
+    expect(normalizeExtension('png')).toBe('.png');
+    expect(normalizeExtension('jpg')).toBe('.jpg');
+  });
+
+  it('should keep leading dot if present', () => {
+    expect(normalizeExtension('.png')).toBe('.png');
+    expect(normalizeExtension('.jpg')).toBe('.jpg');
+  });
+
+  it('should convert to lowercase', () => {
+    expect(normalizeExtension('PNG')).toBe('.png');
+    expect(normalizeExtension('.JPG')).toBe('.jpg');
+    expect(normalizeExtension('JpEg')).toBe('.jpeg');
+  });
+
+  it('should return empty string for empty input', () => {
+    expect(normalizeExtension('')).toBe('');
+  });
+});
+
+describe('getMimeTypeByExtension (DRY helper)', () => {
+  it('should return correct MIME type for image extensions', () => {
+    expect(getMimeTypeByExtension('.png')).toBe('image/png');
+    expect(getMimeTypeByExtension('.jpg')).toBe('image/jpeg');
+    expect(getMimeTypeByExtension('.jpeg')).toBe('image/jpeg');
+    expect(getMimeTypeByExtension('.gif')).toBe('image/gif');
+    expect(getMimeTypeByExtension('.webp')).toBe('image/webp');
+    expect(getMimeTypeByExtension('.svg')).toBe('image/svg+xml');
+  });
+
+  it('should handle extensions without leading dot', () => {
+    expect(getMimeTypeByExtension('png')).toBe('image/png');
+    expect(getMimeTypeByExtension('jpg')).toBe('image/jpeg');
+  });
+
+  it('should handle case insensitivity', () => {
+    expect(getMimeTypeByExtension('.PNG')).toBe('image/png');
+    expect(getMimeTypeByExtension('JPG')).toBe('image/jpeg');
+  });
+
+  it('should return application/octet-stream for unknown extensions', () => {
+    expect(getMimeTypeByExtension('.txt')).toBe('application/octet-stream');
+    expect(getMimeTypeByExtension('.md')).toBe('application/octet-stream');
+    expect(getMimeTypeByExtension('')).toBe('application/octet-stream');
   });
 });
 
