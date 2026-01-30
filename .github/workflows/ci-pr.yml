@@ -64,9 +64,9 @@ jobs:
         run: npm ci
 
       - name: Run unit tests
-        run: npm run test:unit
+        run: npx vitest run --pool=forks --poolOptions.forks.singleFork
         env:
-          NODE_OPTIONS: '--max-old-space-size=4096'
+          NODE_OPTIONS: '--max-old-space-size=6144'
 
   build:
     name: Build
