@@ -340,24 +340,66 @@ const TreeNode = memo(function TreeNode({
       {/* Children */}
       {isDirectory && isExpanded && children && (
         <div role="group">
-          {children.map((child) => (
-            <TreeNode
-              key={child.name}
-              item={child}
-              path={fullPath}
-              depth={depth + 1}
-              worktreeId={worktreeId}
-              expanded={expanded}
-              cache={cache}
-              onToggle={onToggle}
-              onFileSelect={onFileSelect}
-              onLoadChildren={onLoadChildren}
-              onContextMenu={onContextMenu}
-              searchQuery={searchQuery}
-              searchMode={searchMode}
-              matchedPaths={matchedPaths}
-            />
-          ))}
+          {children
+            .filter((child) => {
+              const childFullPath = fullPath ? `${fullPath}/${child.name}` : child.name;
+
+              // No filtering if no search query
+              if (!searchQuery?.trim()) {
+                return true;
+              }
+
+              // Name search: filter by name match
+              if (searchMode === 'name') {
+                const lowerQuery = searchQuery.toLowerCase();
+                // Show if name matches
+                if (child.name.toLowerCase().includes(lowerQuery)) {
+                  return true;
+                }
+                // Show directories to allow expansion and discovery of nested matches
+                if (child.type === 'directory') {
+                  return true;
+                }
+                return false;
+              }
+
+              // Content search: filter by matchedPaths
+              if (searchMode === 'content' && matchedPaths && matchedPaths.size > 0) {
+                // Show if this path is in matched paths
+                if (matchedPaths.has(childFullPath)) {
+                  return true;
+                }
+                // Show directories if they contain matched paths
+                if (child.type === 'directory') {
+                  for (const path of matchedPaths) {
+                    if (path.startsWith(childFullPath + '/')) {
+                      return true;
+                    }
+                  }
+                }
+                return false;
+              }
+
+              return true;
+            })
+            .map((child) => (
+              <TreeNode
+                key={child.name}
+                item={child}
+                path={fullPath}
+                depth={depth + 1}
+                worktreeId={worktreeId}
+                expanded={expanded}
+                cache={cache}
+                onToggle={onToggle}
+                onFileSelect={onFileSelect}
+                onLoadChildren={onLoadChildren}
+                onContextMenu={onContextMenu}
+                searchQuery={searchQuery}
+                searchMode={searchMode}
+                matchedPaths={matchedPaths}
+              />
+            ))}
         </div>
       )}
     </>
