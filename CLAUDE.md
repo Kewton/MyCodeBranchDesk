@@ -259,7 +259,8 @@ npm run dev
 # ビルド
 npm run build          # Next.jsビルド
 npm run build:cli      # CLIモジュールビルド
-npm run build:all      # 全ビルド（Next.js + CLI）
+npm run build:server   # サーバーモジュールビルド（Issue #113）
+npm run build:all      # 全ビルド（Next.js + CLI + server）
 
 # テスト
 npm test              # 全テスト
@@ -455,6 +456,18 @@ commandmate status
   - `src/config/uploadable-extensions.ts` - アップロード可能拡張子・検証ロジック
   - `src/app/api/worktrees/[id]/upload/[...path]/route.ts` - アップロードAPIエンドポイント
 - 詳細: [設計書](./dev-reports/design/issue-94-file-upload-design-policy.md)
+
+### Issue #113: server.tsビルド済みJS変換
+- **tsx依存解消**: `npm install -g commandmate`後の`tsx: command not found`エラーを解消
+- **ビルド方式**: `server.ts`を事前にJavaScriptにコンパイルし、`node dist/server/server.js`で実行
+- **tsc-alias導入**: @/パスエイリアスをビルド時に相対パスに変換
+- **TypeScript設定共通化**: `tsconfig.base.json`で共通設定を集約（DRY原則）
+- **CI/CD更新**: `ci-pr.yml`と`publish.yml`に`build:server`ステップを追加
+- **主要コンポーネント**:
+  - `tsconfig.base.json` - 共通TypeScript設定
+  - `tsconfig.server.json` - サーバービルド設定（依存ファイルのみをinclude）
+  - `dist/server/server.js` - ビルド済みサーバーエントリポイント
+- 詳細: [設計書](./dev-reports/design/issue-113-server-build-design-policy.md)
 
 ### Issue #112: サイドバートグルパフォーマンス改善
 - **transform方式**: width方式からtransform方式に変更し、GPUアクセラレーションを活用
