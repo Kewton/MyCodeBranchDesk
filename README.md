@@ -73,6 +73,7 @@ commandmate start --daemon    # バックグラウンドで起動
 | `commandmate init` | 初期設定（対話形式） |
 | `commandmate init --defaults` | 初期設定（デフォルト値） |
 | `commandmate start --daemon` | バックグラウンド起動 |
+| `commandmate start -p 3001` | ポート指定で起動 |
 | `commandmate stop` | サーバー停止 |
 | `commandmate status` | 状態確認 |
 
