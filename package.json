@@ -12,15 +12,18 @@
   "files": [
     "bin/",
     "dist/",
+    ".next/",
+    "public/",
     ".env.example"
   ],
   "scripts": {
     "dev": "tsx server.ts",
     "build": "next build",
     "build:cli": "tsc --project tsconfig.cli.json",
-    "build:all": "npm run build && npm run build:cli",
-    "prepublishOnly": "npm run build:cli",
-    "start": "NODE_ENV=production tsx server.ts",
+    "build:server": "tsc --project tsconfig.server.json && tsc-alias -p tsconfig.server.json",
+    "build:all": "npm run build && npm run build:cli && npm run build:server",
+    "prepublishOnly": "npm run build:all",
+    "start": "NODE_ENV=production node dist/server/server.js",
     "lint": "next lint",
     "test": "vitest",
     "test:ui": "vitest --ui",
@@ -75,6 +78,7 @@
     "eslint": "^8.57.0",
     "eslint-config-next": "^14.2.35",
     "tailwindcss": "^3.4.18",
+    "tsc-alias": "~1.8.16",
     "tsx": "^4.20.6",
     "typescript": "^5.5.0",
     "vitest": "^4.0.9"
