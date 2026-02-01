@@ -13,20 +13,27 @@
  * Layer hierarchy (bottom to top):
  * 1. Base content (default stacking)
  * 2. Dropdown menus (10)
- * 3. Maximized editor (40)
+ * 3. Sidebar (30) - Desktop layout only
  * 4. Modal dialogs (50)
- * 5. Toast notifications (60)
- * 6. Context menus (70)
+ * 5. Maximized editor (55) - Issue #104: Must be above Modal for iPad fullscreen
+ * 6. Toast notifications (60)
+ * 7. Context menus (70)
  */
 export const Z_INDEX = {
   /** Dropdown menus and select options */
   DROPDOWN: 10,
 
-  /** Maximized editor overlay */
-  MAXIMIZED_EDITOR: 40,
+  /**
+   * Desktop sidebar - Issue #112: transform-based animation
+   * Note: Mobile uses MobileHeader (z-40) and drawer (z-50) in separate hierarchy
+   */
+  SIDEBAR: 30,
 
   /** Modal dialogs and overlays */
   MODAL: 50,
+
+  /** Maximized editor overlay - above Modal for iPad fullscreen support */
+  MAXIMIZED_EDITOR: 55,
 
   /** Toast notifications */
   TOAST: 60,

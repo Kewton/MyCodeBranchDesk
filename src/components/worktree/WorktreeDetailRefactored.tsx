@@ -848,6 +848,8 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [fileViewerPath, setFileViewerPath] = useState<string | null>(null);
   const [editorFilePath, setEditorFilePath] = useState<string | null>(null);
+  // Issue #104: Track editor maximized state to disable Modal close handlers
+  const [isEditorMaximized, setIsEditorMaximized] = useState(false);
   const [autoYesEnabled, setAutoYesEnabled] = useState(false);
   const [autoYesExpiresAt, setAutoYesExpiresAt] = useState<number | null>(null);
   // Trigger to refresh FileTreeView after file operations
@@ -1499,13 +1501,14 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
             worktreeId={worktreeId}
             filePath={fileViewerPath ?? ''}
           />
-          {/* Markdown Editor Modal */}
+          {/* Markdown Editor Modal - Issue #104: disableClose when editor is maximized */}
           {editorFilePath && (
             <Modal
               isOpen={true}
               onClose={handleEditorClose}
               title={editorFilePath.split('/').pop() || 'Editor'}
               size="full"
+              disableClose={isEditorMaximized}
             >
               <div className="h-[80vh]">
                 <MarkdownEditor
@@ -1513,6 +1516,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
                   filePath={editorFilePath}
                   onClose={handleEditorClose}
                   onSave={handleEditorSave}
+                  onMaximizedChange={setIsEditorMaximized}
                 />
               </div>
             </Modal>
@@ -1616,13 +1620,14 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
           worktreeId={worktreeId}
           filePath={fileViewerPath ?? ''}
         />
-        {/* Markdown Editor Modal (Mobile) */}
+        {/* Markdown Editor Modal (Mobile) - Issue #104: disableClose when editor is maximized */}
         {editorFilePath && (
           <Modal
             isOpen={true}
             onClose={handleEditorClose}
             title={editorFilePath.split('/').pop() || 'Editor'}
             size="full"
+            disableClose={isEditorMaximized}
           >
             <div className="h-[80vh]">
               <MarkdownEditor
@@ -1630,6 +1635,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
                 filePath={editorFilePath}
                 onClose={handleEditorClose}
                 onSave={handleEditorSave}
+                onMaximizedChange={setIsEditorMaximized}
               />
             </div>
           </Modal>

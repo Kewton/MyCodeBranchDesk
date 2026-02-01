@@ -46,6 +46,32 @@ export interface UseFullscreenOptions {
 }
 
 /**
+ * Check if device is iOS/iPadOS
+ * Issue #104: iOS/iPadOS automatically exits fullscreen when virtual keyboard appears,
+ * so we force CSS fallback mode on these devices to maintain fullscreen during editing.
+ *
+ * Detection covers:
+ * - iPad/iPhone/iPod via userAgent
+ * - iPad Pro (reports as MacIntel but has touch support)
+ */
+function isIOSDevice(): boolean {
+  if (typeof navigator === 'undefined') return false;
+
+  // Check for iPad, iPhone, iPod in userAgent
+  if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+    return true;
+  }
+
+  // iPad Pro running iPadOS 13+ reports as MacIntel
+  // Detect by checking for touch support on Mac platform
+  if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Check if Fullscreen API is available
  */
 function isFullscreenSupported(): boolean {
@@ -180,9 +206,22 @@ export function useFullscreen(options: UseFullscreenOptions = {}): UseFullscreen
   /**
    * Enter fullscreen mode
    * IMPORTANT: Must be called from user gesture (click, keydown, etc.)
+   *
+   * Issue #104: On iOS/iPadOS, the Fullscreen API automatically exits when the
+   * virtual keyboard appears. To maintain fullscreen during text editing,
+   * we force CSS fallback mode on these devices.
    */
   const enterFullscreen = useCallback(async () => {
     setError(null);
+
+    // Issue #104: Force CSS fallback on iOS/iPadOS to prevent
+    // automatic fullscreen exit when virtual keyboard appears
+    if (isIOSDevice()) {
+      setIsFullscreen(true);
+      setIsFallbackMode(true);
+      onEnter?.();
+      return;
+    }
 
     // If API is supported, use it
     if (isFullscreenSupported() && elementRef?.current) {

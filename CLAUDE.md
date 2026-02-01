@@ -194,10 +194,48 @@ src/
 1. **mainへの直push禁止**
    - 全ての変更はPRを通じて行う
    - `git push origin main` は拒否される
+   - **Git Hook（pre-push）で強制**: ローカル環境でmainブランチへの直接pushをブロック
 
 2. **force push禁止**
    - `git push --force` は原則禁止
    - 例外: 自分のfeatureブランチのみ許可
+
+### Git Hook設定
+
+mainブランチへの直接pushを防止するpre-push hookが設置されています。
+
+**設置場所**: `.git/hooks/pre-push`
+
+**動作**:
+```bash
+$ git push origin main
+❌ Error: Direct push to 'main' is not allowed.
+   Please create a Pull Request instead.
+```
+
+**新規クローン時の設定**:
+`.git/hooks/`はgit管理外のため、クローン後に手動設定が必要です。
+
+```bash
+cat > .git/hooks/pre-push << 'EOF'
+#!/bin/bash
+protected_branch='main'
+while read local_ref local_sha remote_ref remote_sha; do
+    remote_branch=$(echo "$remote_ref" | sed 's,.*/,,')
+    if [ "$remote_branch" = "$protected_branch" ]; then
+        echo ""
+        echo "❌ Error: Direct push to '$protected_branch' is not allowed."
+        echo "   Please create a Pull Request instead."
+        echo ""
+        exit 1
+    fi
+done
+exit 0
+EOF
+chmod +x .git/hooks/pre-push
+```
+
+**注意**: `--no-verify`オプションで回避可能なため、チームルールとしての遵守が重要です。
 
 ### コード
 1. **console.logの本番残留禁止**
@@ -221,7 +259,8 @@ npm run dev
 # ビルド
 npm run build          # Next.jsビルド
 npm run build:cli      # CLIモジュールビルド
-npm run build:all      # 全ビルド（Next.js + CLI）
+npm run build:server   # サーバーモジュールビルド（Issue #113）
+npm run build:all      # 全ビルド（Next.js + CLI + server）
 
 # テスト
 npm test              # 全テスト
@@ -331,6 +370,23 @@ commandmate status
   - `src/components/worktree/SearchBar.tsx` - 検索UIコンポーネント
 - 詳細: [設計書](./dev-reports/design/issue-21-file-search-design-policy.md)
 
+### Issue #114: npm install -g ドキュメント整備
+- **ドキュメント更新**: `npm install -g commandmate` を標準セットアップ方法として明確化
+- **対象ユーザーの分離**:
+  - 一般ユーザー: `npm install -g commandmate`（推奨）
+  - 開発者/コントリビューター: `git clone`
+- **更新ファイル**:
+  - `README.md` - Quick Startを npm install -g 方式に変更
+  - `docs/DEPLOYMENT.md` - npm方式を追加、git clone を開発環境向けに移動
+  - `docs/user-guide/webapp-guide.md` - 起動方法を更新
+  - `docs/user-guide/quick-start.md` - 前提条件を追加
+  - `CONTRIBUTING.md` - 開発者向けセットアップを明記
+  - `docs/internal/TESTING_GUIDE.md` - 環境変数を `CM_*` に統一
+  - `docs/internal/PRODUCTION_CHECKLIST.md` - npm方式を追加
+- **新規ファイル**:
+  - `docs/user-guide/cli-setup-guide.md` - CLIセットアップ専用ガイド（インストール、トラブルシューティング、アップグレード、アンインストール）
+- **トラブルシューティング**: command not found、権限エラー、ポート競合の対応手順を文書化
+
 ### Issue #96: npm CLIサポート
 - **CLIコマンド**: `npm install -g commandmate`でグローバルインストール可能
 - **サブコマンド**:
@@ -417,6 +473,29 @@ commandmate status
   - `src/config/uploadable-extensions.ts` - アップロード可能拡張子・検証ロジック
   - `src/app/api/worktrees/[id]/upload/[...path]/route.ts` - アップロードAPIエンドポイント
 - 詳細: [設計書](./dev-reports/design/issue-94-file-upload-design-policy.md)
+
+### Issue #113: server.tsビルド済みJS変換
+- **tsx依存解消**: `npm install -g commandmate`後の`tsx: command not found`エラーを解消
+- **ビルド方式**: `server.ts`を事前にJavaScriptにコンパイルし、`node dist/server/server.js`で実行
+- **tsc-alias導入**: @/パスエイリアスをビルド時に相対パスに変換
+- **TypeScript設定共通化**: `tsconfig.base.json`で共通設定を集約（DRY原則）
+- **CI/CD更新**: `ci-pr.yml`と`publish.yml`に`build:server`ステップを追加
+- **主要コンポーネント**:
+  - `tsconfig.base.json` - 共通TypeScript設定
+  - `tsconfig.server.json` - サーバービルド設定（依存ファイルのみをinclude）
+  - `dist/server/server.js` - ビルド済みサーバーエントリポイント
+- 詳細: [設計書](./dev-reports/design/issue-113-server-build-design-policy.md)
+
+### Issue #112: サイドバートグルパフォーマンス改善
+- **transform方式**: width方式からtransform方式に変更し、GPUアクセラレーションを活用
+- **Reflow回避**: translate-x-0/-translate-x-fullでアニメーション、レイアウト再計算を削減
+- **iPad最適化**: iPadでのサイドバー開閉時のモッサリ感を解消
+- **z-index管理**: SIDEBAR定数（30）をz-index.tsに追加、階層管理を一元化
+- **アクセシビリティ**: aria-hidden属性をisOpen状態に連動
+- **主要コンポーネント**:
+  - `src/components/layout/AppShell.tsx` - デスクトップレイアウトのtransform方式実装
+  - `src/config/z-index.ts` - SIDEBAR定数追加（DROPDOWN(10) < SIDEBAR(30) < MODAL(50)）
+- 詳細: [設計書](./dev-reports/design/issue-112-sidebar-transform-design-policy.md)
 
 ### Issue #99: マークダウンエディタ表示機能改善
 - **最大化機能**: エディタを画面全体に最大化表示（Ctrl/Cmd+Shift+F、ESCで解除）

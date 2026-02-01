@@ -14,6 +14,12 @@ export interface ModalProps {
   children: React.ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
   showCloseButton?: boolean;
+  /**
+   * Disable close handlers (ESC key, backdrop click)
+   * Used when child component (e.g., maximized MarkdownEditor) handles its own close
+   * Issue #104
+   */
+  disableClose?: boolean;
 }
 
 /**
@@ -33,11 +39,14 @@ export function Modal({
   children,
   size = 'lg',
   showCloseButton = true,
+  disableClose = false,
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
 
-  // Close on escape key
+  // Close on escape key (Issue #104: skip if disableClose is true)
   useEffect(() => {
+    if (disableClose) return;
+
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
         onClose();
@@ -46,7 +55,7 @@ export function Modal({
 
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, disableClose]);
 
   // Prevent body scroll when modal is open
   useEffect(() => {
@@ -73,10 +82,10 @@ export function Modal({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
-      {/* Backdrop */}
+      {/* Backdrop - Issue #104: skip onClick if disableClose is true */}
       <div
         className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
-        onClick={onClose}
+        onClick={disableClose ? undefined : onClose}
       />
 
       {/* Modal */}

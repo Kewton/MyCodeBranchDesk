@@ -262,6 +262,139 @@ describe('useFullscreen', () => {
     });
   });
 
+  describe('iOS/iPad detection (Issue #104)', () => {
+    it('should use fallback mode on iPad even when Fullscreen API is supported', async () => {
+      // Mock iPad user agent
+      const originalNavigator = global.navigator;
+      Object.defineProperty(global, 'navigator', {
+        value: {
+          userAgent: 'Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X)',
+          platform: 'iPad',
+          maxTouchPoints: 5,
+        },
+        configurable: true,
+      });
+
+      const mockElement = {
+        requestFullscreen: mockRequestFullscreen,
+      } as unknown as HTMLDivElement;
+      const elementRef = { current: mockElement };
+
+      const { result } = renderHook(() => useFullscreen({ elementRef }));
+
+      await act(async () => {
+        await result.current.enterFullscreen();
+      });
+
+      // Should use fallback mode on iPad, not Fullscreen API
+      expect(result.current.isFullscreen).toBe(true);
+      expect(result.current.isFallbackMode).toBe(true);
+      expect(mockRequestFullscreen).not.toHaveBeenCalled();
+
+      // Restore navigator
+      Object.defineProperty(global, 'navigator', {
+        value: originalNavigator,
+        configurable: true,
+      });
+    });
+
+    it('should use fallback mode on iPhone even when Fullscreen API is supported', async () => {
+      const originalNavigator = global.navigator;
+      Object.defineProperty(global, 'navigator', {
+        value: {
+          userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)',
+          platform: 'iPhone',
+          maxTouchPoints: 5,
+        },
+        configurable: true,
+      });
+
+      const mockElement = {
+        requestFullscreen: mockRequestFullscreen,
+      } as unknown as HTMLDivElement;
+      const elementRef = { current: mockElement };
+
+      const { result } = renderHook(() => useFullscreen({ elementRef }));
+
+      await act(async () => {
+        await result.current.enterFullscreen();
+      });
+
+      expect(result.current.isFullscreen).toBe(true);
+      expect(result.current.isFallbackMode).toBe(true);
+      expect(mockRequestFullscreen).not.toHaveBeenCalled();
+
+      Object.defineProperty(global, 'navigator', {
+        value: originalNavigator,
+        configurable: true,
+      });
+    });
+
+    it('should use fallback mode on iPad Pro (MacIntel with touch)', async () => {
+      const originalNavigator = global.navigator;
+      Object.defineProperty(global, 'navigator', {
+        value: {
+          userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+          platform: 'MacIntel',
+          maxTouchPoints: 5, // iPad Pro reports as MacIntel but has touch
+        },
+        configurable: true,
+      });
+
+      const mockElement = {
+        requestFullscreen: mockRequestFullscreen,
+      } as unknown as HTMLDivElement;
+      const elementRef = { current: mockElement };
+
+      const { result } = renderHook(() => useFullscreen({ elementRef }));
+
+      await act(async () => {
+        await result.current.enterFullscreen();
+      });
+
+      expect(result.current.isFullscreen).toBe(true);
+      expect(result.current.isFallbackMode).toBe(true);
+      expect(mockRequestFullscreen).not.toHaveBeenCalled();
+
+      Object.defineProperty(global, 'navigator', {
+        value: originalNavigator,
+        configurable: true,
+      });
+    });
+
+    it('should use Fullscreen API on desktop Mac', async () => {
+      const originalNavigator = global.navigator;
+      Object.defineProperty(global, 'navigator', {
+        value: {
+          userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+          platform: 'MacIntel',
+          maxTouchPoints: 0, // Desktop Mac has no touch
+        },
+        configurable: true,
+      });
+
+      const mockElement = {
+        requestFullscreen: mockRequestFullscreen,
+      } as unknown as HTMLDivElement;
+      const elementRef = { current: mockElement };
+
+      const { result } = renderHook(() => useFullscreen({ elementRef }));
+
+      await act(async () => {
+        await result.current.enterFullscreen();
+      });
+
+      expect(result.current.isFullscreen).toBe(true);
+      expect(result.current.isFallbackMode).toBe(false);
+      expect(mockRequestFullscreen).toHaveBeenCalled();
+
+      Object.defineProperty(global, 'navigator', {
+        value: originalNavigator,
+        configurable: true,
+      });
+    });
+  });
+
   describe('fullscreenchange event', () => {
     it('should update state when fullscreenchange event fires', async () => {
       const mockElement = {

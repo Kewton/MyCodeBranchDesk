@@ -40,11 +40,21 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Build
+      - name: Build Next.js
         run: npm run build
 
       - name: Build CLI
         run: npm run build:cli
+
+      - name: Build server
+        run: npm run build:server
+
+      - name: Check package size
+        run: |
+          npm pack --dry-run 2>&1 | tee pack-output.txt
+          # Display package size information
+          SIZE=$(grep "total files" pack-output.txt | grep -oE '[0-9]+(\.[0-9]+)?\s*(MB|kB)' || echo "0 kB")
+          echo "Package size: $SIZE"
 
       - name: Publish to npm (OIDC)
         run: npm publish --provenance --access public
