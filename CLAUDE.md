@@ -194,10 +194,48 @@ src/
 1. **mainへの直push禁止**
    - 全ての変更はPRを通じて行う
    - `git push origin main` は拒否される
+   - **Git Hook（pre-push）で強制**: ローカル環境でmainブランチへの直接pushをブロック
 
 2. **force push禁止**
    - `git push --force` は原則禁止
    - 例外: 自分のfeatureブランチのみ許可
+
+### Git Hook設定
+
+mainブランチへの直接pushを防止するpre-push hookが設置されています。
+
+**設置場所**: `.git/hooks/pre-push`
+
+**動作**:
+```bash
+$ git push origin main
+❌ Error: Direct push to 'main' is not allowed.
+   Please create a Pull Request instead.
+```
+
+**新規クローン時の設定**:
+`.git/hooks/`はgit管理外のため、クローン後に手動設定が必要です。
+
+```bash
+cat > .git/hooks/pre-push << 'EOF'
+#!/bin/bash
+protected_branch='main'
+while read local_ref local_sha remote_ref remote_sha; do
+    remote_branch=$(echo "$remote_ref" | sed 's,.*/,,')
+    if [ "$remote_branch" = "$protected_branch" ]; then
+        echo ""
+        echo "❌ Error: Direct push to '$protected_branch' is not allowed."
+        echo "   Please create a Pull Request instead."
+        echo ""
+        exit 1
+    fi
+done
+exit 0
+EOF
+chmod +x .git/hooks/pre-push
+```
+
+**注意**: `--no-verify`オプションで回避可能なため、チームルールとしての遵守が重要です。
 
 ### コード
 1. **console.logの本番残留禁止**
