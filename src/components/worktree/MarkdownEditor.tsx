@@ -26,6 +26,7 @@ import React, {
   useMemo,
   useRef,
 } from 'react';
+import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
@@ -107,6 +108,7 @@ export function MarkdownEditor({
   onClose,
   onSave,
   initialViewMode,
+  onMaximizedChange,
 }: EditorProps) {
   // State
   const [content, setContent] = useState('');
@@ -122,6 +124,9 @@ export function MarkdownEditor({
 
   // Mobile tab state (for portrait mode)
   const [mobileTab, setMobileTab] = useState<MobileTab>('editor');
+
+  // Portal container state for maximized mode (Issue #104)
+  const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
 
   // Toast hook
   const { toasts, showToast, removeToast } = useToast();
@@ -389,6 +394,36 @@ export function MarkdownEditor({
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Issue #104: Create/cleanup portal container for maximized mode
+  // Portal is needed because Modal's transform property creates a new stacking context
+  // which prevents fixed positioning from covering the viewport
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    // Create portal container if it doesn't exist
+    let container = document.getElementById('markdown-editor-portal');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'markdown-editor-portal';
+      document.body.appendChild(container);
+    }
+    setPortalContainer(container);
+
+    // Cleanup: remove container if empty when component unmounts
+    return () => {
+      const portalEl = document.getElementById('markdown-editor-portal');
+      if (portalEl && portalEl.childNodes.length === 0) {
+        portalEl.remove();
+      }
+    };
+  }, []);
+
+  // Issue #104: Notify parent when maximized state changes
+  // This allows Modal to disable its ESC/backdrop handlers
+  useEffect(() => {
+    onMaximizedChange?.(isMaximized);
+  }, [isMaximized, onMaximizedChange]);
+
   // Load content on mount
   useEffect(() => {
     loadContent();
@@ -535,7 +570,8 @@ export function MarkdownEditor({
     );
   }
 
-  return (
+  // Main editor content (may be rendered via Portal when maximized)
+  const editorContent = (
     <div
       ref={(el) => {
         // Merge refs for containerRef and swipeRef
@@ -546,6 +582,8 @@ export function MarkdownEditor({
       className={containerClasses}
       style={containerStyle}
       onKeyDown={handleKeyDown}
+      role={isMaximized && isFallbackMode ? 'dialog' : undefined}
+      aria-modal={isMaximized && isFallbackMode ? 'true' : undefined}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-gray-50">
@@ -809,4 +847,14 @@ export function MarkdownEditor({
       <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
   );
+
+  // Issue #104: Use Portal for maximized mode in CSS fallback
+  // This breaks out of Modal's transform stacking context
+  const usePortal = isMaximized && isFallbackMode && portalContainer;
+
+  if (usePortal) {
+    return createPortal(editorContent, portalContainer);
+  }
+
+  return editorContent;
 }

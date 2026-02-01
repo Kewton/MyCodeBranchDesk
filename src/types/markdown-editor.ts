@@ -83,6 +83,11 @@ export interface EditorProps {
   onSave?: (filePath: string) => void;
   /** Optional initial view mode */
   initialViewMode?: ViewMode;
+  /**
+   * Callback when maximized state changes (Issue #104)
+   * Used to notify parent (Modal) to disable its ESC/backdrop handlers
+   */
+  onMaximizedChange?: (isMaximized: boolean) => void;
 }
 
 /**
