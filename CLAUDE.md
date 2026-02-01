@@ -456,6 +456,17 @@ commandmate status
   - `src/app/api/worktrees/[id]/upload/[...path]/route.ts` - アップロードAPIエンドポイント
 - 詳細: [設計書](./dev-reports/design/issue-94-file-upload-design-policy.md)
 
+### Issue #112: サイドバートグルパフォーマンス改善
+- **transform方式**: width方式からtransform方式に変更し、GPUアクセラレーションを活用
+- **Reflow回避**: translate-x-0/-translate-x-fullでアニメーション、レイアウト再計算を削減
+- **iPad最適化**: iPadでのサイドバー開閉時のモッサリ感を解消
+- **z-index管理**: SIDEBAR定数（30）をz-index.tsに追加、階層管理を一元化
+- **アクセシビリティ**: aria-hidden属性をisOpen状態に連動
+- **主要コンポーネント**:
+  - `src/components/layout/AppShell.tsx` - デスクトップレイアウトのtransform方式実装
+  - `src/config/z-index.ts` - SIDEBAR定数追加（DROPDOWN(10) < SIDEBAR(30) < MODAL(50)）
+- 詳細: [設計書](./dev-reports/design/issue-112-sidebar-transform-design-policy.md)
+
 ### Issue #99: マークダウンエディタ表示機能改善
 - **最大化機能**: エディタを画面全体に最大化表示（Ctrl/Cmd+Shift+F、ESCで解除）
 - **リサイズ機能**: Split View時にドラッグでエディタ/プレビュー比率を変更（ダブルクリックで50:50リセット）
