@@ -433,12 +433,17 @@ export function MarkdownEditor({
   }, [isMaximized, isFallbackMode]);
 
   // Calculate container style for z-index when maximized
+  // Issue #104: z-index must be set for ALL maximized states, not just fallback mode.
+  // On iPad Chrome landscape, Fullscreen API works (isFallbackMode=false), but we still
+  // need z-index to ensure the editor appears above other UI elements like terminal tabs.
+  // Note: containerClasses only applies `fixed inset-0` in fallback mode, as Fullscreen API
+  // handles positioning natively. However, z-index is needed in BOTH modes.
   const containerStyle = useMemo(() => {
-    if (isMaximized && isFallbackMode) {
+    if (isMaximized) {
       return { zIndex: Z_INDEX.MAXIMIZED_EDITOR };
     }
     return undefined;
-  }, [isMaximized, isFallbackMode]);
+  }, [isMaximized]);
 
   // Calculate editor width style for split view with custom ratio
   const editorWidthStyle = useMemo(() => {

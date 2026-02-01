@@ -789,6 +789,97 @@ describe('MarkdownEditor', () => {
     });
   });
 
+  describe('Maximize z-index (Issue #104)', () => {
+    it('should set z-index=40 when isMaximized=true and isFallbackMode=false (Fullscreen API works)', async () => {
+      // Mock Fullscreen API as available and working
+      const originalFullscreenEnabled = Object.getOwnPropertyDescriptor(document, 'fullscreenEnabled');
+      const originalRequestFullscreen = Element.prototype.requestFullscreen;
+      const originalFullscreenElement = Object.getOwnPropertyDescriptor(document, 'fullscreenElement');
+
+      Object.defineProperty(document, 'fullscreenEnabled', { value: true, configurable: true });
+      Element.prototype.requestFullscreen = vi.fn().mockResolvedValue(undefined);
+
+      // Track if fullscreen is active
+      let isInFullscreen = false;
+      Object.defineProperty(document, 'fullscreenElement', {
+        get: () => isInFullscreen ? document.body : null,
+        configurable: true,
+      });
+
+      // Override requestFullscreen to also set fullscreen state
+      Element.prototype.requestFullscreen = vi.fn().mockImplementation(() => {
+        isInFullscreen = true;
+        return Promise.resolve();
+      });
+
+      try {
+        render(<MarkdownEditor {...defaultProps} />);
+
+        await waitFor(() => {
+          expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
+        });
+
+        // Click maximize button to trigger fullscreen (API mode)
+        const maximizeButton = screen.getByTestId('maximize-button');
+        fireEvent.click(maximizeButton);
+
+        await waitFor(() => {
+          expect(screen.getByTestId('maximize-hint')).toBeInTheDocument();
+        });
+
+        const editor = screen.getByTestId('markdown-editor');
+        // z-index should be 40 (Z_INDEX.MAXIMIZED_EDITOR) when maximized
+        // even when Fullscreen API is working (isFallbackMode=false)
+        expect(editor).toHaveStyle({ zIndex: 40 });
+      } finally {
+        // Restore original implementation
+        if (originalFullscreenEnabled) {
+          Object.defineProperty(document, 'fullscreenEnabled', originalFullscreenEnabled);
+        } else {
+          // @ts-expect-error - delete property for cleanup
+          delete document.fullscreenEnabled;
+        }
+        Element.prototype.requestFullscreen = originalRequestFullscreen;
+        if (originalFullscreenElement) {
+          Object.defineProperty(document, 'fullscreenElement', originalFullscreenElement);
+        }
+      }
+    });
+
+    it('should set z-index=40 when isMaximized=true and isFallbackMode=true (CSS fallback)', async () => {
+      render(<MarkdownEditor {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
+      });
+
+      // Click maximize button - in jsdom, Fullscreen API is not available, so fallback mode is used
+      const maximizeButton = screen.getByTestId('maximize-button');
+      fireEvent.click(maximizeButton);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('maximize-hint')).toBeInTheDocument();
+      });
+
+      const editor = screen.getByTestId('markdown-editor');
+      // In fallback mode, z-index should also be 40
+      expect(editor).toHaveStyle({ zIndex: 40 });
+    });
+
+    it('should not set z-index when isMaximized=false', async () => {
+      render(<MarkdownEditor {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
+      });
+
+      const editor = screen.getByTestId('markdown-editor');
+      // When not maximized, z-index should not be inline styled
+      // Check that the style attribute does not contain z-index
+      expect(editor.style.zIndex).toBe('');
+    });
+  });
+
   describe('Mermaid Diagram Integration (Issue #100)', () => {
     it('should render mermaid code block with MermaidCodeBlock component', async () => {
       const contentWithMermaid = `# Test Document
