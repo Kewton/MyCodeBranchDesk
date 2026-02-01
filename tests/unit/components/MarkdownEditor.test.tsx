@@ -790,7 +790,7 @@ describe('MarkdownEditor', () => {
   });
 
   describe('Maximize z-index (Issue #104)', () => {
-    it('should set z-index=40 when isMaximized=true and isFallbackMode=false (Fullscreen API works)', async () => {
+    it('should set z-index=55 when isMaximized=true and isFallbackMode=false (Fullscreen API works)', async () => {
       // Mock Fullscreen API as available and working
       const originalFullscreenEnabled = Object.getOwnPropertyDescriptor(document, 'fullscreenEnabled');
       const originalRequestFullscreen = Element.prototype.requestFullscreen;
@@ -828,9 +828,9 @@ describe('MarkdownEditor', () => {
         });
 
         const editor = screen.getByTestId('markdown-editor');
-        // z-index should be 40 (Z_INDEX.MAXIMIZED_EDITOR) when maximized
+        // z-index should be 55 (Z_INDEX.MAXIMIZED_EDITOR) when maximized
         // even when Fullscreen API is working (isFallbackMode=false)
-        expect(editor).toHaveStyle({ zIndex: 40 });
+        expect(editor).toHaveStyle({ zIndex: 55 });
       } finally {
         // Restore original implementation
         if (originalFullscreenEnabled) {
@@ -846,7 +846,7 @@ describe('MarkdownEditor', () => {
       }
     });
 
-    it('should set z-index=40 when isMaximized=true and isFallbackMode=true (CSS fallback)', async () => {
+    it('should set z-index=55 when isMaximized=true and isFallbackMode=true (CSS fallback)', async () => {
       render(<MarkdownEditor {...defaultProps} />);
 
       await waitFor(() => {
@@ -862,8 +862,8 @@ describe('MarkdownEditor', () => {
       });
 
       const editor = screen.getByTestId('markdown-editor');
-      // In fallback mode, z-index should also be 40
-      expect(editor).toHaveStyle({ zIndex: 40 });
+      // In fallback mode, z-index should also be 55
+      expect(editor).toHaveStyle({ zIndex: 55 });
     });
 
     it('should not set z-index when isMaximized=false', async () => {
