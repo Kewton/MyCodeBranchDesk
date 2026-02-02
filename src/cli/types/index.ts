@@ -152,3 +152,17 @@ export interface ConfirmOptions {
   /** Default value if user presses Enter (true = Y, false = N) */
   default?: boolean;
 }
+
+/**
+ * Extract error message from unknown error
+ * Issue #125: DRY - centralized error message extraction
+ *
+ * @param error - Unknown error object
+ * @returns Error message string
+ */
+export function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}

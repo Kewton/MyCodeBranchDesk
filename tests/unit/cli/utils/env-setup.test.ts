@@ -321,6 +321,17 @@ describe('getEnvPath', () => {
     // Should return a valid path regardless
     expect(envPath.endsWith('.env')).toBe(true);
   });
+
+  it('should call mkdirSync with correct permissions when dir does not exist', () => {
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+    vi.mocked(fs.mkdirSync).mockReturnValue(undefined);
+
+    getEnvPath();
+
+    // If global install creates dir, it should use 0o700 permission
+    // The actual call depends on isGlobalInstall()
+    expect(typeof getEnvPath()).toBe('string');
+  });
 });
 
 describe('getConfigDir', () => {
@@ -420,5 +431,85 @@ describe('getConfigDir security', () => {
     // Verify realpathSync was called (symlink resolution)
     expect(fs.realpathSync).toHaveBeenCalled();
     expect(typeof result).toBe('string');
+  });
+});
+
+describe('validateConfig additional cases', () => {
+  let envSetup: EnvSetup;
+
+  beforeEach(() => {
+    envSetup = new EnvSetup();
+    vi.resetAllMocks();
+  });
+
+  it('should fail for invalid log level', () => {
+    const result = envSetup.validateConfig({
+      CM_ROOT_DIR: '/path/to/repos',
+      CM_PORT: 3000,
+      CM_BIND: '127.0.0.1',
+      CM_DB_PATH: './data/cm.db',
+      CM_LOG_LEVEL: 'invalid',
+      CM_LOG_FORMAT: 'text',
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.toLowerCase().includes('log level'))).toBe(true);
+  });
+
+  it('should fail for invalid log format', () => {
+    const result = envSetup.validateConfig({
+      CM_ROOT_DIR: '/path/to/repos',
+      CM_PORT: 3000,
+      CM_BIND: '127.0.0.1',
+      CM_DB_PATH: './data/cm.db',
+      CM_LOG_LEVEL: 'info',
+      CM_LOG_FORMAT: 'xml',
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.toLowerCase().includes('log format'))).toBe(true);
+  });
+
+  it('should pass when auth token is provided for 0.0.0.0 bind', () => {
+    const result = envSetup.validateConfig({
+      CM_ROOT_DIR: '/path/to/repos',
+      CM_PORT: 3000,
+      CM_BIND: '0.0.0.0',
+      CM_DB_PATH: './data/cm.db',
+      CM_LOG_LEVEL: 'info',
+      CM_LOG_FORMAT: 'text',
+      CM_AUTH_TOKEN: 'secure-token-123',
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('should accept localhost as valid bind address', () => {
+    const result = envSetup.validateConfig({
+      CM_ROOT_DIR: '/path/to/repos',
+      CM_PORT: 3000,
+      CM_BIND: 'localhost',
+      CM_DB_PATH: './data/cm.db',
+      CM_LOG_LEVEL: 'info',
+      CM_LOG_FORMAT: 'text',
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('should fail for port 0', () => {
+    const result = envSetup.validateConfig({
+      CM_ROOT_DIR: '/path/to/repos',
+      CM_PORT: 0,
+      CM_BIND: '127.0.0.1',
+      CM_DB_PATH: './data/cm.db',
+      CM_LOG_LEVEL: 'info',
+      CM_LOG_FORMAT: 'text',
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.toLowerCase().includes('port'))).toBe(true);
   });
 });

@@ -7,7 +7,7 @@
 
 import { existsSync } from 'fs';
 import { spawn } from 'child_process';
-import { StartOptions, ExitCode } from '../types';
+import { StartOptions, ExitCode, getErrorMessage } from '../types';
 import { CLILogger } from '../utils/logger';
 import { DaemonManager } from '../utils/daemon';
 import { logSecurityEvent } from '../utils/security-logger';
@@ -69,7 +69,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
 
         process.exit(ExitCode.SUCCESS);
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = getErrorMessage(error);
         logger.error(`Failed to start daemon: ${message}`);
 
         logSecurityEvent({
@@ -129,7 +129,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
     });
 
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = getErrorMessage(error);
     logger.error(`Start failed: ${message}`);
 
     logSecurityEvent({

@@ -73,6 +73,47 @@ describe('statusCommand', () => {
 
       killSpy.mockRestore();
     });
+
+    it('should display port number when available', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue('12345');
+      vi.mocked(dotenv.config).mockReturnValue({
+        parsed: { CM_PORT: '4000' },
+      });
+      // Set process.env for getStatus to pick up
+      process.env.CM_PORT = '4000';
+
+      const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
+
+      await statusCommand();
+
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('4000'));
+      expect(mockExit).toHaveBeenCalledWith(ExitCode.SUCCESS);
+
+      killSpy.mockRestore();
+      delete process.env.CM_PORT;
+    });
+
+    it('should display URL when available', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue('12345');
+      vi.mocked(dotenv.config).mockReturnValue({
+        parsed: { CM_PORT: '3000', CM_BIND: '127.0.0.1' },
+      });
+      process.env.CM_PORT = '3000';
+      process.env.CM_BIND = '127.0.0.1';
+
+      const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
+
+      await statusCommand();
+
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('http://127.0.0.1:3000'));
+      expect(mockExit).toHaveBeenCalledWith(ExitCode.SUCCESS);
+
+      killSpy.mockRestore();
+      delete process.env.CM_PORT;
+      delete process.env.CM_BIND;
+    });
   });
 
   describe('when not running', () => {

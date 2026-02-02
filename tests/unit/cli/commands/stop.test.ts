@@ -149,4 +149,27 @@ describe('stopCommand', () => {
       killSpy.mockRestore();
     });
   });
+
+  describe('error handling', () => {
+    it('should exit with UNEXPECTED_ERROR on unexpected exception', async () => {
+      vi.mocked(fs.existsSync).mockImplementation(() => {
+        throw new Error('Unexpected filesystem error');
+      });
+
+      await stopCommand({});
+
+      expect(mockExit).toHaveBeenCalledWith(ExitCode.UNEXPECTED_ERROR);
+    });
+
+    it('should log error message on failure', async () => {
+      const consoleSpy = vi.spyOn(console, 'error');
+      vi.mocked(fs.existsSync).mockImplementation(() => {
+        throw new Error('Test error message');
+      });
+
+      await stopCommand({});
+
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Test error message'));
+    });
+  });
 });

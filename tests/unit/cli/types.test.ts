@@ -12,6 +12,7 @@ import {
   DaemonStatus,
   DependencyCheck,
   PreflightResult,
+  getErrorMessage,
 } from '../../../src/cli/types';
 
 describe('ExitCode enum', () => {
@@ -164,5 +165,58 @@ describe('PreflightResult interface', () => {
       ],
     };
     expect(result.success).toBe(false);
+  });
+});
+
+describe('getErrorMessage', () => {
+  it('should extract message from Error object', () => {
+    const error = new Error('Test error message');
+    expect(getErrorMessage(error)).toBe('Test error message');
+  });
+
+  it('should handle TypeError', () => {
+    const error = new TypeError('Type error occurred');
+    expect(getErrorMessage(error)).toBe('Type error occurred');
+  });
+
+  it('should handle RangeError', () => {
+    const error = new RangeError('Range error occurred');
+    expect(getErrorMessage(error)).toBe('Range error occurred');
+  });
+
+  it('should convert string to message', () => {
+    const error = 'String error message';
+    expect(getErrorMessage(error)).toBe('String error message');
+  });
+
+  it('should convert number to message', () => {
+    const error = 42;
+    expect(getErrorMessage(error)).toBe('42');
+  });
+
+  it('should convert null to message', () => {
+    const error = null;
+    expect(getErrorMessage(error)).toBe('null');
+  });
+
+  it('should convert undefined to message', () => {
+    const error = undefined;
+    expect(getErrorMessage(error)).toBe('undefined');
+  });
+
+  it('should convert object to message', () => {
+    const error = { code: 'ERR_TEST', detail: 'test detail' };
+    expect(getErrorMessage(error)).toBe('[object Object]');
+  });
+
+  it('should handle Error subclass with custom message', () => {
+    class CustomError extends Error {
+      constructor(message: string) {
+        super(message);
+        this.name = 'CustomError';
+      }
+    }
+    const error = new CustomError('Custom error message');
+    expect(getErrorMessage(error)).toBe('Custom error message');
   });
 });

@@ -217,6 +217,92 @@ describe('DaemonManager', () => {
     });
   });
 
+  describe('start security warnings (Issue #125)', () => {
+    it('should log warning when binding to 0.0.0.0 without auth token', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.openSync).mockReturnValue(3);
+      vi.mocked(fs.writeSync).mockReturnValue(5);
+      vi.mocked(fs.closeSync).mockReturnValue(undefined);
+      vi.mocked(dotenv.config).mockReturnValue({
+        parsed: { CM_BIND: '0.0.0.0', CM_PORT: '3000' },
+      });
+
+      const mockChild = {
+        pid: 12345,
+        unref: vi.fn(),
+        on: vi.fn(),
+      };
+      vi.mocked(childProcess.spawn).mockReturnValue(mockChild as unknown as childProcess.ChildProcess);
+
+      // Spy on console to verify warning logs
+      const warnSpy = vi.spyOn(console, 'log');
+
+      const pid = await daemonManager.start({});
+
+      expect(pid).toBe(12345);
+      // Verify warning was logged (CLILogger uses console.log)
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('0.0.0.0')
+      );
+    });
+
+    it('should not log security warning when auth token is provided', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.openSync).mockReturnValue(3);
+      vi.mocked(fs.writeSync).mockReturnValue(5);
+      vi.mocked(fs.closeSync).mockReturnValue(undefined);
+      vi.mocked(dotenv.config).mockReturnValue({
+        parsed: { CM_BIND: '0.0.0.0', CM_PORT: '3000', CM_AUTH_TOKEN: 'secret-token' },
+      });
+
+      const mockChild = {
+        pid: 12345,
+        unref: vi.fn(),
+        on: vi.fn(),
+      };
+      vi.mocked(childProcess.spawn).mockReturnValue(mockChild as unknown as childProcess.ChildProcess);
+
+      const warnSpy = vi.spyOn(console, 'log');
+
+      const pid = await daemonManager.start({});
+
+      expect(pid).toBe(12345);
+      // Should log about 0.0.0.0 but not the "No authentication token" warning
+      const warningCalls = warnSpy.mock.calls.filter(call =>
+        typeof call[0] === 'string' && call[0].includes('No authentication token')
+      );
+      expect(warningCalls).toHaveLength(0);
+    });
+
+    it('should not log warning when binding to localhost', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.openSync).mockReturnValue(3);
+      vi.mocked(fs.writeSync).mockReturnValue(5);
+      vi.mocked(fs.closeSync).mockReturnValue(undefined);
+      vi.mocked(dotenv.config).mockReturnValue({
+        parsed: { CM_BIND: '127.0.0.1', CM_PORT: '3000' },
+      });
+
+      const mockChild = {
+        pid: 12345,
+        unref: vi.fn(),
+        on: vi.fn(),
+      };
+      vi.mocked(childProcess.spawn).mockReturnValue(mockChild as unknown as childProcess.ChildProcess);
+
+      const warnSpy = vi.spyOn(console, 'log');
+
+      const pid = await daemonManager.start({});
+
+      expect(pid).toBe(12345);
+      // Should not log any external access warning
+      const externalAccessWarnings = warnSpy.mock.calls.filter(call =>
+        typeof call[0] === 'string' && call[0].includes('external networks')
+      );
+      expect(externalAccessWarnings).toHaveLength(0);
+    });
+  });
+
   describe('start with .env loading (Issue #125)', () => {
     it('should load .env file using dotenv', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(false);

@@ -6,7 +6,7 @@
  */
 
 import { config as dotenvConfig } from 'dotenv';
-import { ExitCode } from '../types';
+import { ExitCode, getErrorMessage } from '../types';
 import { CLILogger } from '../utils/logger';
 import { DaemonManager } from '../utils/daemon';
 import { getPidFilePath, getEnvPath } from '../utils/env-setup';
@@ -65,7 +65,7 @@ export async function statusCommand(): Promise<void> {
 
     process.exit(ExitCode.SUCCESS);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = getErrorMessage(error);
     logger.error(`Status check failed: ${message}`);
     process.exit(ExitCode.UNEXPECTED_ERROR);
   }

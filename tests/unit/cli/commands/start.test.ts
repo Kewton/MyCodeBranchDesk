@@ -192,4 +192,50 @@ describe('startCommand', () => {
       // Covered by integration tests
     });
   });
+
+  describe('error handling', () => {
+    it('should exit with UNEXPECTED_ERROR on unexpected exception', async () => {
+      vi.mocked(fs.existsSync).mockImplementation(() => {
+        throw new Error('Unexpected filesystem error');
+      });
+
+      await startCommand({});
+
+      expect(mockExit).toHaveBeenCalledWith(ExitCode.UNEXPECTED_ERROR);
+    });
+
+    it('should log error message on failure', async () => {
+      const consoleSpy = vi.spyOn(console, 'error');
+      vi.mocked(fs.existsSync).mockImplementation(() => {
+        throw new Error('Test error message');
+      });
+
+      await startCommand({});
+
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Test error message'));
+    });
+
+    it('should exit with START_FAILED when daemon start fails', async () => {
+      vi.mocked(fs.existsSync).mockImplementation((path) => {
+        if (typeof path === 'string' && path.endsWith('.env')) {
+          return true;
+        }
+        return false;
+      });
+      vi.mocked(fs.openSync).mockImplementation(() => {
+        throw new Error('Failed to write PID file');
+      });
+
+      const mockChild = {
+        pid: 12345,
+        unref: vi.fn(),
+        on: vi.fn(),
+      };
+      vi.mocked(childProcess.spawn).mockReturnValue(mockChild as unknown as childProcess.ChildProcess);
+
+      await startCommand({ daemon: true });
+
+      expect(mockExit).toHaveBeenCalledWith(ExitCode.START_FAILED);
+    });
+  });
 });

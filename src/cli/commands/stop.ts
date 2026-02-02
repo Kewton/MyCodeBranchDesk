@@ -5,7 +5,7 @@
  * Stop CommandMate server
  */
 
-import { StopOptions, ExitCode } from '../types';
+import { StopOptions, ExitCode, getErrorMessage } from '../types';
 import { CLILogger } from '../utils/logger';
 import { DaemonManager } from '../utils/daemon';
 import { logSecurityEvent } from '../utils/security-logger';
@@ -78,7 +78,7 @@ export async function stopCommand(options: StopOptions): Promise<void> {
       process.exit(ExitCode.STOP_FAILED);
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = getErrorMessage(error);
     logger.error(`Stop failed: ${message}`);
 
     logSecurityEvent({
