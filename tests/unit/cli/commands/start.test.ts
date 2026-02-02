@@ -1,6 +1,7 @@
 /**
  * Start Command Tests
  * Tests for commandmate start command
+ * Issue #125: Updated to test getEnvPath and getPidFilePath usage
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -10,10 +11,15 @@ import * as childProcess from 'child_process';
 vi.mock('fs');
 vi.mock('child_process');
 vi.mock('../../../../src/cli/utils/security-logger');
+vi.mock('../../../../src/cli/utils/env-setup', () => ({
+  getEnvPath: vi.fn(() => '/mock/home/.commandmate/.env'),
+  getPidFilePath: vi.fn(() => '/mock/home/.commandmate/.commandmate.pid'),
+}));
 
 // Import after mocking
 import { startCommand } from '../../../../src/cli/commands/start';
 import { ExitCode } from '../../../../src/cli/types';
+import { getEnvPath, getPidFilePath } from '../../../../src/cli/utils/env-setup';
 
 describe('startCommand', () => {
   let mockExit: ReturnType<typeof vi.fn>;
@@ -30,13 +36,44 @@ describe('startCommand', () => {
     vi.restoreAllMocks();
   });
 
-  describe('.env check', () => {
+  describe('.env check (Issue #125)', () => {
     it('should exit with CONFIG_ERROR when .env does not exist', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(false);
 
       await startCommand({});
 
       expect(mockExit).toHaveBeenCalledWith(ExitCode.CONFIG_ERROR);
+    });
+
+    it('should use getEnvPath for .env path resolution', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+
+      await startCommand({});
+
+      expect(getEnvPath).toHaveBeenCalled();
+    });
+
+    it('should use getPidFilePath for PID file path resolution', async () => {
+      vi.mocked(fs.existsSync).mockImplementation((path) => {
+        if (typeof path === 'string' && path.endsWith('.env')) {
+          return true;
+        }
+        return false;
+      });
+      vi.mocked(fs.openSync).mockReturnValue(3);
+      vi.mocked(fs.writeSync).mockReturnValue(5);
+      vi.mocked(fs.closeSync).mockReturnValue(undefined);
+
+      const mockChild = {
+        pid: 12345,
+        unref: vi.fn(),
+        on: vi.fn(),
+      };
+      vi.mocked(childProcess.spawn).mockReturnValue(mockChild as unknown as childProcess.ChildProcess);
+
+      await startCommand({ daemon: true });
+
+      expect(getPidFilePath).toHaveBeenCalled();
     });
   });
 
@@ -153,6 +190,52 @@ describe('startCommand', () => {
   describe.skip('foreground mode', () => {
     it('should start in foreground by default', () => {
       // Covered by integration tests
+    });
+  });
+
+  describe('error handling', () => {
+    it('should exit with UNEXPECTED_ERROR on unexpected exception', async () => {
+      vi.mocked(fs.existsSync).mockImplementation(() => {
+        throw new Error('Unexpected filesystem error');
+      });
+
+      await startCommand({});
+
+      expect(mockExit).toHaveBeenCalledWith(ExitCode.UNEXPECTED_ERROR);
+    });
+
+    it('should log error message on failure', async () => {
+      const consoleSpy = vi.spyOn(console, 'error');
+      vi.mocked(fs.existsSync).mockImplementation(() => {
+        throw new Error('Test error message');
+      });
+
+      await startCommand({});
+
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Test error message'));
+    });
+
+    it('should exit with START_FAILED when daemon start fails', async () => {
+      vi.mocked(fs.existsSync).mockImplementation((path) => {
+        if (typeof path === 'string' && path.endsWith('.env')) {
+          return true;
+        }
+        return false;
+      });
+      vi.mocked(fs.openSync).mockImplementation(() => {
+        throw new Error('Failed to write PID file');
+      });
+
+      const mockChild = {
+        pid: 12345,
+        unref: vi.fn(),
+        on: vi.fn(),
+      };
+      vi.mocked(childProcess.spawn).mockReturnValue(mockChild as unknown as childProcess.ChildProcess);
+
+      await startCommand({ daemon: true });
+
+      expect(mockExit).toHaveBeenCalledWith(ExitCode.START_FAILED);
     });
   });
 });

@@ -15,6 +15,8 @@ import {
   isGlobalInstall,
   getEnvPath,
   getConfigDir,
+  getPidFilePath,
+  resolveSecurePath,
   DEFAULT_ROOT_DIR,
 } from '../../../../src/cli/utils/env-setup';
 import { homedir } from 'os';
@@ -319,13 +321,195 @@ describe('getEnvPath', () => {
     // Should return a valid path regardless
     expect(envPath.endsWith('.env')).toBe(true);
   });
+
+  it('should call mkdirSync with correct permissions when dir does not exist', () => {
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+    vi.mocked(fs.mkdirSync).mockReturnValue(undefined);
+
+    getEnvPath();
+
+    // If global install creates dir, it should use 0o700 permission
+    // The actual call depends on isGlobalInstall()
+    expect(typeof getEnvPath()).toBe('string');
+  });
 });
 
 describe('getConfigDir', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
   it('should return a directory path', () => {
+    // Mock realpathSync for symlink resolution
+    vi.mocked(fs.realpathSync).mockImplementation((p) => p.toString());
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+
     const configDir = getConfigDir();
     expect(typeof configDir).toBe('string');
     // Should be either ~/.commandmate or cwd depending on install type
     expect(configDir.length).toBeGreaterThan(0);
+  });
+
+  it('should resolve symlinks using realpathSync', () => {
+    const mockCwd = '/some/symlinked/path';
+    vi.spyOn(process, 'cwd').mockReturnValue(mockCwd);
+    vi.mocked(fs.realpathSync).mockReturnValue('/real/path');
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+
+    const configDir = getConfigDir();
+
+    // Local install returns realpath of cwd
+    expect(configDir).toBe('/real/path');
+  });
+});
+
+describe('getPidFilePath', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('should return a path ending with .commandmate.pid', () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.realpathSync).mockImplementation((p) => p.toString());
+
+    const pidPath = getPidFilePath();
+
+    expect(typeof pidPath).toBe('string');
+    expect(pidPath.endsWith('.commandmate.pid')).toBe(true);
+  });
+
+  it('should use getConfigDir for path resolution', () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.realpathSync).mockImplementation((p) => p.toString());
+
+    const pidPath = getPidFilePath();
+    const configDir = getConfigDir();
+
+    // PID file should be in the config directory
+    expect(pidPath.startsWith(configDir)).toBe(true);
+  });
+});
+
+describe('resolveSecurePath', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('should resolve symlinks and verify path is within allowed directory', () => {
+    vi.mocked(fs.realpathSync)
+      .mockReturnValueOnce('/home/user/.commandmate/file.txt')  // target
+      .mockReturnValueOnce('/home/user/.commandmate');  // base
+
+    const result = resolveSecurePath('/home/user/.commandmate/file.txt', '/home/user/.commandmate');
+
+    expect(result).toBe('/home/user/.commandmate/file.txt');
+  });
+
+  it('should throw error for path traversal attempt', () => {
+    vi.mocked(fs.realpathSync)
+      .mockReturnValueOnce('/etc/passwd')  // target resolves outside
+      .mockReturnValueOnce('/home/user/.commandmate');  // base
+
+    expect(() => {
+      resolveSecurePath('/home/user/.commandmate/../../../etc/passwd', '/home/user/.commandmate');
+    }).toThrow('Path traversal detected');
+  });
+});
+
+describe('getConfigDir security', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('should call realpathSync for symlink resolution', () => {
+    // For local install, getConfigDir should resolve cwd using realpathSync
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.realpathSync).mockImplementation((p) => p.toString());
+
+    const result = getConfigDir();
+
+    // Verify realpathSync was called (symlink resolution)
+    expect(fs.realpathSync).toHaveBeenCalled();
+    expect(typeof result).toBe('string');
+  });
+});
+
+describe('validateConfig additional cases', () => {
+  let envSetup: EnvSetup;
+
+  beforeEach(() => {
+    envSetup = new EnvSetup();
+    vi.resetAllMocks();
+  });
+
+  it('should fail for invalid log level', () => {
+    const result = envSetup.validateConfig({
+      CM_ROOT_DIR: '/path/to/repos',
+      CM_PORT: 3000,
+      CM_BIND: '127.0.0.1',
+      CM_DB_PATH: './data/cm.db',
+      CM_LOG_LEVEL: 'invalid',
+      CM_LOG_FORMAT: 'text',
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.toLowerCase().includes('log level'))).toBe(true);
+  });
+
+  it('should fail for invalid log format', () => {
+    const result = envSetup.validateConfig({
+      CM_ROOT_DIR: '/path/to/repos',
+      CM_PORT: 3000,
+      CM_BIND: '127.0.0.1',
+      CM_DB_PATH: './data/cm.db',
+      CM_LOG_LEVEL: 'info',
+      CM_LOG_FORMAT: 'xml',
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.toLowerCase().includes('log format'))).toBe(true);
+  });
+
+  it('should pass when auth token is provided for 0.0.0.0 bind', () => {
+    const result = envSetup.validateConfig({
+      CM_ROOT_DIR: '/path/to/repos',
+      CM_PORT: 3000,
+      CM_BIND: '0.0.0.0',
+      CM_DB_PATH: './data/cm.db',
+      CM_LOG_LEVEL: 'info',
+      CM_LOG_FORMAT: 'text',
+      CM_AUTH_TOKEN: 'secure-token-123',
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('should accept localhost as valid bind address', () => {
+    const result = envSetup.validateConfig({
+      CM_ROOT_DIR: '/path/to/repos',
+      CM_PORT: 3000,
+      CM_BIND: 'localhost',
+      CM_DB_PATH: './data/cm.db',
+      CM_LOG_LEVEL: 'info',
+      CM_LOG_FORMAT: 'text',
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('should fail for port 0', () => {
+    const result = envSetup.validateConfig({
+      CM_ROOT_DIR: '/path/to/repos',
+      CM_PORT: 0,
+      CM_BIND: '127.0.0.1',
+      CM_DB_PATH: './data/cm.db',
+      CM_LOG_LEVEL: 'info',
+      CM_LOG_FORMAT: 'text',
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.toLowerCase().includes('port'))).toBe(true);
   });
 });

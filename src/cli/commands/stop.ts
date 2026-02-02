@@ -1,24 +1,27 @@
 /**
  * Stop Command
  * Issue #96: npm install CLI support
+ * Issue #125: Use getPidFilePath for correct path resolution
  * Stop CommandMate server
  */
 
-import { join } from 'path';
-import { StopOptions, ExitCode } from '../types';
+import { StopOptions, ExitCode, getErrorMessage } from '../types';
 import { CLILogger } from '../utils/logger';
 import { DaemonManager } from '../utils/daemon';
 import { logSecurityEvent } from '../utils/security-logger';
+import { getPidFilePath } from '../utils/env-setup';
 
 const logger = new CLILogger();
-const PID_FILE = join(process.cwd(), '.commandmate.pid');
 
 /**
  * Execute stop command
+ * Issue #125: Use getPidFilePath for correct path resolution
  */
 export async function stopCommand(options: StopOptions): Promise<void> {
   try {
-    const daemonManager = new DaemonManager(PID_FILE);
+    // Issue #125: Get PID file path from correct location
+    const pidFilePath = getPidFilePath();
+    const daemonManager = new DaemonManager(pidFilePath);
 
     // Check if running
     if (!(await daemonManager.isRunning())) {
@@ -75,7 +78,7 @@ export async function stopCommand(options: StopOptions): Promise<void> {
       process.exit(ExitCode.STOP_FAILED);
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = getErrorMessage(error);
     logger.error(`Stop failed: ${message}`);
 
     logSecurityEvent({

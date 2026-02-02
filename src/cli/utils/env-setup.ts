@@ -10,6 +10,7 @@ import {
   chmodSync,
   copyFileSync,
   mkdirSync,
+  realpathSync,
 } from 'fs';
 import { join, normalize, dirname } from 'path';
 import { randomBytes } from 'crypto';
@@ -80,16 +81,63 @@ export function getEnvPath(): string {
 }
 
 /**
+ * Resolve path securely by resolving symlinks and verifying within allowed directory
+ * Issue #125: Path traversal protection (OWASP A01:2021 - Broken Access Control)
+ *
+ * @param targetPath - The path to resolve and verify
+ * @param allowedBaseDir - The base directory that targetPath must be within
+ * @returns The resolved real path
+ * @throws Error if path resolves outside allowed directory
+ */
+export function resolveSecurePath(targetPath: string, allowedBaseDir: string): string {
+  const realPath = realpathSync(targetPath);
+  const realBaseDir = realpathSync(allowedBaseDir);
+
+  if (!realPath.startsWith(realBaseDir)) {
+    throw new Error(`Path traversal detected: ${targetPath} resolves outside of ${allowedBaseDir}`);
+  }
+
+  return realPath;
+}
+
+/**
  * Get the config directory path
  * Issue #119: Returns ~/.commandmate for global, cwd for local
+ * Issue #125: Added symlink resolution for security (path traversal protection)
  *
- * @returns Path to config directory
+ * @returns Path to config directory (absolute, with symlinks resolved)
  */
 export function getConfigDir(): string {
   if (isGlobalInstall()) {
-    return join(homedir(), '.commandmate');
+    const configDir = join(homedir(), '.commandmate');
+
+    // Verify config directory is within home directory (security check)
+    // Only validate if the directory exists (it may not exist yet during init)
+    if (existsSync(configDir)) {
+      const realPath = realpathSync(configDir);
+      const realHome = realpathSync(homedir());
+      if (!realPath.startsWith(realHome)) {
+        throw new Error(`Security error: Config directory ${configDir} is outside home directory`);
+      }
+      return realPath;
+    }
+
+    return configDir;
   }
-  return process.cwd();
+
+  // Local install - resolve symlinks in cwd
+  const cwd = process.cwd();
+  return realpathSync(cwd);
+}
+
+/**
+ * Get the PID file path based on install type
+ * Issue #125: DRY principle - centralized PID file path resolution
+ *
+ * @returns Path to PID file (uses getConfigDir for consistency)
+ */
+export function getPidFilePath(): string {
+  return join(getConfigDir(), '.commandmate.pid');
 }
 
 /**
