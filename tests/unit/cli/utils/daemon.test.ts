@@ -1,15 +1,21 @@
 /**
  * Daemon Manager Tests
  * Tests for daemon process management (start/stop)
+ * Issue #125: Add .env loading and security warning tests
  * Note: Testing DaemonManager methods via integration with PidManager
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as childProcess from 'child_process';
 import * as fs from 'fs';
+import * as dotenv from 'dotenv';
 
 vi.mock('child_process');
 vi.mock('fs');
+vi.mock('dotenv');
+vi.mock('../../../../src/cli/utils/env-setup', () => ({
+  getEnvPath: vi.fn(() => '/mock/.commandmate/.env'),
+}));
 
 // Import after mocking
 import { DaemonManager } from '../../../../src/cli/utils/daemon';
@@ -20,6 +26,8 @@ describe('DaemonManager', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default mock for dotenv.config - used by start()
+    vi.mocked(dotenv.config).mockReturnValue({ parsed: {} });
     daemonManager = new DaemonManager(testPidPath);
   });
 
@@ -206,6 +214,114 @@ describe('DaemonManager', () => {
       vi.mocked(fs.existsSync).mockReturnValue(false);
 
       expect(await daemonManager.isRunning()).toBe(false);
+    });
+  });
+
+  describe('start with .env loading (Issue #125)', () => {
+    it('should load .env file using dotenv', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.openSync).mockReturnValue(3);
+      vi.mocked(fs.writeSync).mockReturnValue(5);
+      vi.mocked(fs.closeSync).mockReturnValue(undefined);
+      vi.mocked(dotenv.config).mockReturnValue({
+        parsed: { CM_PORT: '3000', CM_ROOT_DIR: '/repos' },
+      });
+
+      const mockChild = {
+        pid: 12345,
+        unref: vi.fn(),
+        on: vi.fn(),
+      };
+      vi.mocked(childProcess.spawn).mockReturnValue(mockChild as unknown as childProcess.ChildProcess);
+
+      const pid = await daemonManager.start({});
+
+      expect(pid).toBe(12345);
+      expect(dotenv.config).toHaveBeenCalledWith({ path: '/mock/.commandmate/.env' });
+    });
+
+    it('should pass .env variables to child process', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.openSync).mockReturnValue(3);
+      vi.mocked(fs.writeSync).mockReturnValue(5);
+      vi.mocked(fs.closeSync).mockReturnValue(undefined);
+      vi.mocked(dotenv.config).mockReturnValue({
+        parsed: { CM_PORT: '4000', CM_ROOT_DIR: '/custom/repos' },
+      });
+
+      const mockChild = {
+        pid: 12345,
+        unref: vi.fn(),
+        on: vi.fn(),
+      };
+      vi.mocked(childProcess.spawn).mockReturnValue(mockChild as unknown as childProcess.ChildProcess);
+
+      await daemonManager.start({});
+
+      expect(childProcess.spawn).toHaveBeenCalledWith(
+        'npm',
+        expect.any(Array),
+        expect.objectContaining({
+          env: expect.objectContaining({
+            CM_PORT: '4000',
+            CM_ROOT_DIR: '/custom/repos',
+          }),
+        })
+      );
+    });
+
+    it('should fallback when .env loading fails', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.openSync).mockReturnValue(3);
+      vi.mocked(fs.writeSync).mockReturnValue(5);
+      vi.mocked(fs.closeSync).mockReturnValue(undefined);
+      // Mock error response - use type casting to handle DotenvError type
+      const mockError = new Error('File not found') as Error & { code: string };
+      mockError.code = 'NOT_FOUND_DOTENV_ENVIRONMENT';
+      vi.mocked(dotenv.config).mockReturnValue({
+        error: mockError as dotenv.DotenvConfigOutput['error'],
+      });
+
+      const mockChild = {
+        pid: 12345,
+        unref: vi.fn(),
+        on: vi.fn(),
+      };
+      vi.mocked(childProcess.spawn).mockReturnValue(mockChild as unknown as childProcess.ChildProcess);
+
+      // Should not throw, should fallback to process.env
+      const pid = await daemonManager.start({});
+
+      expect(pid).toBe(12345);
+    });
+
+    it('should allow command line port to override .env port', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.openSync).mockReturnValue(3);
+      vi.mocked(fs.writeSync).mockReturnValue(5);
+      vi.mocked(fs.closeSync).mockReturnValue(undefined);
+      vi.mocked(dotenv.config).mockReturnValue({
+        parsed: { CM_PORT: '3000' },
+      });
+
+      const mockChild = {
+        pid: 12345,
+        unref: vi.fn(),
+        on: vi.fn(),
+      };
+      vi.mocked(childProcess.spawn).mockReturnValue(mockChild as unknown as childProcess.ChildProcess);
+
+      await daemonManager.start({ port: 5000 });
+
+      expect(childProcess.spawn).toHaveBeenCalledWith(
+        'npm',
+        expect.any(Array),
+        expect.objectContaining({
+          env: expect.objectContaining({
+            CM_PORT: '5000',
+          }),
+        })
+      );
     });
   });
 });

@@ -1,6 +1,7 @@
 /**
  * Stop Command Tests
  * Tests for commandmate stop command
+ * Issue #125: Updated to test getPidFilePath usage
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -8,10 +9,14 @@ import * as fs from 'fs';
 
 vi.mock('fs');
 vi.mock('../../../../src/cli/utils/security-logger');
+vi.mock('../../../../src/cli/utils/env-setup', () => ({
+  getPidFilePath: vi.fn(() => '/mock/home/.commandmate/.commandmate.pid'),
+}));
 
 // Import after mocking
 import { stopCommand } from '../../../../src/cli/commands/stop';
 import { ExitCode } from '../../../../src/cli/types';
+import { getPidFilePath } from '../../../../src/cli/utils/env-setup';
 
 describe('stopCommand', () => {
   let mockExit: ReturnType<typeof vi.fn>;
@@ -26,6 +31,16 @@ describe('stopCommand', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  describe('PID file path resolution (Issue #125)', () => {
+    it('should use getPidFilePath for PID file path resolution', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+
+      await stopCommand({});
+
+      expect(getPidFilePath).toHaveBeenCalled();
+    });
   });
 
   describe('when not running', () => {

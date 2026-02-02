@@ -15,6 +15,8 @@ import {
   isGlobalInstall,
   getEnvPath,
   getConfigDir,
+  getPidFilePath,
+  resolveSecurePath,
   DEFAULT_ROOT_DIR,
 } from '../../../../src/cli/utils/env-setup';
 import { homedir } from 'os';
@@ -322,10 +324,101 @@ describe('getEnvPath', () => {
 });
 
 describe('getConfigDir', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
   it('should return a directory path', () => {
+    // Mock realpathSync for symlink resolution
+    vi.mocked(fs.realpathSync).mockImplementation((p) => p.toString());
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+
     const configDir = getConfigDir();
     expect(typeof configDir).toBe('string');
     // Should be either ~/.commandmate or cwd depending on install type
     expect(configDir.length).toBeGreaterThan(0);
+  });
+
+  it('should resolve symlinks using realpathSync', () => {
+    const mockCwd = '/some/symlinked/path';
+    vi.spyOn(process, 'cwd').mockReturnValue(mockCwd);
+    vi.mocked(fs.realpathSync).mockReturnValue('/real/path');
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+
+    const configDir = getConfigDir();
+
+    // Local install returns realpath of cwd
+    expect(configDir).toBe('/real/path');
+  });
+});
+
+describe('getPidFilePath', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('should return a path ending with .commandmate.pid', () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.realpathSync).mockImplementation((p) => p.toString());
+
+    const pidPath = getPidFilePath();
+
+    expect(typeof pidPath).toBe('string');
+    expect(pidPath.endsWith('.commandmate.pid')).toBe(true);
+  });
+
+  it('should use getConfigDir for path resolution', () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.realpathSync).mockImplementation((p) => p.toString());
+
+    const pidPath = getPidFilePath();
+    const configDir = getConfigDir();
+
+    // PID file should be in the config directory
+    expect(pidPath.startsWith(configDir)).toBe(true);
+  });
+});
+
+describe('resolveSecurePath', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('should resolve symlinks and verify path is within allowed directory', () => {
+    vi.mocked(fs.realpathSync)
+      .mockReturnValueOnce('/home/user/.commandmate/file.txt')  // target
+      .mockReturnValueOnce('/home/user/.commandmate');  // base
+
+    const result = resolveSecurePath('/home/user/.commandmate/file.txt', '/home/user/.commandmate');
+
+    expect(result).toBe('/home/user/.commandmate/file.txt');
+  });
+
+  it('should throw error for path traversal attempt', () => {
+    vi.mocked(fs.realpathSync)
+      .mockReturnValueOnce('/etc/passwd')  // target resolves outside
+      .mockReturnValueOnce('/home/user/.commandmate');  // base
+
+    expect(() => {
+      resolveSecurePath('/home/user/.commandmate/../../../etc/passwd', '/home/user/.commandmate');
+    }).toThrow('Path traversal detected');
+  });
+});
+
+describe('getConfigDir security', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('should call realpathSync for symlink resolution', () => {
+    // For local install, getConfigDir should resolve cwd using realpathSync
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.realpathSync).mockImplementation((p) => p.toString());
+
+    const result = getConfigDir();
+
+    // Verify realpathSync was called (symlink resolution)
+    expect(fs.realpathSync).toHaveBeenCalled();
+    expect(typeof result).toBe('string');
   });
 });

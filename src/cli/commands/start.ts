@@ -1,36 +1,39 @@
 /**
  * Start Command
  * Issue #96: npm install CLI support
+ * Issue #125: Use getEnvPath and getPidFilePath for correct path resolution
  * Start CommandMate server
  */
 
 import { existsSync } from 'fs';
 import { spawn } from 'child_process';
-import { join } from 'path';
 import { StartOptions, ExitCode } from '../types';
 import { CLILogger } from '../utils/logger';
 import { DaemonManager } from '../utils/daemon';
 import { logSecurityEvent } from '../utils/security-logger';
 import { getPackageRoot } from '../utils/paths';
+import { getEnvPath, getPidFilePath } from '../utils/env-setup';
 
 const logger = new CLILogger();
-const PID_FILE = join(process.cwd(), '.commandmate.pid');
 
 /**
  * Execute start command
+ * Issue #125: Use getEnvPath and getPidFilePath for correct path resolution
  */
 export async function startCommand(options: StartOptions): Promise<void> {
   try {
-    // Check for .env file
-    const envPath = join(process.cwd(), '.env');
+    // Issue #125: Check for .env file at correct location
+    const envPath = getEnvPath();
+    const pidFilePath = getPidFilePath();
+
     if (!existsSync(envPath)) {
-      logger.error('.env file not found');
+      logger.error(`.env file not found at ${envPath}`);
       logger.info('Run "commandmate init" to create a configuration file');
       process.exit(ExitCode.CONFIG_ERROR);
       return;
     }
 
-    const daemonManager = new DaemonManager(PID_FILE);
+    const daemonManager = new DaemonManager(pidFilePath);
 
     // Daemon mode
     if (options.daemon) {

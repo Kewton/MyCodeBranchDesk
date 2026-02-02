@@ -1,23 +1,32 @@
 /**
  * Status Command
  * Issue #96: npm install CLI support
+ * Issue #125: Use getPidFilePath and load .env for correct settings display
  * Display CommandMate server status
  */
 
-import { join } from 'path';
+import { config as dotenvConfig } from 'dotenv';
 import { ExitCode } from '../types';
 import { CLILogger } from '../utils/logger';
 import { DaemonManager } from '../utils/daemon';
+import { getPidFilePath, getEnvPath } from '../utils/env-setup';
 
 const logger = new CLILogger();
-const PID_FILE = join(process.cwd(), '.commandmate.pid');
 
 /**
  * Execute status command
+ * Issue #125: Use getPidFilePath and load .env for correct settings display
  */
 export async function statusCommand(): Promise<void> {
   try {
-    const daemonManager = new DaemonManager(PID_FILE);
+    // Issue #125: Get PID file path and load .env for correct settings
+    const pidFilePath = getPidFilePath();
+    const envPath = getEnvPath();
+
+    // Load .env so getStatus() can access correct CM_PORT and CM_BIND values
+    dotenvConfig({ path: envPath });
+
+    const daemonManager = new DaemonManager(pidFilePath);
     const status = await daemonManager.getStatus();
 
     console.log('');
