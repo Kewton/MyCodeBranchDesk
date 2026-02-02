@@ -11,21 +11,7 @@
 import fs from 'fs';
 import path from 'path';
 import { homedir } from 'os';
-
-/**
- * System directories that are not allowed for DB storage
- * SEC-001, SEC-002, SEC-005: Protection against writing to critical system paths
- */
-const SYSTEM_DIRECTORIES = [
-  '/etc',
-  '/usr',
-  '/bin',
-  '/sbin',
-  '/var',
-  '/dev',
-  '/sys',
-  '/proc',
-];
+import { isSystemDirectory } from '../config/system-directories';
 
 /**
  * Migration result interface
@@ -64,7 +50,7 @@ export function resolveAndValidatePath(
     const resolvedPath = fs.realpathSync(filePath);
 
     // Check if path is in a system directory
-    if (SYSTEM_DIRECTORIES.some((dir) => resolvedPath.startsWith(dir))) {
+    if (isSystemDirectory(resolvedPath)) {
       console.warn(
         `[Security] ${description} points to system directory, skipping: ${resolvedPath}`
       );
@@ -101,7 +87,7 @@ export function getLegacyDbPaths(): string[] {
   if (envDbPath) {
     try {
       const resolvedPath = path.resolve(envDbPath);
-      if (!SYSTEM_DIRECTORIES.some((dir) => resolvedPath.startsWith(dir))) {
+      if (!isSystemDirectory(resolvedPath)) {
         paths.push(envDbPath);
       } else {
         console.warn(
@@ -138,7 +124,7 @@ export function getLegacyDbPaths(): string[] {
 export function migrateDbIfNeeded(targetPath: string): MigrationResult {
   // Validate target path - reject system directories
   const resolvedTargetPath = path.resolve(targetPath);
-  if (SYSTEM_DIRECTORIES.some((dir) => resolvedTargetPath.startsWith(dir))) {
+  if (isSystemDirectory(resolvedTargetPath)) {
     throw new Error(
       `Security error: Target path cannot be in system directory: ${resolvedTargetPath}`
     );

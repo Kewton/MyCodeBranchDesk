@@ -11,22 +11,7 @@
 import path from 'path';
 import { homedir } from 'os';
 import { isGlobalInstall } from '../cli/utils/env-setup';
-
-/**
- * System directories that are not allowed for DB storage (SEC-001)
- * This protects against writing to critical system paths
- */
-const SYSTEM_DIRECTORIES = [
-  '/etc',
-  '/usr',
-  '/bin',
-  '/sbin',
-  '/var',
-  '/tmp',
-  '/dev',
-  '/sys',
-  '/proc',
-];
+import { isSystemDirectory } from '../config/system-directories';
 
 /**
  * Get the default database path based on install type
@@ -85,7 +70,7 @@ export function validateDbPath(dbPath: string): string {
     }
   } else {
     // Local install: DB path must not be in system directories (SEC-001)
-    if (SYSTEM_DIRECTORIES.some((dir) => resolvedPath.startsWith(dir))) {
+    if (isSystemDirectory(resolvedPath)) {
       throw new Error(
         `Security error: DB path cannot be in system directory: ${resolvedPath}`
       );

@@ -124,7 +124,11 @@ src/
 
 | モジュール | 説明 |
 |-----------|------|
-| `src/lib/env.ts` | 環境変数取得・フォールバック処理 |
+| `src/lib/env.ts` | 環境変数取得・フォールバック処理、getDatabasePathWithDeprecationWarning() |
+| `src/lib/db-path-resolver.ts` | DBパス解決（getDefaultDbPath()、validateDbPath()） |
+| `src/lib/db-migration-path.ts` | DBマイグレーション（migrateDbIfNeeded()、getLegacyDbPaths()） |
+| `src/lib/db-instance.ts` | DBインスタンス管理（getEnv().CM_DB_PATH使用） |
+| `src/config/system-directories.ts` | システムディレクトリ定数（SYSTEM_DIRECTORIES、isSystemDirectory()） |
 | `src/config/status-colors.ts` | ステータス色の一元管理 |
 | `src/lib/cli-patterns.ts` | CLIツール別パターン定義 |
 | `src/lib/prompt-detector.ts` | プロンプト検出ロジック |
@@ -348,6 +352,29 @@ commandmate status
 ---
 
 ## 最近の実装機能
+
+### Issue #135: DBパス解決ロジック修正
+- **バグ修正**: グローバルインストール時のバージョンアップでDBが消失する問題を修正
+- **根本原因**: `process.cwd()`依存のDBパス解決がグローバルインストールで予測不能な動作
+- **修正内容**:
+  - `getEnv().CM_DB_PATH`経由でDBパスを取得するよう統一
+  - グローバルインストール: `~/.commandmate/data/cm.db`（絶対パス）
+  - ローカルインストール: `<cwd>/data/cm.db`（絶対パスに解決）
+- **マイグレーション機能**: 旧DB（`db.sqlite`）を自動検出し、新パスにマイグレーション
+- **セキュリティ対策**:
+  - SEC-001: システムディレクトリ保護（`/etc`, `/usr`等への書き込み禁止）
+  - SEC-002: シンボリックリンク解決（TOCTOU攻撃防止）
+  - SEC-003: ディレクトリ作成時に`mode: 0o700`
+  - SEC-004: `DATABASE_PATH`使用時にdeprecation警告
+  - SEC-005: `DATABASE_PATH`検証後にマイグレーション対象追加
+  - SEC-006: バックアップファイルのパーミッション`0o600`
+- **主要コンポーネント**:
+  - `src/lib/db-path-resolver.ts` - DBパス解決（getDefaultDbPath(), validateDbPath()）
+  - `src/lib/db-migration-path.ts` - マイグレーション（migrateDbIfNeeded()）
+  - `src/lib/env.ts` - getDatabasePathWithDeprecationWarning()追加
+  - `src/lib/db-instance.ts` - getEnv().CM_DB_PATH使用に変更
+  - `src/config/system-directories.ts` - システムディレクトリ定数（DRY対応）
+- 詳細: [設計書](./dev-reports/design/issue-135-db-path-resolution-design-policy.md)
 
 ### Issue #111: Gitブランチ可視化機能
 - **ブランチ表示**: ワークツリー詳細画面のヘッダーに現在のgitブランチ名を表示
