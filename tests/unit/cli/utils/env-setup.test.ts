@@ -17,6 +17,7 @@ import {
   getConfigDir,
   getPidFilePath,
   resolveSecurePath,
+  getDefaultDbPath,
   DEFAULT_ROOT_DIR,
 } from '../../../../src/cli/utils/env-setup';
 import { homedir } from 'os';
@@ -511,5 +512,29 @@ describe('validateConfig additional cases', () => {
 
     expect(result.valid).toBe(false);
     expect(result.errors.some(e => e.toLowerCase().includes('port'))).toBe(true);
+  });
+});
+
+// Issue #135: Tests for getDefaultDbPath
+describe('getDefaultDbPath (Issue #135)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('should return a string path', () => {
+    const dbPath = getDefaultDbPath();
+    expect(typeof dbPath).toBe('string');
+    expect(dbPath.endsWith('cm.db')).toBe(true);
+  });
+
+  it('should return an absolute path', () => {
+    const dbPath = getDefaultDbPath();
+    // Absolute paths start with /
+    expect(dbPath.startsWith('/')).toBe(true);
+  });
+
+  it('should include data directory', () => {
+    const dbPath = getDefaultDbPath();
+    expect(dbPath).toContain('/data/');
   });
 });

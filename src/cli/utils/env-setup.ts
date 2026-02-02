@@ -24,11 +24,14 @@ import {
 /**
  * Default environment configuration values
  * SF-4: DRY - Centralized defaults
+ *
+ * Issue #135: CM_DB_PATH removed - use getDefaultDbPath() instead
+ * for dynamic path resolution based on install type
  */
 export const ENV_DEFAULTS = {
   CM_PORT: 3000,
   CM_BIND: '127.0.0.1',
-  CM_DB_PATH: './data/cm.db',
+  // CM_DB_PATH removed - Issue #135: use getDefaultDbPath() instead
   CM_LOG_LEVEL: 'info',
   CM_LOG_FORMAT: 'text',
 } as const;
@@ -37,6 +40,32 @@ export const ENV_DEFAULTS = {
  * Default root directory for worktrees
  */
 export const DEFAULT_ROOT_DIR = join(homedir(), 'repos');
+
+/**
+ * Get the default database path based on install type
+ * Issue #135: Dynamic DB path resolution
+ *
+ * Note: This is a local implementation to avoid circular imports.
+ * The canonical implementation is in src/lib/db-path-resolver.ts.
+ * Both implementations must remain in sync.
+ *
+ * For global installs: ~/.commandmate/data/cm.db
+ * For local installs: <cwd>/data/cm.db (as absolute path)
+ *
+ * @returns Absolute path to the default database file
+ */
+export function getDefaultDbPath(): string {
+  if (isGlobalInstall()) {
+    return join(homedir(), '.commandmate', 'data', 'cm.db');
+  }
+  // Use path module for absolute path resolution
+  // Note: join is imported from path at the top, but resolve is needed here
+  // We use join with cwd() to get absolute path since join with absolute first segment
+  // returns an absolute path
+  const cwd = process.cwd();
+  // If cwd is absolute (starts with /), join will return absolute path
+  return join(cwd, 'data', 'cm.db');
+}
 
 /**
  * Check if running as global npm package
