@@ -14,7 +14,7 @@ import { CLILogger } from '../utils/logger';
 import { DaemonManager } from '../utils/daemon';
 import { logSecurityEvent } from '../utils/security-logger';
 import { getPackageRoot } from '../utils/paths';
-import { getEnvPath, getPidFilePath, getDefaultDbPath } from '../utils/env-setup';
+import { getEnvPath, getPidFilePath } from '../utils/env-setup';
 import { validateIssueNoResult } from '../utils/input-validators';
 import { PortAllocator } from '../utils/port-allocator';
 import { DbPathResolver } from '../utils/resource-resolvers';
