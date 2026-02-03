@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-02-04
+
+### Added
+- Server-side Auto-Yes polling feature (Issue #138)
+  - `src/lib/auto-yes-manager.ts` for centralized polling management
+  - Background polling when browser tab is inactive
+  - Exponential backoff after 5 consecutive errors (max 60s)
+  - Duplicate response prevention with `lastServerResponseTimestamp`
+  - MAX_CONCURRENT_POLLERS=50 limit for DoS prevention
+- Git Worktree parallel development environment (Issue #136)
+  - `commandmate start --issue {issueNo} [--auto-port]` for issue-specific servers
+  - `commandmate stop/status --issue {issueNo}` for worktree management
+  - Port range 3001-3100 (main server uses 3000)
+  - Issue-specific DB: `~/.commandmate/data/cm-{issueNo}.db`
+  - `/worktree-setup` and `/worktree-cleanup` skills
+- DB path resolution fix for global installs (Issue #135)
+  - Consistent DB path via `getEnv().CM_DB_PATH`
+  - Auto-migration from legacy DB paths
+  - System directory protection
+
+### Fixed
+- Terminal scroll behavior on worktree switch (Issue #131)
+  - Uses instant scroll for worktree changes
+  - Smooth scroll only for new messages in same worktree
+- Empty state now shows New File/New Directory buttons (Issue #139)
+- Ready status detection for prompts with recommended commands (Issue #141)
+- Worktree sync now removes deleted worktrees from DB
+
+### Security
+- worktreeID format validation (command injection prevention)
+- Issue number validation (1-999999 range)
+- Branch name whitelist validation (`[a-zA-Z0-9_/-]`)
+- Graceful shutdown stops all auto-yes pollers
+
 ## [0.1.10] - 2026-02-02
 
 ### Added
