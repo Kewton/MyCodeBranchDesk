@@ -126,6 +126,20 @@ if [ -f "$LOG_FILE" ]; then
 fi
 ```
 
+### Phase 6: Worktree同期
+
+削除したWorktreeをCommandMateから除外するため、同期APIを呼び出します。
+
+```bash
+# CommandMateサーバーが起動している場合
+curl -s -X POST http://localhost:${CM_PORT:-3000}/api/repositories/sync
+
+# または、メインリポジトリに戻ってサーバーを再起動
+# cd /path/to/main/repo && npm run dev
+```
+
+**重要**: この同期処理により、削除したWorktreeがCommandMateのトップ画面から除外されます。
+
 ---
 
 ## 出力例

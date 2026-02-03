@@ -106,6 +106,20 @@ PORT=$((3000 + ISSUE_NO % 100 + 1))
 CM_PORT=$PORT CM_DB_PATH=~/.commandmate/data/cm-${ISSUE_NO}.db npm run dev
 ```
 
+### Phase 6: Worktree同期
+
+新しいWorktreeをCommandMateに認識させるため、同期APIを呼び出します。
+
+```bash
+# CommandMateサーバーが起動している場合
+curl -s -X POST http://localhost:${CM_PORT:-3000}/api/repositories/sync
+
+# または、メインリポジトリに戻ってサーバーを再起動
+# cd /path/to/main/repo && npm run dev
+```
+
+**重要**: この同期処理により、新しいWorktreeがCommandMateのトップ画面に表示されるようになります。
+
 ---
 
 ## 出力例
