@@ -13,6 +13,7 @@ import {
 import {
   CLAUDE_PROMPT_PATTERN,
   CLAUDE_SEPARATOR_PATTERN,
+  stripAnsi,
 } from './cli-patterns';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -243,9 +244,11 @@ export async function waitForPrompt(
   const pollInterval = CLAUDE_PROMPT_POLL_INTERVAL;
 
   while (Date.now() - startTime < timeout) {
-    const output = await capturePane(sessionName, { startLine: -10 });
+    // Use -50 lines to capture more context including status bars
+    const output = await capturePane(sessionName, { startLine: -50 });
     // DRY-001: Use CLAUDE_PROMPT_PATTERN from cli-patterns.ts
-    if (CLAUDE_PROMPT_PATTERN.test(output)) {
+    // Strip ANSI escape sequences before pattern matching (Issue #152)
+    if (CLAUDE_PROMPT_PATTERN.test(stripAnsi(output))) {
       return; // Prompt detected
     }
     await new Promise((resolve) => setTimeout(resolve, pollInterval));
@@ -317,7 +320,9 @@ export async function startClaudeSession(
         const output = await capturePane(sessionName, { startLine: -50 });
         // Claude is ready when we see the prompt or separator line (DRY-001, DRY-002)
         // Use patterns from cli-patterns.ts for consistency
-        if (CLAUDE_PROMPT_PATTERN.test(output) || CLAUDE_SEPARATOR_PATTERN.test(output)) {
+        // Strip ANSI escape sequences before pattern matching (Issue #152)
+        const cleanOutput = stripAnsi(output);
+        if (CLAUDE_PROMPT_PATTERN.test(cleanOutput) || CLAUDE_SEPARATOR_PATTERN.test(cleanOutput)) {
           // Wait for stability after prompt detection (CONS-007, DOC-001)
           await new Promise((resolve) => setTimeout(resolve, CLAUDE_POST_PROMPT_DELAY));
           console.log(`Claude initialized in ${Date.now() - startTime}ms`);
@@ -367,10 +372,18 @@ export async function sendMessageToClaude(
   }
 
   // Verify prompt state before sending (CONS-006, DRY-001)
-  const output = await capturePane(sessionName, { startLine: -10 });
-  if (!CLAUDE_PROMPT_PATTERN.test(output)) {
+  // Use -50 lines to ensure we capture the prompt even with status bars
+  const output = await capturePane(sessionName, { startLine: -50 });
+  // Strip ANSI escape sequences before pattern matching (Issue #152)
+  if (!CLAUDE_PROMPT_PATTERN.test(stripAnsi(output))) {
     // Wait for prompt if not at prompt state
-    await waitForPrompt(sessionName, CLAUDE_PROMPT_WAIT_TIMEOUT);
+    // Use longer timeout (10s) to handle slow responses
+    try {
+      await waitForPrompt(sessionName, 10000);
+    } catch {
+      // Log warning but don't block - Claude might be in a special state
+      console.warn(`[sendMessageToClaude] Prompt not detected, sending anyway`);
+    }
   }
 
   // Send message using sendKeys consistently (CONS-001)
