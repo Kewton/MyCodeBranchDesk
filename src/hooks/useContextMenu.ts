@@ -31,12 +31,15 @@ const INITIAL_STATE: ContextMenuState = {
 
 /**
  * Return type for useContextMenu hook
+ *
+ * [Issue #123] openMenu now accepts both MouseEvent and TouchEvent
+ * to support iPad/iPhone long press context menus.
  */
 export interface UseContextMenuReturn {
   /** Current menu state */
   menuState: ContextMenuState;
-  /** Open menu at specified position for target */
-  openMenu: (e: React.MouseEvent, path: string, type: 'file' | 'directory') => void;
+  /** Open menu at specified position for target (supports mouse and touch events) */
+  openMenu: (e: React.MouseEvent | React.TouchEvent, path: string, type: 'file' | 'directory') => void;
   /** Close menu (preserves target info) */
   closeMenu: () => void;
   /** Reset menu to initial state */
@@ -81,13 +84,36 @@ export function useContextMenu(): UseContextMenuReturn {
 
   /**
    * Open context menu at event position
+   *
+   * [Issue #123] Supports both MouseEvent and TouchEvent.
+   * Touch coordinates are extracted from touches[0].clientX/clientY.
+   * These are safe numeric values provided by the browser Touch API.
+   * [SEC-CONSIDER-001] Touch coordinates are read-only numeric primitives
+   * from the browser, not user-controlled strings.
    */
   const openMenu = useCallback(
-    (e: React.MouseEvent, path: string, type: 'file' | 'directory') => {
+    (e: React.MouseEvent | React.TouchEvent, path: string, type: 'file' | 'directory') => {
       e.preventDefault();
+
+      // Extract coordinates from mouse or touch event
+      // Touch coordinates are safe numeric values from browser Touch API
+      let x: number, y: number;
+      if ('touches' in e && e.touches.length > 0) {
+        // TouchEvent - extract from first touch point
+        x = e.touches[0].clientX;
+        y = e.touches[0].clientY;
+      } else if ('clientX' in e) {
+        // MouseEvent - use clientX/clientY directly
+        x = e.clientX;
+        y = e.clientY;
+      } else {
+        // Cannot determine position, do not open menu
+        return;
+      }
+
       setMenuState({
         isOpen: true,
-        position: { x: e.clientX, y: e.clientY },
+        position: { x, y },
         targetPath: path,
         targetType: type,
       });
