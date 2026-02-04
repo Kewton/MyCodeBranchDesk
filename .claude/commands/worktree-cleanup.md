@@ -31,11 +31,15 @@
 ### Phase 1: 入力検証
 
 1. Issue番号が正の整数であることを確認
-2. Issue番号が1〜999999の範囲内であることを確認
+2. Issue番号が1〜2147483647の範囲内であることを確認
 
 ```bash
+# 共通バリデーション関数を読み込み
+# Synced with: src/cli/utils/input-validators.ts MAX_ISSUE_NO
+source "$(dirname "$0")/../lib/validators.sh"
+
 # Issue番号の検証
-if ! [[ "$ISSUE_NO" =~ ^[0-9]+$ ]] || [ "$ISSUE_NO" -lt 1 ] || [ "$ISSUE_NO" -gt 999999 ]; then
+if ! validate_issue_no "$ISSUE_NO"; then
   echo "Error: Invalid issue number"
   exit 1
 fi
@@ -43,10 +47,19 @@ fi
 
 ### Phase 2: サーバー停止
 
-1. Issue専用サーバーが起動中か確認
-2. 起動中の場合は停止
+1. Issue専用サーバーが起動中か確認（PIDファイルベース）
+2. ポートベースでサーバーを検出（フォールバック）
+3. 起動中の場合は停止
 
 ```bash
+# プロセス管理ユーティリティを読み込み
+source "$(dirname "$0")/../lib/process-utils.sh"
+
+# Worktreeの絶対パスを取得
+WORKTREE_DIR="../commandmate-issue-${ISSUE_NO}"
+WORKTREE_ABS=$(cd "$WORKTREE_DIR" 2>/dev/null && pwd)
+
+# Step 1: PIDファイルベースの検出（既存ロジック）
 PID_FILE=~/.commandmate/pids/${ISSUE_NO}.pid
 
 if [ -f "$PID_FILE" ]; then
@@ -54,11 +67,29 @@ if [ -f "$PID_FILE" ]; then
   if kill -0 "$PID" 2>/dev/null; then
     echo "Stopping server for Issue #${ISSUE_NO} (PID: $PID)..."
     kill "$PID"
-    sleep 2
+    sleep 3
     # 強制終了（必要な場合）
     kill -0 "$PID" 2>/dev/null && kill -9 "$PID"
   fi
   rm -f "$PID_FILE"
+fi
+
+# Step 2: ポートベースの検出（フォールバック）
+# npm run devで直接起動したサーバーはPIDファイルがないため、ポートで検出
+if check_lsof_available && [ -n "$WORKTREE_ABS" ]; then
+  # 検出対象ポートの配列を構築
+  PORTS_TO_CHECK=(3000)  # デフォルトポート
+
+  # Issue専用ポート（4桁以下のIssue番号のみ）
+  # ポート番号上限65535のため、3{issueNo}形式は1-9999まで
+  if [ "$ISSUE_NO" -le 9999 ]; then
+    PORTS_TO_CHECK+=("3${ISSUE_NO}")
+  fi
+
+  # 各ポートをチェック
+  for PORT in "${PORTS_TO_CHECK[@]}"; do
+    stop_server_by_port "$PORT" "$WORKTREE_ABS" "$ISSUE_NO"
+  done
 fi
 ```
 
@@ -94,7 +125,7 @@ if git show-ref --verify --quiet "refs/heads/$BRANCH_NAME"; then
     echo "Deleting merged branch: $BRANCH_NAME"
     git branch -d "$BRANCH_NAME"
   else
-    echo "⚠️  Branch not merged: $BRANCH_NAME"
+    echo "WARNING: Branch not merged: $BRANCH_NAME"
     echo "   Run 'git branch -D $BRANCH_NAME' to force delete"
   fi
 fi
@@ -164,7 +195,7 @@ curl -s -X POST http://localhost:${CM_PORT:-3000}/api/repositories/sync
 
 | エラー | 対応 |
 |--------|------|
-| Invalid issue number | 正の整数（1-999999）を指定してください |
+| Invalid issue number | 正の整数（1-2147483647）を指定してください |
 | Worktree not found | 既に削除済みか、存在しません |
 | Branch not merged | PRをマージするか、`git branch -D`で強制削除 |
 | Server stop failed | `kill -9`で強制終了、またはPIDファイルを手動削除 |
