@@ -31,11 +31,15 @@
 ### Phase 1: 入力検証
 
 1. Issue番号が正の整数であることを確認
-2. Issue番号が1〜999999の範囲内であることを確認
+2. Issue番号が1〜2147483647の範囲内であることを確認
 
 ```bash
+# 共通バリデーション関数を読み込み
+# Synced with: src/cli/utils/input-validators.ts MAX_ISSUE_NO
+source "$(dirname "$0")/../lib/validators.sh"
+
 # Issue番号の検証
-if ! [[ "$ISSUE_NO" =~ ^[0-9]+$ ]] || [ "$ISSUE_NO" -lt 1 ] || [ "$ISSUE_NO" -gt 999999 ]; then
+if ! validate_issue_no "$ISSUE_NO"; then
   echo "Error: Invalid issue number"
   exit 1
 fi
@@ -147,7 +151,7 @@ curl -s -X POST http://localhost:${CM_PORT:-3000}/api/repositories/sync
 
 | エラー | 対応 |
 |--------|------|
-| Invalid issue number | 正の整数（1-999999）を指定してください |
+| Invalid issue number | 正の整数（1-2147483647）を指定してください |
 | Not a git repository | Gitリポジトリ内で実行してください |
 | main branch not found | mainブランチを作成してください |
 | Worktree already exists | 既存のWorktreeを使用するか、cleanupしてください |
