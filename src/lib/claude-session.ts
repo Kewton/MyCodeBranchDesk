@@ -19,31 +19,73 @@ import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
+// ----- Helper Functions -----
+
+/**
+ * Extract error message from unknown error type
+ * Provides consistent error message extraction across the module (DRY)
+ *
+ * @param error - Unknown error object
+ * @returns Error message string
+ */
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 // ----- Timeout and Polling Constants (OCP-001) -----
+// These constants are exported to allow configuration and testing.
+// Changing these values affects Claude CLI session startup behavior.
 
 /**
  * Claude CLI initialization max wait time (milliseconds)
+ *
+ * This timeout allows sufficient time for Claude CLI to:
+ * - Load and initialize its internal state
+ * - Authenticate with Anthropic servers (if needed)
+ * - Display the interactive prompt
+ *
+ * 15 seconds provides headroom for slower networks or cold starts.
  */
 export const CLAUDE_INIT_TIMEOUT = 15000;
 
 /**
  * Initialization polling interval (milliseconds)
+ *
+ * How frequently we check if Claude CLI has finished initializing.
+ * 300ms balances responsiveness with avoiding excessive polling overhead.
  */
 export const CLAUDE_INIT_POLL_INTERVAL = 300;
 
 /**
  * Stability delay after prompt detection (milliseconds)
- * Buffer to ensure Claude CLI has finished rendering (DOC-001)
+ *
+ * This delay is necessary because Claude CLI renders its UI progressively:
+ * 1. The prompt character (> or U+276F) appears first
+ * 2. Additional UI elements (tips, suggestions) may render afterward
+ * 3. Sending input too quickly can interrupt this rendering process
+ *
+ * The 500ms value was empirically determined to provide sufficient buffer
+ * for Claude CLI to complete its initialization rendering while maintaining
+ * responsive user experience. (DOC-001)
+ *
+ * @see Issue #152 - First message not being sent after session start
  */
 export const CLAUDE_POST_PROMPT_DELAY = 500;
 
 /**
  * Prompt wait timeout before message send (milliseconds)
+ *
+ * When sending a message, we first verify Claude is at a prompt state.
+ * This timeout limits how long we wait for Claude to return to prompt
+ * if it's still processing a previous request.
  */
 export const CLAUDE_PROMPT_WAIT_TIMEOUT = 5000;
 
 /**
  * Prompt wait polling interval (milliseconds)
+ *
+ * How frequently we check for prompt state before sending messages.
+ * 200ms provides quick response while minimizing CPU usage.
  */
 export const CLAUDE_PROMPT_POLL_INTERVAL = 200;
 
@@ -294,8 +336,7 @@ export async function startClaudeSession(
 
     console.log(`Started Claude session: ${sessionName}`);
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to start Claude session: ${errorMessage}`);
+    throw new Error(`Failed to start Claude session: ${getErrorMessage(error)}`);
   }
 }
 
@@ -367,8 +408,7 @@ export async function captureClaudeOutput(
   try {
     return await capturePane(sessionName, { startLine: -lines });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to capture Claude output: ${errorMessage}`);
+    throw new Error(`Failed to capture Claude output: ${getErrorMessage(error)}`);
   }
 }
 
@@ -407,8 +447,7 @@ export async function stopClaudeSession(worktreeId: string): Promise<boolean> {
 
     return killed;
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`Error stopping Claude session: ${errorMessage}`);
+    console.error(`Error stopping Claude session: ${getErrorMessage(error)}`);
     return false;
   }
 }
