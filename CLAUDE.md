@@ -131,6 +131,7 @@ src/
 | `src/config/system-directories.ts` | システムディレクトリ定数（SYSTEM_DIRECTORIES、isSystemDirectory()） |
 | `src/config/status-colors.ts` | ステータス色の一元管理 |
 | `src/lib/cli-patterns.ts` | CLIツール別パターン定義 |
+| `src/lib/claude-session.ts` | Claude CLI tmuxセッション管理（Issue #152で改善: プロンプト検出強化、タイムアウトエラー、waitForPrompt()） |
 | `src/lib/prompt-detector.ts` | プロンプト検出ロジック |
 | `src/lib/auto-yes-manager.ts` | Auto-Yes状態管理とサーバー側ポーリング（Issue #138） |
 | `src/lib/auto-yes-resolver.ts` | Auto-Yes自動応答判定ロジック |
@@ -370,6 +371,24 @@ commandmate status --all                   # 全サーバー状態確認
 ---
 
 ## 最近の実装機能
+
+### Issue #152: セッション初回メッセージ送信の信頼性向上
+- **問題解決**: 新規Worktree選択時に初回メッセージがClaude CLIに送信されない問題を解決
+- **根本原因**: `startClaudeSession()`がタイムアウト超過でもエラーなく続行し、Claude CLI初期化前にメッセージ送信されていた
+- **プロンプト検出強化**:
+  - `CLAUDE_PROMPT_PATTERN`/`CLAUDE_SEPARATOR_PATTERN`をcli-patterns.tsから使用（DRY原則）
+  - レガシー`>`と新形式`❯`(U+276F)の両方のプロンプト文字をサポート
+- **タイムアウト処理改善**:
+  - タイムアウト時に`Error('Claude initialization timeout (15000ms)')`をスロー
+  - タイムアウト値を名前付き定数として抽出（OCP原則）
+- **新規関数`waitForPrompt()`**:
+  - メッセージ送信前にプロンプト状態を検証
+  - タイムアウト時にエラースロー
+- **安定待機追加**: プロンプト検出後に500ms待機（Claude CLI描画完了バッファ）
+- **主要コンポーネント**:
+  - `src/lib/claude-session.ts` - コア実装（startClaudeSession, waitForPrompt, sendMessageToClaude改善）
+  - `src/lib/cli-patterns.ts` - CLAUDE_PROMPT_PATTERN, CLAUDE_SEPARATOR_PATTERN
+- 詳細: [設計書](./dev-reports/design/issue-152-first-message-not-sent-design-policy.md)
 
 ### Issue #138: サーバー側Auto-Yesポーリング
 - **問題解決**: ブラウザのバックグラウンドタブで`setInterval`が抑制され、auto-yesが動作しない問題を解決
