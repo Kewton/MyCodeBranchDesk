@@ -373,6 +373,28 @@ commandmate status --all                   # 全サーバー状態確認
 
 ## 最近の実装機能
 
+### Issue #151: worktree-cleanup サーバー検出機能改善
+- **問題解決**: `/worktree-cleanup` スキル実行時、`npm run dev` で直接起動したサーバーを検出・停止できない問題を修正
+- **ポートベース検出**: PIDファイル検出に加え、ポートベース検出をフォールバックとして追加
+- **共通ライブラリ導入**:
+  - `.claude/lib/validators.sh` - Issue番号検証関数（MAX_ISSUE_NO=2147483647）
+  - `.claude/lib/process-utils.sh` - プロセス検出・停止関数群
+- **検出対象ポート**:
+  - デフォルトポート 3000
+  - Issue専用ポート 3{issueNo}（4桁以下のIssue番号のみ）
+- **OS互換性**: macOS（lsof -F n形式）とLinux（/proc/$PID/cwd）の両対応
+- **セキュリティ対策**:
+  - SEC-001: Issue番号検証（1-2147483647）
+  - SEC-003: cwd検証による誤停止防止
+  - SEC-006: プロセス終了の監査ログ（~/.commandmate/logs/security.log）
+  - SEC-007: プロセスコマンド検証（node/npm）
+- **主要コンポーネント**:
+  - `.claude/lib/validators.sh` - Issue番号検証（validate_issue_no()）
+  - `.claude/lib/process-utils.sh` - サーバー検出・停止（8関数）
+  - `.claude/commands/worktree-cleanup.md` - Phase 1修正、Phase 2拡張
+  - `.claude/commands/worktree-setup.md` - Phase 1検証範囲修正
+- 詳細: [設計書](./dev-reports/design/issue-151-worktree-cleanup-server-detection-design-policy.md)
+
 ### Issue #152: セッション初回メッセージ送信の信頼性向上
 - **問題解決**: 新規Worktree選択時に初回メッセージがClaude CLIに送信されない問題を解決
 - **根本原因**: `startClaudeSession()`がタイムアウト超過でもエラーなく続行し、Claude CLI初期化前にメッセージ送信されていた
