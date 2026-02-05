@@ -809,9 +809,20 @@ commandmate status --all                   # 全サーバー状態確認
 - **ブランチ一覧**: リアルタイムステータス付き
 - **ソート機能**: 更新日時、リポジトリ名、ブランチ名、ステータス
 
-### Issue #4: CLIツールサポート
-- **対応ツール**: Claude Code
-- **Strategy パターン**: 拡張可能な設計
+### Issue #4: CLIツールサポート（Codex CLI追加）
+- **対応ツール**: Claude Code, Codex CLI
+- **Strategy パターン**: 拡張可能な設計（BaseCLITool抽象クラス）
+- **Codexタブ有効化**: WorktreeDetailにCodexタブを追加
+- **個別セッション終了**: Claude/Codex/Geminiを個別に終了可能
+- **セキュリティ対策**: sessionName検証によるコマンドインジェクション防止
+- **パターン拡張**: CODEX_THINKING_PATTERNにRan, Deciding追加
+- **主要コンポーネント**:
+  - `src/lib/cli-tools/validation.ts` - sessionName検証（SESSION_NAME_PATTERN）
+  - `src/lib/cli-tools/types.ts` - CLI_TOOL_IDS定数、CLIToolType派生
+  - `src/lib/cli-tools/manager.ts` - stopPollers()メソッド追加
+  - `src/lib/cli-patterns.ts` - Codexパターン拡張
+  - `src/app/api/worktrees/[id]/kill-session/route.ts` - cliToolパラメータ対応
+- 詳細: [設計書](./dev-reports/design/issue-4-codex-cli-support-design-policy.md)
 
 ---
 
