@@ -821,9 +821,8 @@ commandmate status --all                   # 全サーバー状態確認
 - **セキュリティ対策**: sessionName検証によるコマンドインジェクション防止
 - **パターン拡張**: CODEX_THINKING_PATTERNにRan, Deciding追加
 - **スラッシュコマンドフィルタリング**: CLIツール別にスラッシュコマンドをフィルタリング
-  - Claude専用（12）: `/clear`, `/resume`, `/rewind`, `/config`, `/permissions`, `/context`, `/cost`, `/pr-comments`, `/help`, `/doctor`, `/export`, `/todos`
-  - Codex専用（10）: `/approvals`, `/diff`, `/mention`, `/mcp`, `/init`, `/feedback`, `/new`, `/undo`, `/logout`, `/quit`
-  - 共通（4）: `/compact`, `/model`, `/status`, `/review`
+  - Claude標準（16）: 既存コマンドを維持（`/clear`, `/compact`, `/resume`, `/rewind`, `/config`, `/model`, `/permissions`, `/status`, `/context`, `/cost`, `/review`, `/pr-comments`, `/help`, `/doctor`, `/export`, `/todos`）
+  - Codex専用（10）: `/new`, `/undo`, `/logout`, `/quit`, `/approvals`, `/diff`, `/mention`, `/mcp`, `/init`, `/feedback`
 - **主要コンポーネント**:
   - `src/lib/cli-tools/validation.ts` - sessionName検証（SESSION_NAME_PATTERN）
   - `src/lib/cli-tools/types.ts` - CLI_TOOL_IDS定数、CLIToolType派生
