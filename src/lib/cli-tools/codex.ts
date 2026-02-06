@@ -118,14 +118,8 @@ export class CodexTool extends BaseCLITool {
     }
 
     try {
-      // Issue #163: Route by content type
-      // - Single-line: use sendKeys (keystroke-by-keystroke, reliable)
-      // - Multiline: use sendTextViaBuffer with bracketed paste
-      if (message.includes('\n')) {
-        await sendTextViaBuffer(sessionName, message, true);
-      } else {
-        await sendKeys(sessionName, message, true);
-      }
+      // Send message via buffer to avoid paste detection (Issue #163)
+      await sendTextViaBuffer(sessionName, message, true);
 
       console.log(`✓ Sent message to Codex session: ${sessionName}`);
     } catch (error: unknown) {
