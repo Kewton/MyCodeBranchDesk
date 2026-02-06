@@ -809,9 +809,34 @@ commandmate status --all                   # 全サーバー状態確認
 - **ブランチ一覧**: リアルタイムステータス付き
 - **ソート機能**: 更新日時、リポジトリ名、ブランチ名、ステータス
 
-### Issue #4: CLIツールサポート
-- **対応ツール**: Claude Code
-- **Strategy パターン**: 拡張可能な設計
+### Issue #4: CLIツールサポート（Codex CLI追加）
+- **対応ツール**: Claude Code, Codex CLI
+- **Strategy パターン**: 拡張可能な設計（BaseCLITool抽象クラス）
+- **Codexタブ有効化**: WorktreeDetailにCodexタブを追加
+- **個別セッション終了**: Claude/Codex/Geminiを個別に終了可能（確認ダイアログ付き）
+- **セッション終了確認ダイアログ**: ENDボタン押下時にModal確認ダイアログを表示（誤操作防止）
+- **CLI別ステータスドット**: サイドバーとCLIタブにClaude/Codex個別のステータスインジケータを表示
+- **モバイルCLIタブ切替**: モバイル表示でAuto Yesトグルとインラインで配置
+- **レスポンス保存バグ修正**: tmuxバッファの空行パディングによる行数不整合を修正（assistant-response-saver.ts）
+- **セキュリティ対策**: sessionName検証によるコマンドインジェクション防止
+- **パターン拡張**: CODEX_THINKING_PATTERNにRan, Deciding追加
+- **スラッシュコマンドフィルタリング**: CLIツール別にスラッシュコマンドをフィルタリング
+  - Claude標準（16）: 既存コマンドを維持（`/clear`, `/compact`, `/resume`, `/rewind`, `/config`, `/model`, `/permissions`, `/status`, `/context`, `/cost`, `/review`, `/pr-comments`, `/help`, `/doctor`, `/export`, `/todos`）
+  - Codex専用（10）: `/new`, `/undo`, `/logout`, `/quit`, `/approvals`, `/diff`, `/mention`, `/mcp`, `/init`, `/feedback`
+- **主要コンポーネント**:
+  - `src/lib/cli-tools/validation.ts` - sessionName検証（SESSION_NAME_PATTERN）
+  - `src/lib/cli-tools/types.ts` - CLI_TOOL_IDS定数、CLIToolType派生
+  - `src/lib/cli-tools/manager.ts` - stopPollers()メソッド追加
+  - `src/lib/cli-patterns.ts` - Codexパターン拡張
+  - `src/lib/standard-commands.ts` - CLIツール別コマンド定義
+  - `src/lib/command-merger.ts` - filterCommandsByCliTool()関数
+  - `src/app/api/worktrees/[id]/kill-session/route.ts` - cliToolパラメータ対応
+  - `src/app/api/worktrees/[id]/slash-commands/route.ts` - cliToolクエリパラメータ対応
+  - `src/components/worktree/WorktreeDetailRefactored.tsx` - 確認ダイアログ、CLI別ステータスドット
+  - `src/components/sidebar/BranchListItem.tsx` - サイドバーCLI別ステータスドット
+  - `src/types/sidebar.ts` - deriveCliStatus()、SidebarBranchItem.cliStatus拡張
+  - `src/lib/assistant-response-saver.ts` - tmuxバッファ行数トリミング修正
+- 詳細: [設計書](./dev-reports/design/issue-4-codex-cli-support-design-policy.md)
 
 ---
 
