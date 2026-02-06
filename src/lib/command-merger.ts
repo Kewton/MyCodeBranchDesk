@@ -173,7 +173,8 @@ export function filterCommandGroups(
  * Filter command groups by CLI tool (Issue #4)
  *
  * Filters commands to only show those available for the specified CLI tool.
- * Commands with undefined cliTools are available for ALL tools (backward compatible).
+ * - Commands with undefined cliTools: Claude only (backward compatible with existing commands)
+ * - Commands with cliTools array: shown only for specified tools
  *
  * @param groups - Array of SlashCommandGroup objects
  * @param cliToolId - CLI tool ID to filter by ('claude', 'codex', 'gemini')
@@ -187,9 +188,9 @@ export function filterCommandsByCliTool(
     .map((group) => ({
       ...group,
       commands: group.commands.filter((cmd) => {
-        // If cliTools is undefined, command is available for ALL tools
+        // If cliTools is undefined, command is Claude-only (backward compatible)
         if (!cmd.cliTools) {
-          return true;
+          return cliToolId === 'claude';
         }
         // Otherwise, check if the tool is in the allowed list
         return cmd.cliTools.includes(cliToolId);

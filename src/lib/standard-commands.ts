@@ -2,9 +2,8 @@
  * Standard CLI Tool Commands (Issue #56, Issue #4)
  *
  * Static definitions for built-in slash commands of supported CLI tools.
- * - Claude Code commands
- * - Codex CLI commands
- * - Shared commands (available in both)
+ * - Claude Code commands (existing, no cliTools field for backward compatibility)
+ * - Codex CLI commands (new, with cliTools: ['codex'])
  *
  * References:
  * - Claude Code: https://www.gradually.ai/en/claude-code-commands/
@@ -17,66 +16,15 @@ import { groupByCategory } from '@/lib/command-merger';
 /**
  * Standard CLI tool commands
  *
- * Issue #4: Each command specifies which CLI tools it's available for via `cliTools` field.
- * - undefined or omitted: available for ALL tools (backward compatible)
- * - ['claude']: Claude Code only
- * - ['codex']: Codex CLI only
- * - ['claude', 'codex']: available for both tools
+ * Issue #4: Codex-specific commands use `cliTools: ['codex']`.
+ * Existing Claude commands have no cliTools field (backward compatible, Claude-only).
  */
 export const STANDARD_COMMANDS: SlashCommand[] = [
   // ============================================================================
-  // SHARED COMMANDS (Claude Code + Codex CLI)
+  // CLAUDE CODE COMMANDS (existing, no cliTools for backward compatibility)
   // ============================================================================
 
-  // Session Management - Shared
-  {
-    name: 'compact',
-    description: 'Compact context to reduce token usage',
-    category: 'standard-session',
-    isStandard: true,
-    source: 'standard',
-    filePath: '',
-    cliTools: ['claude', 'codex'],
-  },
-
-  // Configuration - Shared
-  {
-    name: 'model',
-    description: 'Switch AI model',
-    category: 'standard-config',
-    isStandard: true,
-    source: 'standard',
-    filePath: '',
-    cliTools: ['claude', 'codex'],
-  },
-
-  // Monitoring - Shared
-  {
-    name: 'status',
-    description: 'Check session status',
-    category: 'standard-monitor',
-    isStandard: true,
-    source: 'standard',
-    filePath: '',
-    cliTools: ['claude', 'codex'],
-  },
-
-  // Git/Review - Shared
-  {
-    name: 'review',
-    description: 'Review code changes',
-    category: 'standard-git',
-    isStandard: true,
-    source: 'standard',
-    filePath: '',
-    cliTools: ['claude', 'codex'],
-  },
-
-  // ============================================================================
-  // CLAUDE CODE ONLY COMMANDS
-  // ============================================================================
-
-  // Session Management - Claude only
+  // Session Management
   {
     name: 'clear',
     description: 'Clear conversation history',
@@ -84,7 +32,14 @@ export const STANDARD_COMMANDS: SlashCommand[] = [
     isStandard: true,
     source: 'standard',
     filePath: '',
-    cliTools: ['claude'],
+  },
+  {
+    name: 'compact',
+    description: 'Compact context to reduce token usage',
+    category: 'standard-session',
+    isStandard: true,
+    source: 'standard',
+    filePath: '',
   },
   {
     name: 'resume',
@@ -93,7 +48,6 @@ export const STANDARD_COMMANDS: SlashCommand[] = [
     isStandard: true,
     source: 'standard',
     filePath: '',
-    cliTools: ['claude'],
   },
   {
     name: 'rewind',
@@ -102,10 +56,9 @@ export const STANDARD_COMMANDS: SlashCommand[] = [
     isStandard: true,
     source: 'standard',
     filePath: '',
-    cliTools: ['claude'],
   },
 
-  // Configuration - Claude only
+  // Configuration
   {
     name: 'config',
     description: 'Open configuration settings',
@@ -113,7 +66,14 @@ export const STANDARD_COMMANDS: SlashCommand[] = [
     isStandard: true,
     source: 'standard',
     filePath: '',
-    cliTools: ['claude'],
+  },
+  {
+    name: 'model',
+    description: 'Switch AI model',
+    category: 'standard-config',
+    isStandard: true,
+    source: 'standard',
+    filePath: '',
   },
   {
     name: 'permissions',
@@ -122,10 +82,17 @@ export const STANDARD_COMMANDS: SlashCommand[] = [
     isStandard: true,
     source: 'standard',
     filePath: '',
-    cliTools: ['claude'],
   },
 
-  // Monitoring - Claude only
+  // Monitoring
+  {
+    name: 'status',
+    description: 'Check session status',
+    category: 'standard-monitor',
+    isStandard: true,
+    source: 'standard',
+    filePath: '',
+  },
   {
     name: 'context',
     description: 'Show context window usage',
@@ -133,7 +100,6 @@ export const STANDARD_COMMANDS: SlashCommand[] = [
     isStandard: true,
     source: 'standard',
     filePath: '',
-    cliTools: ['claude'],
   },
   {
     name: 'cost',
@@ -142,10 +108,17 @@ export const STANDARD_COMMANDS: SlashCommand[] = [
     isStandard: true,
     source: 'standard',
     filePath: '',
-    cliTools: ['claude'],
   },
 
-  // Git/Review - Claude only
+  // Git/Review
+  {
+    name: 'review',
+    description: 'Review code changes',
+    category: 'standard-git',
+    isStandard: true,
+    source: 'standard',
+    filePath: '',
+  },
   {
     name: 'pr-comments',
     description: 'Show PR comments',
@@ -153,10 +126,9 @@ export const STANDARD_COMMANDS: SlashCommand[] = [
     isStandard: true,
     source: 'standard',
     filePath: '',
-    cliTools: ['claude'],
   },
 
-  // Utility - Claude only
+  // Utility
   {
     name: 'help',
     description: 'Show all available commands',
@@ -164,7 +136,6 @@ export const STANDARD_COMMANDS: SlashCommand[] = [
     isStandard: true,
     source: 'standard',
     filePath: '',
-    cliTools: ['claude'],
   },
   {
     name: 'doctor',
@@ -173,7 +144,6 @@ export const STANDARD_COMMANDS: SlashCommand[] = [
     isStandard: true,
     source: 'standard',
     filePath: '',
-    cliTools: ['claude'],
   },
   {
     name: 'export',
@@ -182,7 +152,6 @@ export const STANDARD_COMMANDS: SlashCommand[] = [
     isStandard: true,
     source: 'standard',
     filePath: '',
-    cliTools: ['claude'],
   },
   {
     name: 'todos',
@@ -191,12 +160,49 @@ export const STANDARD_COMMANDS: SlashCommand[] = [
     isStandard: true,
     source: 'standard',
     filePath: '',
-    cliTools: ['claude'],
   },
 
   // ============================================================================
-  // CODEX CLI ONLY COMMANDS
+  // CODEX CLI ONLY COMMANDS (Issue #4)
   // ============================================================================
+
+  // Session Management - Codex only
+  {
+    name: 'new',
+    description: 'Start a new conversation in same session',
+    category: 'standard-session',
+    isStandard: true,
+    source: 'standard',
+    filePath: '',
+    cliTools: ['codex'],
+  },
+  {
+    name: 'undo',
+    description: 'Undo the last Codex action',
+    category: 'standard-session',
+    isStandard: true,
+    source: 'standard',
+    filePath: '',
+    cliTools: ['codex'],
+  },
+  {
+    name: 'logout',
+    description: 'Sign out from Codex',
+    category: 'standard-session',
+    isStandard: true,
+    source: 'standard',
+    filePath: '',
+    cliTools: ['codex'],
+  },
+  {
+    name: 'quit',
+    description: 'Exit Codex CLI',
+    category: 'standard-session',
+    isStandard: true,
+    source: 'standard',
+    filePath: '',
+    cliTools: ['codex'],
+  },
 
   // Configuration - Codex only
   {
@@ -257,44 +263,6 @@ export const STANDARD_COMMANDS: SlashCommand[] = [
     filePath: '',
     cliTools: ['codex'],
   },
-
-  // Session Management - Codex only
-  {
-    name: 'new',
-    description: 'Start a new conversation in same session',
-    category: 'standard-session',
-    isStandard: true,
-    source: 'standard',
-    filePath: '',
-    cliTools: ['codex'],
-  },
-  {
-    name: 'undo',
-    description: 'Undo the last Codex action',
-    category: 'standard-session',
-    isStandard: true,
-    source: 'standard',
-    filePath: '',
-    cliTools: ['codex'],
-  },
-  {
-    name: 'logout',
-    description: 'Sign out from Codex',
-    category: 'standard-session',
-    isStandard: true,
-    source: 'standard',
-    filePath: '',
-    cliTools: ['codex'],
-  },
-  {
-    name: 'quit',
-    description: 'Exit Codex CLI',
-    category: 'standard-session',
-    isStandard: true,
-    source: 'standard',
-    filePath: '',
-    cliTools: ['codex'],
-  },
 ];
 
 /**
@@ -302,7 +270,7 @@ export const STANDARD_COMMANDS: SlashCommand[] = [
  */
 export const FREQUENTLY_USED: Record<string, string[]> = {
   claude: ['clear', 'compact', 'status', 'help', 'review'],
-  codex: ['compact', 'status', 'review', 'diff', 'undo'],
+  codex: ['new', 'undo', 'diff', 'approvals', 'mcp'],
 };
 
 /**
@@ -329,6 +297,10 @@ export function getFrequentlyUsedCommands(cliToolId?: string): SlashCommand[] {
   return STANDARD_COMMANDS.filter(
     (cmd) =>
       frequentNames.includes(cmd.name) &&
-      (!cmd.cliTools || cmd.cliTools.includes(toolId as 'claude' | 'codex' | 'gemini'))
+      // For Claude: include commands without cliTools or with 'claude' in cliTools
+      // For Codex: include only commands with 'codex' in cliTools
+      (toolId === 'claude'
+        ? !cmd.cliTools || cmd.cliTools.includes('claude')
+        : cmd.cliTools?.includes(toolId as 'claude' | 'codex' | 'gemini'))
   );
 }
