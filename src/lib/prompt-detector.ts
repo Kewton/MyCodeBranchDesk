@@ -175,13 +175,39 @@ const TEXT_INPUT_PATTERNS: RegExp[] = [
 ];
 
 /**
+ * Defensive check: protection against future unknown false positive patterns.
+ * Note: The actual false positive pattern in Issue #161 ("1. Create file\n2. Run tests")
+ * IS consecutive from 1, so this validation alone does not prevent it.
+ * The primary defense layers are: Layer 1 (thinking check in caller) + Layer 2 (2-pass
+ * cursor detection). This function provides Layer 3 defense against future unknown
+ * patterns with scattered/non-consecutive numbering.
+ *
+ * [S3-010] This validation assumes Claude CLI always uses consecutive numbering
+ * starting from 1. If in the future Claude CLI is observed to filter choices and
+ * output non-consecutive numbers (e.g., 1, 2, 4), consider relaxing this validation
+ * (e.g., only check starts-from-1, remove consecutive requirement).
+ */
+function isConsecutiveFromOne(numbers: number[]): boolean {
+  if (numbers.length === 0) return false;
+  if (numbers[0] !== 1) return false;
+  for (let i = 1; i < numbers.length; i++) {
+    if (numbers[i] !== numbers[i - 1] + 1) return false;
+  }
+  return true;
+}
+
+/**
  * Detect multiple choice prompts (numbered list with ❯ indicator)
  *
- * This function scans the output from bottom to top looking for numbered options
- * with a selection indicator (❯). It requires at least 2 options and a default
- * indicator to be considered a valid prompt.
+ * Uses a 2-pass detection approach (Issue #161):
+ * - Pass 1: Scan 50-line window for ❯ indicator lines (defaultOptionPattern).
+ *   If no ❯ lines found, immediately return isPrompt: false.
+ * - Pass 2: Only if ❯ was found, re-scan collecting options using both
+ *   defaultOptionPattern (isDefault=true) and normalOptionPattern (isDefault=false).
  *
- * Example:
+ * This prevents normal numbered lists from being accumulated in the options array.
+ *
+ * Example of valid prompt:
  * Do you want to proceed?
  * ❯ 1. Yes
  *   2. No
@@ -193,33 +219,65 @@ const TEXT_INPUT_PATTERNS: RegExp[] = [
 function detectMultipleChoicePrompt(output: string): PromptDetectionResult {
   const lines = output.split('\n');
 
-  // Look for lines that match the pattern: [optional leading spaces] [❯ or spaces] [number]. [text]
-  // Note: ANSI codes sometimes cause spaces to be lost after stripping, so we use \s* instead of \s+
-  const optionPattern = /^\s*([❯ ]\s*)?(\d+)\.\s*(.+)$/;
+  // ❯ (U+276F) indicator pattern for default selection
+  const defaultOptionPattern = /^\s*\u276F\s*(\d+)\.\s*(.+)$/;
+  // Normal option pattern (no ❯ indicator, just leading whitespace + number)
+  const normalOptionPattern = /^\s*(\d+)\.\s*(.+)$/;
+
+  // Calculate scan window: last 50 lines
+  const scanStart = Math.max(0, lines.length - 50);
+
+  // ==========================================================================
+  // Pass 1: Check for ❯ indicator existence in scan window
+  // If no ❯ lines found, there is no multiple_choice prompt.
+  // ==========================================================================
+  let hasDefaultLine = false;
+  for (let i = scanStart; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (defaultOptionPattern.test(line)) {
+      hasDefaultLine = true;
+      break;
+    }
+  }
+
+  if (!hasDefaultLine) {
+    return {
+      isPrompt: false,
+      cleanContent: output.trim(),
+    };
+  }
+
+  // ==========================================================================
+  // Pass 2: Collect options (only executed when ❯ was found in Pass 1)
+  // Scan from end to find options, using both patterns.
+  // ==========================================================================
   const options: Array<{ number: number; label: string; isDefault: boolean }> = [];
-
   let questionEndIndex = -1;
-  let firstOptionIndex = -1;
 
-  // Scan from the end to find options
-  // Increased from 20 to 50 to handle multi-line wrapped options
-  for (let i = lines.length - 1; i >= 0 && i >= lines.length - 50; i--) {
+  for (let i = lines.length - 1; i >= scanStart; i--) {
     const line = lines[i].trim();
     const rawLine = lines[i]; // Keep original indentation for checking
-    const match = line.match(optionPattern);
 
-    if (match) {
-      const hasDefault = Boolean(match[1] && match[1].includes('❯'));
-      const number = parseInt(match[2], 10);
-      const label = match[3].trim();
+    // Try defaultOptionPattern first (❯ indicator)
+    const defaultMatch = line.match(defaultOptionPattern);
+    if (defaultMatch) {
+      const number = parseInt(defaultMatch[1], 10);
+      const label = defaultMatch[2].trim();
+      options.unshift({ number, label, isDefault: true });
+      continue;
+    }
 
-      // Insert at beginning since we're scanning backwards
-      options.unshift({ number, label, isDefault: hasDefault });
+    // Try normalOptionPattern (no ❯ indicator)
+    const normalMatch = line.match(normalOptionPattern);
+    if (normalMatch) {
+      const number = parseInt(normalMatch[1], 10);
+      const label = normalMatch[2].trim();
+      options.unshift({ number, label, isDefault: false });
+      continue;
+    }
 
-      if (firstOptionIndex === -1) {
-        firstOptionIndex = i;
-      }
-    } else if (options.length > 0 && line && !line.match(/^[-─]+$/)) {
+    // Non-option line handling
+    if (options.length > 0 && line && !line.match(/^[-─]+$/)) {
       // Check if this is a continuation line (indented line between options)
       // Continuation lines typically start with spaces (like "  work/github...")
       // Also treat very short lines (< 5 chars) as potential word-wrap fragments
@@ -238,7 +296,16 @@ function detectMultipleChoicePrompt(output: string): PromptDetectionResult {
     }
   }
 
-  // Must have at least 2 options AND at least one with ❯ indicator to be considered a prompt
+  // Layer 3: Consecutive number validation (defensive measure)
+  const optionNumbers = options.map(opt => opt.number);
+  if (!isConsecutiveFromOne(optionNumbers)) {
+    return {
+      isPrompt: false,
+      cleanContent: output.trim(),
+    };
+  }
+
+  // Layer 4: Must have at least 2 options AND at least one with ❯ indicator
   const hasDefaultIndicator = options.some(opt => opt.isDefault);
   if (options.length < 2 || !hasDefaultIndicator) {
     return {
