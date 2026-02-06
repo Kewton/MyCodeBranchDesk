@@ -132,8 +132,8 @@ src/
 | `src/config/status-colors.ts` | ステータス色の一元管理 |
 | `src/lib/cli-patterns.ts` | CLIツール別パターン定義 |
 | `src/lib/claude-session.ts` | Claude CLI tmuxセッション管理（Issue #152で改善: プロンプト検出強化、タイムアウトエラー、waitForPrompt()） |
-| `src/lib/prompt-detector.ts` | プロンプト検出ロジック |
-| `src/lib/auto-yes-manager.ts` | Auto-Yes状態管理とサーバー側ポーリング（Issue #138） |
+| `src/lib/prompt-detector.ts` | プロンプト検出ロジック（Issue #161: 2パス❯検出方式で誤検出防止、連番検証） |
+| `src/lib/auto-yes-manager.ts` | Auto-Yes状態管理とサーバー側ポーリング（Issue #138）、thinking状態のprompt検出スキップ（Issue #161） |
 | `src/lib/auto-yes-resolver.ts` | Auto-Yes自動応答判定ロジック |
 | `src/hooks/useAutoYes.ts` | Auto-Yesクライアント側フック（重複応答防止対応） |
 | `src/lib/cli-tools/` | CLIツール抽象化（Strategy パターン） |
@@ -372,6 +372,24 @@ commandmate status --all                   # 全サーバー状態確認
 ---
 
 ## 最近の実装機能
+
+### Issue #161: Auto-Yes誤検出修正（番号付きリストの誤検出防止）
+- **問題解決**: Auto-Yesモード有効時、Claude CLIの通常出力に含まれる番号付きリスト（例：「1. ファイルを作成」「2. テストを実行」）がmultiple_choiceプロンプトとして誤検出され、「1」が自動送信される問題を修正
+- **根本原因**: `detectMultipleChoicePrompt`の`optionPattern`の`[❯ ]`文字クラスが空白文字も許容し、通常の番号付きリストが選択肢として蓄積されていた
+- **2パス❯検出方式**（多層防御Layer 2）:
+  - パス1: 50行ウィンドウ内で❯インジケーターの存在を確認
+  - パス2: ❯が存在する場合のみ選択肢行を収集
+  - ❯が存在しない場合、通常の番号付きリストは一切検出されない
+- **thinking状態スキップ**（多層防御Layer 1）:
+  - `auto-yes-manager.ts`の`pollAutoYes()`で`detectThinking()`による事前チェック
+  - thinking中は`detectPrompt()`をスキップ
+- **連番検証**（多層防御Layer 3、防御的措置）:
+  - `isConsecutiveFromOne()`で選択肢番号が1始まり連番であることを検証
+- **設計原則準拠**: prompt-detector.tsのCLIツール非依存性を維持（CLAUDE_THINKING_PATTERNをimportしない）
+- **主要コンポーネント**:
+  - `src/lib/prompt-detector.ts` - 2パス検出方式、連番検証（防御的措置）
+  - `src/lib/auto-yes-manager.ts` - thinking状態のprompt検出スキップ
+- 詳細: [設計書](./dev-reports/design/issue-161-auto-yes-false-positive-design-policy.md)
 
 ### Issue #151: worktree-cleanup サーバー検出機能改善
 - **問題解決**: `/worktree-cleanup` スキル実行時、`npm run dev` で直接起動したサーバーを検出・停止できない問題を修正
