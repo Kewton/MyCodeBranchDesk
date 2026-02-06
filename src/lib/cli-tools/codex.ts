@@ -9,12 +9,10 @@ import {
   hasSession,
   createSession,
   sendKeys,
+  sendTextViaBuffer,
+  sendSpecialKey,
   killSession,
 } from '../tmux';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execAsync = promisify(exec);
 
 /**
  * Codex initialization timing constants
@@ -90,9 +88,9 @@ export class CodexTool extends BaseCLITool {
 
       // T2.6: Skip model selection dialog by sending Down arrow + Enter
       // This selects the default model and proceeds to the prompt
-      await execAsync(`tmux send-keys -t "${sessionName}" Down`);
+      await sendKeys(sessionName, 'Down', false);
       await new Promise((resolve) => setTimeout(resolve, CODEX_MODEL_SELECT_WAIT_MS));
-      await execAsync(`tmux send-keys -t "${sessionName}" Enter`);
+      await sendKeys(sessionName, '', true);
       await new Promise((resolve) => setTimeout(resolve, CODEX_MODEL_SELECT_WAIT_MS));
 
       console.log(`✓ Started Codex session: ${sessionName}`);
@@ -120,17 +118,8 @@ export class CodexTool extends BaseCLITool {
     }
 
     try {
-      // Send message to Codex (without Enter)
-      await sendKeys(sessionName, message, false);
-
-      // Wait a moment for the text to be typed
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      // Send Enter key separately
-      await execAsync(`tmux send-keys -t "${sessionName}" C-m`);
-
-      // Wait a moment for the message to be processed
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      // Send message via buffer to avoid paste detection (Issue #163)
+      await sendTextViaBuffer(sessionName, message, true);
 
       console.log(`✓ Sent message to Codex session: ${sessionName}`);
     } catch (error: unknown) {
@@ -151,8 +140,8 @@ export class CodexTool extends BaseCLITool {
       // Send Ctrl+D to exit Codex gracefully
       const exists = await hasSession(sessionName);
       if (exists) {
-        // Send Ctrl+D (ASCII 4)
-        await execAsync(`tmux send-keys -t "${sessionName}" C-d`);
+        // Send Ctrl+D via tmux abstraction layer
+        await sendSpecialKey(sessionName, 'C-d');
 
         // Wait a moment for Codex to exit
         await new Promise((resolve) => setTimeout(resolve, 500));
