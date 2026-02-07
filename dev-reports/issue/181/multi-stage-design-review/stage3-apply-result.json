@@ -1,0 +1,87 @@
+{
+  "issue_number": 181,
+  "stage": 3,
+  "stage_name": "影響分析レビュー",
+  "status": "success",
+  "design_policy_updated": true,
+  "reflected_items": {
+    "must_fix": [
+      {
+        "id": "DR3-F005",
+        "item": "detectPrompt() 内部で lastLines を作成するが detectMultipleChoicePrompt() には full output を渡す設計の説明不足",
+        "section_updated": "セクション6.1.1（新設）",
+        "status": "reflected",
+        "details": "呼び出し元ごとのoutputサイズ一覧表を追加。全出力を渡す呼び出し元、限定的な出力を渡す呼び出し元、既存の制約であるtimeout=100の呼び出し元を明確に分類"
+      }
+    ],
+    "should_fix": [
+      {
+        "id": "DR3-F001",
+        "item": "PromptMessage.tsx と MessageList.tsx がUIラベル表示影響の記載対象に含まれていない",
+        "section_updated": "セクション3.4（新設）",
+        "status": "reflected",
+        "details": "option.labelを直接UIに表示する4つのコンポーネント（PromptMessage.tsx, MessageList.tsx, PromptPanel.tsx, MobilePromptSheet.tsx）を間接影響として追加"
+      },
+      {
+        "id": "DR3-F002",
+        "item": "status-detector.ts における detectPrompt() への入力が last 15 lines に切り詰められている点の影響分析が不十分",
+        "section_updated": "セクション3.2",
+        "status": "reflected",
+        "details": "status-detector.tsの影響内容欄に15行制限の詳細説明を追加。detectMultipleChoicePrompt()への伝搬と他の呼び出し元との差異を明記"
+      },
+      {
+        "id": "DR3-F007",
+        "item": "cleanContent の変化による DB 保存 content の差異分析が不足",
+        "section_updated": "セクション6.1.2（新設）",
+        "status": "reflected",
+        "details": "修正前後のcleanContentとmessageTypeの変化を明示。正しい動作への変更であること、response-poller.tsとclaude-poller.tsのcreateMessage()への影響を記載"
+      }
+    ],
+    "nice_to_have": [
+      {
+        "id": "DR3-F003",
+        "item": "DB保存される promptData.options[].label が不完全になる点の影響の明示不足",
+        "section_updated": "セクション11 制約事項1",
+        "status": "reflected",
+        "details": "DB永続化の影響とUIコンポーネントへの参照を制約事項1に追記。将来のラベル連結対応時のDB整合性考慮を明記"
+      },
+      {
+        "id": "DR3-F004",
+        "item": "useAutoYes.ts とクライアント側 PromptData 消費チェーンの記載が不十分",
+        "section_updated": "セクション3.5（新設）",
+        "status": "reflected",
+        "details": "PromptData型伝搬チェーン（useWorktreeUIState.ts, ui-state.ts, ui-actions.ts, WorktreeDetailRefactored.tsx）を追記。型構造変更なしのため影響なしであることを明記"
+      },
+      {
+        "id": "DR3-F006",
+        "item": "デプロイ・マイグレーション考慮事項のセクションが存在しない",
+        "section_updated": "セクション6.3（新設）",
+        "status": "reflected",
+        "details": "DBスキーマ、環境変数、npm依存関係、ビルド手順、ダウンタイム、ロールバックの全てが「変更なし」であることを明示した表を追加"
+      },
+      {
+        "id": "DR3-F008",
+        "item": "既存テストファイルにmultiple choice関連テストが存在する他ファイルの記載がない",
+        "section_updated": "セクション7.2.1（新設）",
+        "status": "reflected",
+        "details": "回帰確認対象の4つの既存テストファイルを追記（auto-yes-resolver.test.ts, PromptPanel.test.tsx, MobilePromptSheet.test.tsx, MessageListOptimistic.test.tsx）"
+      }
+    ]
+  },
+  "skipped": [],
+  "design_doc_path": "dev-reports/design/issue-181-multiline-option-detection-design-policy.md",
+  "sections_updated": [
+    "セクション3.2（status-detector.ts影響内容拡充）",
+    "セクション3.4（新設: UIラベル表示コンポーネント）",
+    "セクション3.5（新設: PromptData型伝搬チェーン）",
+    "セクション6.1.1（新設: detectPrompt()の内部output伝搬構造）",
+    "セクション6.1.2（新設: cleanContentの動作変化）",
+    "セクション6.3（新設: デプロイ・マイグレーション考慮事項）",
+    "セクション7.2.1（新設: 関連テストの回帰確認）",
+    "セクション11 制約事項1（DB永続化の影響追記）",
+    "セクション13 Stage 3（新設: 影響分析レビュー指摘事項サマリー）",
+    "セクション15 レビュー履歴（Stage 3行追加）",
+    "セクション16 変更履歴（Stage 3反映行追加）"
+  ],
+  "timestamp": "2026-02-07T00:00:00Z"
+}

@@ -1,0 +1,104 @@
+{
+  "stage": 2,
+  "stage_name": "整合性レビュー",
+  "focus_area": "整合性",
+  "findings": [
+    {
+      "id": "DR2-F001",
+      "severity": "should_fix",
+      "category": "行番号不一致",
+      "title": "auto-yes-manager.ts の pollAutoYes() 行番号参照が曖昧",
+      "description": "設計書セクション3.2の表で「auto-yes-manager.ts 280行目 pollAutoYes()」と記載されている。実際のコードでは pollAutoYes() 関数の定義は262行目にある。280行目は pollAutoYes() 関数内部の detectPrompt(cleanOutput) 呼び出し箇所である。設計書の記載は「pollAutoYes() 内の280行目で detectPrompt が呼ばれる」という意味と解釈可能だが、表の書式からは pollAutoYes() 関数自体が280行目にあるように読める。",
+      "suggestion": "「262行目 pollAutoYes() 内の280行目で detectPrompt() を呼び出し」と明確化するか、「280行目 detectPrompt() 呼び出し（pollAutoYes() 内）」に修正する。",
+      "location": "設計書セクション3.2 変更不要ファイル表 auto-yes-manager.ts 行",
+      "actual_code_reference": "src/lib/auto-yes-manager.ts: pollAutoYes() は262行目で定義。detectPrompt() 呼び出しは280行目。"
+    },
+    {
+      "id": "DR2-F002",
+      "severity": "nice_to_have",
+      "category": "行番号不一致",
+      "title": "auto-yes-resolver.ts の行番号が1行ずれている",
+      "description": "設計書セクション4.4で「auto-yes-resolver.ts の resolveAutoAnswer() はオプションの number を使用するため（24-35行目）」と記載されている。実際には multiple_choice の if ブロック全体は23行目から始まる（23行目: if (promptData.type === 'multiple_choice') {）。24行目は const defaultOpt = ... の行であり、if 文本体の先頭ではある。厳密にはブロック全体は23-36行目。ただし、number を実際に使用する箇所は35行目の target.number.toString() であり、24-35行目の範囲指定自体は実質的に正しい。",
+      "suggestion": "厳密に修正する場合は「23-36行目」とするか、「35行目で target.number.toString() を使用」と具体的に記載する。現状でも実用上の問題はない。",
+      "location": "設計書セクション4.4 継続行のスキップ動作",
+      "actual_code_reference": "src/lib/auto-yes-resolver.ts: 23行目 if (promptData.type === 'multiple_choice'), 35行目 return target.number.toString()"
+    },
+    {
+      "id": "DR2-F003",
+      "severity": "nice_to_have",
+      "category": "動作記述不一致",
+      "title": "PromptDetectionResult の定義場所に関する暗黙の前提",
+      "description": "設計書セクション6.1で「型構造 PromptDetectionResult, PromptData, MultipleChoiceOption -- 変更なし」と記載されている。PromptData と MultipleChoiceOption は src/types/models.ts に定義されているが、PromptDetectionResult は src/lib/prompt-detector.ts の14行目に定義されており、models.ts には存在しない。設計書はこれらを同列に記載しているが、PromptDetectionResult は修正対象ファイル内の型であるため、「変更対象ファイル内の型定義も変更なし」という意図を明示した方がより正確である。",
+      "suggestion": "「型構造 PromptDetectionResult（prompt-detector.ts）, PromptData, MultipleChoiceOption（models.ts）-- 変更なし」のように定義場所を明示する。",
+      "location": "設計書セクション6.1 直接的影響 型構造行",
+      "actual_code_reference": "src/lib/prompt-detector.ts 14行目: export interface PromptDetectionResult, src/types/models.ts 153行目: MultipleChoiceOption, 176行目: PromptData"
+    },
+    {
+      "id": "DR2-F004",
+      "severity": "must_fix",
+      "category": "コード不一致",
+      "title": "テストコードの promptData.options[0] の isDefault 検証が実装と不整合の可能性",
+      "description": "設計書セクション7.1.1のテストケースで expect(result.promptData?.options[0]).toMatchObject({ number: 1, label: 'Yes', isDefault: true }) と記載されている。しかし、detectMultipleChoicePrompt() は逆順スキャンで末尾からオプションを検出し、options.unshift() で先頭に挿入する（217行目）。テスト入力の並び順は「1. Yes」「2. Yes, and...」「3. No」であるが、逆順スキャンでは「3. No」が最初に検出され、次に（継続行スキップ後）「1. Yes」が検出される。「2. Yes, and don't ask...」は先頭スペース付き（'  2. Yes, and...'）であり optionPattern にマッチするはずだが、rawLine が '  2. Yes, and...' の場合 /^\\s*([❯ ]\\s*)?(\\d+)\\.\\s*(.+)$/ に対して trim後の line でマッチ判定される。実際には line = lines[i].trim() でトリムされた後に optionPattern でマッチするため、先頭スペースは除去されてから評価される。結果として3つのオプションが検出され、unshift により options = [{1, Yes, true(❯あり)}, {2, 'Yes, and...', false}, {3, No, false}] となる。options[0] は number:1, label:'Yes', isDefault:true で正しい。テストの期待値は正確である。\n\nただし、options[2] の検証で expect(result.promptData?.options[2]).toMatchObject({ number: 3, label: 'No', isDefault: false }) と記載されているが、options のインデックス2（3番目の要素）は number:3 の 'No' である。これも正しい。\n\n**補足調査の結果、本件は問題なしと判断。** 当初懸念した逆順スキャンによる順序問題は unshift() の使用により正しく解決されている。",
+      "suggestion": "本件は詳細調査の結果、問題なしと判断した。設計書の記載は正確である。ステータスを must_fix から取り下げる。（レビュー時の精査により問題なしと確認済み）",
+      "location": "設計書セクション7.1.1 テストコード options[0] と options[2] の検証",
+      "actual_code_reference": "src/lib/prompt-detector.ts 207-221行目: 逆順スキャン + unshift による正順配列構築"
+    },
+    {
+      "id": "DR2-F005",
+      "severity": "should_fix",
+      "category": "動作記述不一致",
+      "title": "テスト入力のオプション2の rawLine 先頭スペースの扱いの明示が不足",
+      "description": "設計書セクション4.2の再現シナリオとセクション7.1.1のテストケースにおいて、オプション2は '  2. Yes, and don\\'t ask again...' と先頭に2スペースが付いている。detectMultipleChoicePrompt() では line = lines[i].trim() で先頭スペースを除去してから optionPattern でマッチ判定する（207行目）。一方、rawLine（208行目）は元の行が保持される。これにより、オプション2は optionPattern にマッチし（trimmed line が '2. Yes, and...' にマッチ）、hasDefault は false（❯がないため）、label は 'Yes, and don\\'t ask again for curl and python3 commands in' となる。設計書セクション4.4の「オプション2のラベルは 'Yes, and don\\'t ask again for curl and python3 commands in' となる」という記述と一致する。しかし、これはオプション2の行自体が optionPattern にマッチした結果であり、継続行の折り返しとは無関係である。設計書の説明では、継続行のスキップがオプション2のラベルを不完全にしているように読めるが、実際にはオプション2の行自体は正常に検出され、折り返し部分（'/Users/...' と 'ndmate-issue-161'）がスキップされるだけで、ラベルにはオプション2の行内テキストがそのまま使われる。この動作説明をもう少し明確にすべきである。",
+      "suggestion": "セクション4.4の説明を「オプション2は '  2. Yes, and don\\'t ask again for curl and python3 commands in' の行で optionPattern にマッチし、label は折り返し前の1行目のテキストのみ（'Yes, and don\\'t ask again for curl and python3 commands in'）となる。折り返し行（'/Users/...' と 'ndmate-issue-161'）は continue でスキップされ、ラベルには連結されない。」と修正する。",
+      "location": "設計書セクション4.4 継続行のスキップ動作について",
+      "actual_code_reference": "src/lib/prompt-detector.ts 207-217行目: line = trim後にoptionPatternでマッチ、label = match[3].trim()"
+    },
+    {
+      "id": "DR2-F006",
+      "severity": "must_fix",
+      "category": "コード不一致",
+      "title": "optionPattern の正規表現が設計書と実際のコードで一致するが、マッチ条件の精度に注意が必要",
+      "description": "設計書セクション5.2で「この条件は options.length > 0（222行目: else if (options.length > 0 ...)）の場合にのみ評価される」と記載されている。実際の222行目は `} else if (options.length > 0 && line && !line.match(/^[-─]+$/)) {` であり、line が空でなく、かつセパレータ行でない場合にのみ継続行判定に進む。設計書の記載は正確だが、line が空文字列の場合の動作説明が不足している。空行の場合、この else if ブロックに入らず、for ループの次のイテレーションに進む。つまり空行はオプションでもセパレータでも継続行でもないが、スキャンを中断しない。テストケース（セクション7.1.1）では空行 '' が含まれており（242行目付近）、この空行はスキャンを中断しないことが前提となっている。実際のコードでは空行は line = '' (trim後) となり、options.length > 0 && line && ... の line が falsy のためこのブロックに入らず、ループ先頭の match = ''.match(optionPattern) も null を返す。結果としてどの条件にも入らず、次のイテレーションに進む。これは設計書の想定通りの動作だが、設計書ではこの空行の挙動について明示的な説明がない。",
+      "suggestion": "セクション4.2の再現シナリオの説明に「空行（区切り行 'Esc to cancel...' の上下）はどの条件にもマッチしないため、スキャンを中断せずに次の行に進む」という注記を追加する。これによりテストケースの空行の意図がより明確になる。",
+      "location": "設計書セクション4.2 問題の再現シナリオ",
+      "actual_code_reference": "src/lib/prompt-detector.ts 207-238行目: 空行は line='' により optionPattern にマッチせず、else if の line 条件も falsy のためスキップされる"
+    },
+    {
+      "id": "DR2-F007",
+      "severity": "should_fix",
+      "category": "動作記述不一致",
+      "title": "再現シナリオの逆順スキャン説明でオプション行以外の行の扱いが不完全",
+      "description": "設計書セクション4.2の逆順スキャン処理の説明で、ステップ1「3. No -- オプション3として検出 (OK)」とステップ2「ndmate-issue-161 -- 継続行として認識されない -- スキャン中断」の間にある空行 '' と 'Esc to cancel ...' の行の扱いが省略されている。実際の逆順スキャンは末尾から以下の順序で処理される: (1) 'Esc to cancel...' 行 -- trim後に optionPattern にマッチせず、options.length == 0 のため else if に入らない、次へ。(2) '' 空行 -- 同上、次へ。(3) '  3. No' -- optionPattern にマッチ、options=[{3,No,false}]。(4) 'ndmate-issue-161' -- optionPattern 不一致、options.length > 0 かつ line = 'ndmate-issue-161' (truthy)、hasLeadingSpaces: rawLine は 'ndmate-issue-161' で先頭スペースなし -> false、isShortFragment: line.length = 16 >= 5 -> false、isContinuationLine = false -> break。設計書の説明はステップ(1)(2)が省略されているが、結果としてステップ(3)(4)の説明は正確。",
+      "suggestion": "セクション4.2の逆順スキャン説明に「(1) 'Esc to cancel...' と空行は options が空のため else if に入らず次へ進む」の1ステップを追加すると、より正確な説明になる。現状の説明でも本質的な理解には支障がないため、対応は任意。",
+      "location": "設計書セクション4.2 逆順スキャン時の処理",
+      "actual_code_reference": "src/lib/prompt-detector.ts 206-238行目: 逆順スキャンのフルフロー"
+    },
+    {
+      "id": "DR2-F008",
+      "severity": "nice_to_have",
+      "category": "テスト不一致",
+      "title": "テストファイルのimport文にMultipleChoicePromptData型が含まれていない",
+      "description": "設計書セクション7.1.1のテストコードで result.promptData?.type === 'multiple_choice' のアサーションが行われているが、promptData の型が MultipleChoicePromptData であることの型ガードが使われていない。既存テストでは YesNoPromptData の型ガード isYesNoPrompt() が8行目で定義されており、defaultOption へのアクセスに使用されている。設計書のテストコードでは options プロパティに直接アクセスしているが、PromptData = YesNoPromptData | MultipleChoicePromptData の union 型において、options の型が異なる（YesNoPromptData では ['yes', 'no'] 固定、MultipleChoicePromptData では MultipleChoiceOption[]）。toMatchObject でのアクセスは実行時には問題ないが、型安全性の観点から MultipleChoicePromptData 用の型ガードも追加するか、あるいは既存パターンに合わせた記載があると良い。",
+      "suggestion": "テストコードで promptData?.options に MultipleChoiceOption[] としてアクセスする場合、isMultipleChoicePrompt() 型ガードの定義を検討する。ただし、toMatchObject は任意のプロパティ検証であり、TypeScript の型エラーにはならないため、実装上の問題はない。",
+      "location": "設計書セクション7.1.1 テストコード",
+      "actual_code_reference": "tests/unit/prompt-detector.test.ts 8行目: import type { PromptData, YesNoPromptData } -- MultipleChoicePromptData は未import"
+    },
+    {
+      "id": "DR2-F009",
+      "severity": "nice_to_have",
+      "category": "動作記述不一致",
+      "title": "設計書のテストコードで detectPrompt の import 元が明示されていない",
+      "description": "設計書セクション7.1のテストコードでは detectPrompt() を使用しているが、import 文が省略されている。既存テスト（tests/unit/prompt-detector.test.ts の7行目）では import { detectPrompt, getAnswerInput } from '@/lib/prompt-detector' となっている。追加テストコードは既存ファイルへの追記であるため import の追加は不要だが、設計書のテストコードスニペットに import 文がないことで、別ファイルに追加する場合に混乱する可能性がある。",
+      "suggestion": "設計書のテストコードの冒頭に「※ 以下のテストケースは既存の tests/unit/prompt-detector.test.ts に追加する。import は既存のものを使用。」という注記を追加する。",
+      "location": "設計書セクション7.1.1 テストコード先頭",
+      "actual_code_reference": "tests/unit/prompt-detector.test.ts 7行目: import { detectPrompt, getAnswerInput } from '@/lib/prompt-detector'"
+    }
+  ],
+  "summary": {
+    "total_findings": 9,
+    "must_fix": 2,
+    "should_fix": 3,
+    "nice_to_have": 4,
+    "overall_assessment": "設計書の行番号参照は全体的に高い精度で実際のソースコードと一致している。全27箇所の行番号参照のうち、実質的な不一致は1箇所のみ（auto-yes-manager.ts の pollAutoYes 関数位置）であり、残りは全て正確である。コードスニペットも実際のコードと完全に一致する。Must Fix として挙げた2件はいずれも詳細調査の結果、実装上の問題ではなく説明の明確化に関する指摘である（DR2-F004は調査の結果問題なしと判断、DR2-F006は空行の挙動説明の追加推奨）。型定義（PromptDetectionResult, PromptData, MultipleChoiceOption）に変更がないという記述も正確であり、呼び出し元への影響分析も正確にトレースされている。テスト計画は実装可能であり、既存テストファイルとの整合性も確認された。全体として、設計書は実装の実態を正確に反映しており、提案された修正は記載通りに実装可能である。"
+  }
+}

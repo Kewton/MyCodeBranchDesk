@@ -1,0 +1,18 @@
+{
+  "stage": 8,
+  "stage_name": "指摘事項反映（2回目）",
+  "iteration": 2,
+  "applied_findings": [
+    {
+      "finding_id": "S7-F001",
+      "status": "applied",
+      "action_taken": "respond/route.ts を「detectPrompt()呼び出し元（間接影響）」テーブルから除外し、新設した「prompt-detector.tsからの関連関数を使用するモジュール（コード変更不要）」カテゴリに移動。このカテゴリには respond/route.ts の他に、既存の auto-yes-resolver.ts、useAutoYes.ts、UIコンポーネントも含め、detectPrompt()を直接呼び出さないが prompt-detector.ts の関連関数を使用するモジュールとして一括管理する形に再構成した。カテゴリの説明文にも detectPrompt() を直接呼び出していない旨を明記し、respond/route.ts のエントリには getAnswerInput() のみ使用である旨を併記した。レビュー履歴セクションにも S7-F001 の対応内容を追記した。"
+    }
+  ],
+  "summary": {
+    "total_findings": 1,
+    "applied": 1,
+    "skipped": 0,
+    "issue_updated": true
+  }
+}

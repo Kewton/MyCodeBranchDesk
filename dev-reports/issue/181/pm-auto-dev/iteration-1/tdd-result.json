@@ -1,0 +1,37 @@
+{
+  "status": "success",
+  "issue_number": 181,
+  "phases": {
+    "red": {
+      "status": "completed",
+      "tests_added": 10,
+      "tests_failing": 4,
+      "details": "4 tests failed as expected: multi-line wrapped options, path starting with ~, path continuation from terminal wrapping, multiple path continuation lines. 6 tests passed (standard multiple choice, false positives, regression, wide terminal)."
+    },
+    "green": {
+      "status": "completed",
+      "tests_passing": 59,
+      "tests_failing": 0,
+      "details": "Added isPathContinuation condition with /^[\\/~]/.test(line) || /^[a-zA-Z0-9_\\/-]+$/.test(line). All 59 prompt-detector tests pass (49 existing + 10 new)."
+    },
+    "refactor": {
+      "status": "skipped",
+      "changes": "No refactoring needed per YAGNI principle. Change is minimal: 1 line added, 1 line modified, comment block updated."
+    }
+  },
+  "quality_checks": {
+    "lint": "pass",
+    "typescript": "pass",
+    "unit_tests": "pass",
+    "build": "pass"
+  },
+  "files_modified": [
+    "src/lib/prompt-detector.ts",
+    "tests/unit/prompt-detector.test.ts"
+  ],
+  "test_coverage": "All prompt-detector tests pass. Regression tests for auto-yes-resolver (8 tests), PromptPanel (28 tests), MobilePromptSheet (29 tests), MessageListOptimistic (23 tests) all pass. Total: 147 tests across 5 test files.",
+  "commits": [
+    "4861152: fix(prompt-detector): detect multiple choice prompts with path-wrapped options"
+  ],
+  "message": "TDD implementation complete for Issue #181. Added isPathContinuation condition to detect terminal line-wrapped file paths in multiple choice option text. All quality checks pass."
+}

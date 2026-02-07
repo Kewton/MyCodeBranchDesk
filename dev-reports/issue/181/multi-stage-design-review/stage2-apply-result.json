@@ -1,0 +1,57 @@
+{
+  "stage": 2,
+  "stage_name": "整合性レビュー指摘事項対応",
+  "applied_findings": [
+    {
+      "finding_id": "DR2-F001",
+      "status": "applied",
+      "action_taken": "セクション3.2の表を修正。「280行目 pollAutoYes()」を「262行目 pollAutoYes() 内の280行目で detectPrompt() を呼び出し」に明確化"
+    },
+    {
+      "finding_id": "DR2-F002",
+      "status": "applied",
+      "action_taken": "セクション4.4を修正。「24-35行目」を「23-36行目、特に35行目の target.number.toString() で使用」に更新"
+    },
+    {
+      "finding_id": "DR2-F003",
+      "status": "applied",
+      "action_taken": "セクション6.1の型構造行を修正。PromptDetectionResult(prompt-detector.ts)とPromptData, MultipleChoiceOption(models.ts)の定義場所を明示"
+    },
+    {
+      "finding_id": "DR2-F004",
+      "status": "applied",
+      "action_taken": "レビュー指摘事項サマリーに「Must Fix -> 問題なし」として記録。詳細調査の結果、unshift()による正順配列構築により設計書の記載は正確であることを確認。設計書本文への修正は不要"
+    },
+    {
+      "finding_id": "DR2-F005",
+      "status": "applied",
+      "action_taken": "セクション4.4の説明を修正。オプション2が optionPattern にマッチする過程（trim後にマッチ判定）と折り返し行のスキップ動作（continue でラベルに連結されない）を明確化"
+    },
+    {
+      "finding_id": "DR2-F006",
+      "status": "applied",
+      "action_taken": "セクション4.2に空行の挙動に関する注記（DR2-F006ブロック引用）を追加。空行は line='' により optionPattern にもマッチせず else if の line 条件も falsy のためスキャンを中断しないことを明示"
+    },
+    {
+      "finding_id": "DR2-F007",
+      "status": "applied",
+      "action_taken": "セクション4.2の逆順スキャン説明にステップ1を追加。'Esc to cancel...' と空行が options が空のため else if に入らず次へ進むことを明示。既存ステップを2-4に繰り下げ"
+    },
+    {
+      "finding_id": "DR2-F008",
+      "status": "applied",
+      "action_taken": "セクション7.1にテスト型安全性に関する注記（DR2-F008ブロック引用）を追加。PromptData union型における toMatchObject アクセスの説明と、将来的な isMultipleChoicePrompt() 型ガード導入の検討を記録"
+    },
+    {
+      "finding_id": "DR2-F009",
+      "status": "applied",
+      "action_taken": "セクション7.1.1の冒頭に注記を追加。テストケースは既存の tests/unit/prompt-detector.test.ts に追加するものであり、import は既存のものを使用する旨を明示"
+    }
+  ],
+  "summary": {
+    "total_findings": 9,
+    "applied": 9,
+    "skipped": 0,
+    "design_doc_updated": true
+  }
+}

@@ -1,0 +1,183 @@
+{
+  "stage": 3,
+  "stage_name": "影響範囲レビュー（1回目）",
+  "focus_area": "影響範囲",
+  "iteration": 1,
+  "review_date": "2026-02-07",
+  "findings": [
+    {
+      "id": "S3-F001",
+      "severity": "must_fix",
+      "category": "影響範囲の漏れ",
+      "title": "detectPrompt()の呼び出し元が影響範囲セクションに大幅に不足",
+      "description": "Issueの影響範囲セクションでは、detectPrompt()を使用するファイルとして prompt-detector.ts、auto-yes-resolver.ts、テスト、UIを挙げているが、実際にはdectPrompt()を直接呼び出す箇所は以下の10ファイルに存在する: (1) src/lib/auto-yes-manager.ts:280, (2) src/lib/status-detector.ts:80, (3) src/lib/claude-poller.ts:164,232, (4) src/lib/response-poller.ts:248,442,556, (5) src/app/api/worktrees/route.ts:62, (6) src/app/api/worktrees/[id]/route.ts:62, (7) src/app/api/worktrees/[id]/current-output/route.ts:79。これらの呼び出し元全てで、detectMultipleChoicePrompt()の挙動変更の影響を受ける。特にstatus-detector.ts、claude-poller.ts、response-poller.tsはIssueに記載されていないが重要な依存先である。",
+      "suggestion": "影響範囲セクションを拡充し、detectPrompt()を呼び出す全ファイルを明記する。特に以下を追加: (1) src/lib/status-detector.ts（セッションステータス判定に使用 - Issue #180と直接関連）, (2) src/lib/claude-poller.ts（応答完了判定に使用）, (3) src/lib/response-poller.ts（応答抽出とプロンプト検出に使用、3箇所で呼び出し）, (4) src/app/api/worktrees/route.ts（サイドバーのステータス表示に使用）, (5) src/app/api/worktrees/[id]/route.ts（個別worktreeのステータスに使用）, (6) src/app/api/worktrees/[id]/current-output/route.ts（リアルタイム出力のプロンプト検出）, (7) src/app/api/worktrees/[id]/respond/route.ts（getAnswerInputのみ使用、影響は限定的）。",
+      "affected_files": [
+        "src/lib/status-detector.ts",
+        "src/lib/claude-poller.ts",
+        "src/lib/response-poller.ts",
+        "src/app/api/worktrees/route.ts",
+        "src/app/api/worktrees/[id]/route.ts",
+        "src/app/api/worktrees/[id]/current-output/route.ts",
+        "src/app/api/worktrees/[id]/respond/route.ts"
+      ],
+      "location": "影響範囲 セクション"
+    },
+    {
+      "id": "S3-F002",
+      "severity": "should_fix",
+      "category": "波及効果",
+      "title": "status-detector.tsへの波及がIssue #180との関連で重要",
+      "description": "src/lib/status-detector.ts は detectPrompt() を使って最後15行からプロンプトを検出し、検出された場合にステータスを 'waiting' と判定する。Issue #180では、まさにこのステータス検出ロジックの誤りが問題になっている。Issue #181の修正で継続行が正しく認識されるようになると、これまで見逃されていたプロンプトが検出されるようになり、status-detector.tsの 'waiting' 判定がより正確になる。これはIssue #180の部分的な改善にもなり得るが、逆に新たな偽陽性が導入された場合、ステータス表示にも波及する。Issueではstatus-detector.tsが影響範囲に含まれていない。",
+      "suggestion": "影響範囲に src/lib/status-detector.ts を追加し、Issue #180との関連で「修正によりステータス判定の精度が向上する可能性がある」旨を記載する。また、偽陽性テストの重要性を強調する（偽陽性が発生した場合、サイドバーのステータスが不正確に 'waiting' と表示される可能性がある）。",
+      "affected_files": [
+        "src/lib/status-detector.ts"
+      ],
+      "location": "影響範囲 セクション / 関連Issue セクション"
+    },
+    {
+      "id": "S3-F003",
+      "severity": "should_fix",
+      "category": "波及効果",
+      "title": "response-poller.tsとclaude-poller.tsへの波及（応答完了判定への影響）",
+      "description": "response-poller.ts は detectPrompt() を3箇所（line 248: 早期プロンプト検出、line 442: インタラクティブプロンプト検出、line 556: 完了応答のプロンプトチェック）で、claude-poller.ts は2箇所（line 164, 232）で使用している。これらではdetectPrompt()の結果により、応答が「完了」であるか「プロンプト待ち」であるかを判定し、メッセージをDBに保存する処理を行う。修正によりこれまで検出されなかったmultiple choiceプロンプトが検出されるようになるため、これらのポーラーの挙動も変わる。具体的には、これまで「応答未完了」として扱われていた出力が「プロンプト検出→完了」として処理され、メッセージが prompt タイプとしてDBに保存されるようになる。これは正しい動作だが、Issueの影響範囲に記載がない。",
+      "suggestion": "影響範囲に response-poller.ts と claude-poller.ts を追加する。「応答完了判定の精度が向上し、折り返しを含むmultiple choiceプロンプトが正しくpromptメッセージとしてDBに保存されるようになる」旨を記載する。",
+      "affected_files": [
+        "src/lib/response-poller.ts",
+        "src/lib/claude-poller.ts"
+      ],
+      "location": "影響範囲 セクション"
+    },
+    {
+      "id": "S3-F004",
+      "severity": "should_fix",
+      "category": "リスク",
+      "title": "isPathContinuationの正規表現がyes/noプロンプトの検出に影響する可能性",
+      "description": "detectMultipleChoicePrompt()はdetectPrompt()の中でPattern 0として最初に呼ばれる。この関数が isPrompt: false を返せば、後続のyes/noパターン（Pattern 1-5）が評価される。修正後の継続行条件が緩くなることで、detectMultipleChoicePrompt()内の逆順スキャンで more lines が「継続行」として消費され、走査範囲が広がる。これにより、options.length >= 2 && hasDefaultIndicator の条件を偶然満たすケースが発生した場合、本来yes/noプロンプトとして検出されるべき出力がmultiple_choice型として誤検出される可能性がゼロではない。ただし、numbered option pattern (`/^\\s*([❯ ]\\s*)?(\\d+)\\.\\s*(.+)$/`) にマッチする行が2つ以上必要であり、かつ少なくとも1つが❯インジケータを含む必要があるため、実際の偽陽性リスクは低い。",
+      "suggestion": "テスト要件に「yes/noプロンプトの出力に numbered option に似た行が含まれるケース」のテストを追加することを推奨する。例えばターミナル出力に '1. First item' のようなリスト表示が含まれ、かつ最後に (y/n) がある場合の動作確認。",
+      "affected_files": [
+        "src/lib/prompt-detector.ts",
+        "tests/unit/prompt-detector.test.ts"
+      ],
+      "location": "修正案 セクション / テスト要件 セクション"
+    },
+    {
+      "id": "S3-F005",
+      "severity": "should_fix",
+      "category": "リスク",
+      "title": "Auto-Yesのラベル連結による影響の未考慮",
+      "description": "detectMultipleChoicePrompt()は継続行を検出した場合、その行を「スキップ」して次の行のスキャンを続行する（line 230-232: continue）。つまり、継続行のテキストは直前に検出されたオプションのlabelには連結されない。これは影響範囲の観点から重要な事実であるが、Issueの修正案や偽陽性リスク分析では「該当行が直前のオプションのラベルに連結される」と記載されている。実際のコードでは continue によりスキップされるのみで、オプションラベルに影響はない。auto-yes-resolver.ts の resolveAutoAnswer() はオプションの number を使用するため、ラベルの内容は自動応答の判定に直接影響しない。ただし、TEXT_INPUT_PATTERNS によるテキスト入力判定はラベルに依存するため、ラベルが不完全（折り返し前の部分のみ）になることの影響を考慮する必要がある。",
+      "suggestion": "以下の2点を検討・記載する: (1) 継続行はスキップされるだけでラベルに連結されない点を明確化する（Issueの偽陽性リスク分析の記載を修正）、(2) オプション2のラベルが 'Yes, and don\\'t ask again for curl and python3 commands in' のように途中で切れる可能性があることの影響を評価する。TEXT_INPUT_PATTERNS のどのパターンにもマッチしないため、Auto-Yesの動作には影響しないが、UIに表示されるラベルが不完全になる可能性がある。",
+      "affected_files": [
+        "src/lib/prompt-detector.ts",
+        "src/lib/auto-yes-resolver.ts"
+      ],
+      "location": "修正案 > 偽陽性リスク分析 セクション"
+    },
+    {
+      "id": "S3-F006",
+      "severity": "nice_to_have",
+      "category": "影響範囲の漏れ",
+      "title": "UIコンポーネント側の影響が具体的に特定されていない",
+      "description": "Issueでは影響範囲に「UIのプロンプト表示機能」と記載しているが、具体的なファイルが示されていない。current-output/route.ts からのレスポンスを消費するクライアントコンポーネント、useAutoYes.ts フック、promptData を表示するUIコンポーネントなど、具体的なファイルを特定することで実装者が影響確認をしやすくなる。ただし、UI側は promptData の型構造が変わらないため、影響は「表示されるか表示されないか」のレベルであり、コード変更は不要と考えられる。",
+      "suggestion": "影響範囲に「UIコンポーネント: コード変更不要。promptDataの型構造は変更されないため、修正により正しくプロンプトが検出されるようになると、既存のUI表示ロジックが自動的に動作する」旨を記載する。",
+      "affected_files": [
+        "src/hooks/useAutoYes.ts"
+      ],
+      "location": "影響範囲 セクション"
+    },
+    {
+      "id": "S3-F007",
+      "severity": "nice_to_have",
+      "category": "パフォーマンス",
+      "title": "正規表現追加によるパフォーマンス影響の考慮",
+      "description": "修正案では、継続行判定に2つの正規表現（/^[\\/~]/.test(line) と /^[a-zA-Z0-9_-]+$/.test(line)）が追加される。detectMultipleChoicePrompt()は最大50行を逆順スキャンし、各行で既存の2つの正規表現に加えて新たに2つの正規表現が評価される。detectPrompt()自体は複数の呼び出し元から2秒間隔のポーリングで繰り返し呼ばれる（auto-yes-manager: 2秒、current-output API: クライアントポーリング）。追加される正規表現は単純なパターンであり、実質的なパフォーマンス影響は無視できるレベルと考えられるが、パフォーマンスの観点からの言及があるとより完全である。",
+      "suggestion": "影響範囲に「パフォーマンス影響: 追加される正規表現は単純パターンであり、既存のポーリング間隔（2秒）と比較して無視できるオーバーヘッド。対応不要。」と記載する。",
+      "affected_files": [
+        "src/lib/prompt-detector.ts"
+      ],
+      "location": "影響範囲 セクション"
+    },
+    {
+      "id": "S3-F008",
+      "severity": "nice_to_have",
+      "category": "リスク",
+      "title": "異なるターミナル幅・エンコーディングによる影響の考慮不足",
+      "description": "修正案の isPathContinuation は特定の折り返しパターンを想定しているが、ターミナル幅が異なれば折り返し位置も変わる。例えば、幅が広いターミナルでは折り返しが発生しない（修正不要のケース）。幅が極端に狭い場合、オプション番号行自体が折り返される可能性がある（例: '  2. Yes, and' の次の行に 'don\\'t ask...'）。後者の場合、'don\\'t' はスペースで始まるため hasLeadingSpaces で捕捉される可能性が高いが、テスト要件としての明記がない。また、ANSI stripが不完全な場合（stripAnsi()が全パターンをカバーしない場合）、不可視文字が残り正規表現マッチに影響する可能性もあるが、これはstripAnsi()の責務であり、Issue #181の修正スコープ外。",
+      "suggestion": "テスト要件に、異なる折り返しパターン（同じ出力がターミナル幅の違いにより異なる位置で折り返されるケース）のテストケースを追加することを推奨する。",
+      "affected_files": [
+        "tests/unit/prompt-detector.test.ts"
+      ],
+      "location": "テスト要件 セクション"
+    }
+  ],
+  "summary": {
+    "total_findings": 8,
+    "must_fix": 1,
+    "should_fix": 4,
+    "nice_to_have": 3,
+    "overall_assessment": "Issue #181の影響範囲セクションは、直接的な変更対象（prompt-detector.ts と auto-yes-resolver.ts）は正しく特定しているが、detectPrompt()を呼び出す10ファイルのうち大半が影響範囲に記載されていない。特に、status-detector.ts（Issue #180と直接関連）、response-poller.ts（3箇所で呼び出し）、claude-poller.ts（2箇所）、worktrees list/detail API の各route.tsは、修正の恩恵を受ける（プロンプト検出精度の向上）一方で、偽陽性が導入された場合のリスクも受ける重要な依存先である。修正自体は prompt-detector.ts 内の detectMultipleChoicePrompt() 関数のみへの変更であり、型構造（PromptDetectionResult, PromptData）に変更がないため、破壊的変更は発生しない。全体としてリスクは低いが、影響範囲の可視化が不十分なため、実装者がテスト範囲を正しく設定できるよう、影響範囲セクションの拡充が必要である。"
+  },
+  "code_references": [
+    {
+      "file": "src/lib/prompt-detector.ts",
+      "lines": "193-289",
+      "relevance": "修正対象: detectMultipleChoicePrompt() 関数。継続行検出ロジック（line 226-228）が変更される。"
+    },
+    {
+      "file": "src/lib/status-detector.ts",
+      "lines": "68-130",
+      "relevance": "影響先: detectSessionStatus() がdetectPrompt()を呼び出し（line 80）、ステータスを判定。Issue #180と密接に関連。"
+    },
+    {
+      "file": "src/lib/auto-yes-manager.ts",
+      "lines": "262-324",
+      "relevance": "影響先: pollAutoYes()がdetectPrompt()を呼び出し（line 280）、Auto-Yes自動応答を実行。"
+    },
+    {
+      "file": "src/lib/response-poller.ts",
+      "lines": "242-259, 439-451, 554-564",
+      "relevance": "影響先: 3箇所でdetectPrompt()を呼び出し、応答完了判定とプロンプトメッセージ保存に使用。"
+    },
+    {
+      "file": "src/lib/claude-poller.ts",
+      "lines": "160-174, 228-236",
+      "relevance": "影響先: 2箇所でdetectPrompt()を呼び出し、応答完了判定に使用。"
+    },
+    {
+      "file": "src/app/api/worktrees/route.ts",
+      "lines": "62",
+      "relevance": "影響先: サイドバーのステータス表示に使用。detectPrompt()の結果でisWaitingForResponseを判定。"
+    },
+    {
+      "file": "src/app/api/worktrees/[id]/route.ts",
+      "lines": "62",
+      "relevance": "影響先: 個別worktreeのステータス表示に使用。"
+    },
+    {
+      "file": "src/app/api/worktrees/[id]/current-output/route.ts",
+      "lines": "79",
+      "relevance": "影響先: リアルタイム出力のプロンプト検出。isPromptWaitingとpromptDataをクライアントに返却。"
+    },
+    {
+      "file": "src/lib/auto-yes-resolver.ts",
+      "lines": "1-39",
+      "relevance": "間接影響: detectPrompt()の結果を消費する。型構造の変更はないため、コード変更不要。"
+    },
+    {
+      "file": "src/hooks/useAutoYes.ts",
+      "lines": "1-96",
+      "relevance": "間接影響: クライアント側Auto-Yesフック。promptDataの型構造が変わらないため、コード変更不要。"
+    },
+    {
+      "file": "tests/unit/prompt-detector.test.ts",
+      "relevance": "テスト追加必須: 既存テストにmultiple choiceプロンプトのテストが存在しない。"
+    }
+  ],
+  "doc_references": [
+    {
+      "file": "CLAUDE.md",
+      "relevance": "prompt-detector.ts, auto-yes-manager.ts, auto-yes-resolver.ts 等のモジュール説明。影響範囲の確認に使用。"
+    }
+  ]
+}

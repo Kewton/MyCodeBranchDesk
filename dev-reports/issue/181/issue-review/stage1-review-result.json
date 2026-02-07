@@ -1,0 +1,110 @@
+{
+  "stage": 1,
+  "stage_name": "通常レビュー（1回目）",
+  "focus_area": "通常",
+  "iteration": 1,
+  "review_date": "2026-02-07",
+  "findings": [
+    {
+      "id": "S1-F001",
+      "severity": "should_fix",
+      "category": "正確性",
+      "title": "継続行検出コードの行番号が不正確",
+      "description": "Issueでは継続行検出ロジックの位置を「line 293-295」と記載しているが、実際の src/lib/prompt-detector.ts では該当コード（hasLeadingSpaces, isShortFragment, isContinuationLine の定義）は226-228行目に存在する。293-295行目は getAnswerInput 関数の JSDoc コメントである。",
+      "suggestion": "「line 293-295」を「line 226-228」に修正する。または行番号の記載を削除し、関数名とコードスニペットのみで参照する。",
+      "location": "根本原因 > 継続行検出の制限（line 293-295）セクション"
+    },
+    {
+      "id": "S1-F002",
+      "severity": "should_fix",
+      "category": "正確性",
+      "title": "isConsecutiveFromOne は実在しない関数",
+      "description": "Issueの「結果」セクションで isConsecutiveFromOne([3]) という関数呼び出しを記載しているが、この関数は src/lib/prompt-detector.ts にもプロジェクト内のどのファイルにも存在しない。実際の検証ロジックは243行目の `if (options.length < 2 || !hasDefaultIndicator)` である。結果的にプロンプト非検出になるという結論は正しいが、中間の説明が不正確。",
+      "suggestion": "疑似コードであることを明記するか、実際のコード（`options.length < 2` チェック）に修正する。例: `options = [{number: 3, ...}] -> options.length < 2 -> true -> isPrompt: false`",
+      "location": "根本原因 > 結果 セクション"
+    },
+    {
+      "id": "S1-F003",
+      "severity": "nice_to_have",
+      "category": "正確性",
+      "title": "スクリーンショットのターミナル出力にタイプミスの可能性",
+      "description": "Issue内のターミナル出力例で `commandmate-issue-161` が `comma\\nndmate-issue-161` と表示されている（nが改行後に重複）。これがターミナルの折り返し表示を忠実に再現しているのか、タイプミスなのかが不明確。ターミナル幅による折り返しの場合、`comma` と `ndmate-issue-161` の間には改行が入るが文字の重複はないはず（ターミナルは単純に幅で切断する）。つまり正しくは `comman\\ndmate-issue-161` のように切れるはず。",
+      "suggestion": "実際のターミナル出力を再確認し、折り返し位置を正確に記載する。再現手順のスクリーンショットに実際の画面キャプチャを添付すると更に良い。",
+      "location": "スクリーンショット セクション"
+    },
+    {
+      "id": "S1-F004",
+      "severity": "should_fix",
+      "category": "完全性",
+      "title": "修正案のisPathContinuation条件に偽陽性リスクの考察が不足",
+      "description": "提案された修正案 `/^[a-zA-Z0-9_-]+$/.test(line)` は、英数字とハイフン・アンダースコアのみで構成される任意の文字列にマッチする。これは例えば質問文に含まれる単一単語（例: 'Proceed', 'Continue' 等）もマッチする可能性がある。options.length > 0 のガード内でのみ評価されるため影響範囲は限定的だが、偽陽性のリスク分析が記載されていない。",
+      "suggestion": "修正案に偽陽性リスクの分析を追加する。例: (1) このチェックが実行される条件（既にオプションが1つ以上検出済み）を明記、(2) 偽陽性が発生した場合の影響（質問文がオプションのラベルに連結される）を説明、(3) 代替案として「オプション番号パターンに一致しない行はすべて継続行」アプローチとのトレードオフを具体化する。",
+      "location": "修正案 セクション"
+    },
+    {
+      "id": "S1-F005",
+      "severity": "nice_to_have",
+      "category": "完全性",
+      "title": "テスト要件の記載がない",
+      "description": "既存テスト tests/unit/prompt-detector.test.ts には multiple choice プロンプトのテストケースが存在しない。修正に伴い追加すべきテストケース（正常系: 複数行オプション検出、異常系: 偽陽性防止）について言及がない。",
+      "suggestion": "受け入れ条件またはテスト要件セクションを追加し、最低限以下のテストケースを明記する: (1) 長いパスを含む複数行オプションの検出、(2) パス以外の継続行パターンの検出、(3) 偽陽性テスト（質問文の単語が継続行として誤認されないこと）、(4) 既存の正常ケースの回帰テスト。",
+      "location": "Issue全体"
+    },
+    {
+      "id": "S1-F006",
+      "severity": "nice_to_have",
+      "category": "完全性",
+      "title": "受け入れ条件が明示されていない",
+      "description": "Issueには「期待される動作」の記載はあるが、具体的な受け入れ条件（Acceptance Criteria）セクションが存在しない。どの状態になればこのIssueが完了とみなせるかが不明確。",
+      "suggestion": "受け入れ条件セクションを追加する。例: (1) 複数行にまたがるオプションテキストを含むmultiple choiceプロンプトが正しく検出されること、(2) Auto-Yesが当該プロンプトで動作すること、(3) UIにプロンプトメッセージとボタンが表示されること、(4) 既存のプロンプト検出が退行しないこと。",
+      "location": "Issue全体"
+    },
+    {
+      "id": "S1-F007",
+      "severity": "must_fix",
+      "category": "正確性",
+      "title": "根本原因分析で中間行（/Users/...パス行）の扱いが未説明",
+      "description": "Issueの根本原因分析では、逆順スキャンの結果として (1) option 3 検出、(2) ndmate-issue-161 が継続行として認識されない、(3) スキャン中断、と記載しているが、ndmate-issue-161 の前にある `/Users/maenokota/share/work/github_kewton/comma` 行と `  2. Yes, and don't ask again for curl and python3 commands in` 行の扱いが説明されていない。実際にはスキャンは ndmate-issue-161 で中断するため上の行は評価されないが、仮に ndmate-issue-161 が継続行として認識されても、次の `/Users/...` 行でも同じ問題が発生するため、修正は複数行の連続的な継続行を全て処理する必要がある。この点の説明が不足している。",
+      "suggestion": "根本原因分析を拡充し、全ての行について逆順スキャンの結果を説明する。特に ndmate-issue-161 だけでなく `/Users/maenokota/share/work/github_kewton/comma` 行も同様に継続行として認識される必要があることを明記する。修正案もこの複数行の連続継続行に対応していることを確認する。（なお、提案された isPathContinuation の `/^[\\/~]/.test(line)` は `/Users/...` 行をカバーしている。）",
+      "location": "根本原因 > 検出アルゴリズムの問題 セクション"
+    }
+  ],
+  "summary": {
+    "total_findings": 7,
+    "must_fix": 1,
+    "should_fix": 3,
+    "nice_to_have": 3,
+    "overall_assessment": "Issue #181 は根本原因の特定と修正方針の提示は概ね正確である。コードの継続行検出ロジックの不足という問題は実際のソースコードで確認でき、再現シナリオも妥当。ただし、(1) 行番号の参照が67行ずれている、(2) 実在しない関数名を疑似コードとして使用している、(3) 中間の折り返し行の扱いが未説明、(4) 修正案の偽陽性リスク分析が不足、(5) 受け入れ条件とテスト要件がない、といった改善点がある。特に根本原因の説明が途中の行をスキップしている点は、実装者が修正の全体像を把握する際に重要な情報が欠落しているため、must_fix として対応を推奨する。"
+  },
+  "code_references": [
+    {
+      "file": "src/lib/prompt-detector.ts",
+      "lines": "226-228",
+      "relevance": "継続行検出ロジック（hasLeadingSpaces, isShortFragment, isContinuationLine）"
+    },
+    {
+      "file": "src/lib/prompt-detector.ts",
+      "lines": "222-239",
+      "relevance": "detectMultipleChoicePrompt の逆順スキャン内の else if ブランチ"
+    },
+    {
+      "file": "src/lib/prompt-detector.ts",
+      "lines": "241-248",
+      "relevance": "オプション数とデフォルトインジケータの検証ロジック"
+    },
+    {
+      "file": "src/lib/auto-yes-resolver.ts",
+      "relevance": "Auto-Yes機能がプロンプト検出に依存（影響範囲の確認）"
+    },
+    {
+      "file": "tests/unit/prompt-detector.test.ts",
+      "relevance": "既存テスト - multiple choice プロンプトのテストケースが存在しない"
+    }
+  ],
+  "doc_references": [
+    {
+      "file": "CLAUDE.md",
+      "relevance": "prompt-detector.ts のモジュール説明（プロンプト検出ロジック）"
+    }
+  ]
+}

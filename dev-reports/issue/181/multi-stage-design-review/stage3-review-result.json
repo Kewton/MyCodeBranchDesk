@@ -1,0 +1,124 @@
+{
+  "stage": 3,
+  "stage_name": "影響分析レビュー",
+  "focus_area": "影響範囲",
+  "findings": [
+    {
+      "id": "DR3-F001",
+      "severity": "should_fix",
+      "category": "影響範囲の漏れ",
+      "title": "PromptMessage.tsx と MessageList.tsx がUIラベル表示影響の記載対象に含まれていない",
+      "description": "設計書セクション3.2の「変更不要ファイル（間接影響のみ）」テーブルおよびセクション3.3の「関連関数使用モジュール」テーブルに、option.label を直接UIに表示する以下のコンポーネントが記載されていない。\n\n- src/components/worktree/PromptMessage.tsx (117行目: {option.label})\n- src/components/worktree/MessageList.tsx (301行目: {option.label})\n- src/components/worktree/PromptPanel.tsx (286行目: {option.number}. {option.label})\n- src/components/mobile/MobilePromptSheet.tsx (399行目: {option.number}. {option.label})\n\nこれらはセクション11の制約事項1（ラベル不完全性）に直接関連するファイルである。PromptPanel.tsx と MobilePromptSheet.tsx は設計書でセクション3.3に言及されていないが、PromptMessage.tsx と MessageList.tsx は完全に記載が漏れている。ラベルが不完全に表示されるUIコンポーネントを明示しておくことで、将来のラベル連結対応時の影響範囲特定が容易になる。",
+      "suggestion": "セクション3.2またはセクション3.3に以下のUIコンポーネントを追加し、option.label の表示に関する間接的影響を明記する。\n\n| ファイル | 使用箇所 | 影響内容 |\n|---------|---------|----------|\n| src/components/worktree/PromptMessage.tsx | 117行目 option.label表示 | ラベルが不完全（折り返し前の部分のみ）で表示される可能性がある |\n| src/components/worktree/MessageList.tsx | 301行目 option.label表示 | 同上 |\n| src/components/worktree/PromptPanel.tsx | 286行目 option.label表示 | 同上 |\n| src/components/mobile/MobilePromptSheet.tsx | 399行目 option.label表示 | 同上 |",
+      "affected_files": [
+        "src/components/worktree/PromptMessage.tsx",
+        "src/components/worktree/MessageList.tsx",
+        "src/components/worktree/PromptPanel.tsx",
+        "src/components/mobile/MobilePromptSheet.tsx"
+      ],
+      "location": "設計書 セクション3.2, セクション3.3, セクション11 制約事項1"
+    },
+    {
+      "id": "DR3-F002",
+      "severity": "should_fix",
+      "category": "呼び出し元の漏れ",
+      "title": "status-detector.ts における detectPrompt() への入力が last 15 lines に切り詰められている点の影響分析が不十分",
+      "description": "設計書セクション3.2の status-detector.ts の記載に、STATUS_CHECK_LINE_COUNT = 15 の制限内に収まるケースで効果があると記述されている。しかし、この分析に以下の重要な補足が欠けている。\n\nstatus-detector.ts の80行目では detectPrompt(lastLines) を呼び出しており、lastLines は output の最後の15行分のみである。detectPrompt() はその引数 output 全体を detectMultipleChoicePrompt(output) に渡す（56行目）。つまり detectMultipleChoicePrompt() が受け取るのは最大15行のテキストである。\n\nIssue #181の再現シナリオ（3オプション + 2つの折り返し行 + 質問文1行 + 空行 + 'Esc to cancel' 行 = 約8-9行）は15行以内に収まるため問題ない。しかし、オプション数が多い場合やオプションごとに複数の折り返し行がある場合、15行を超える可能性がある。この制約を明示的に記述すべきである。",
+      "suggestion": "セクション3.2の status-detector.ts の影響内容に以下の説明を追加する。\n\n「注意: status-detector.ts は detectPrompt() にoutputの最後の15行(STATUS_CHECK_LINE_COUNT)のみを渡す。detectPrompt() はその引数を detectMultipleChoicePrompt() にそのまま渡すため、detectMultipleChoicePrompt() が実際にスキャンできるのは最大15行である。Issue #181の再現シナリオ(3オプション + 2折り返し行 + 質問文 + 区切り = 約8-9行)は15行以内に収まるため問題ないが、オプション数が多く各オプションに折り返し行がある場合はstatus-detector経由での検出に失敗する可能性がある。他の呼び出し元(response-poller.ts, claude-poller.ts, auto-yes-manager.ts, API routes)は全出力を渡すためこの制限はない。」",
+      "affected_files": [
+        "src/lib/status-detector.ts"
+      ],
+      "location": "設計書 セクション3.2 status-detector.ts の行"
+    },
+    {
+      "id": "DR3-F003",
+      "severity": "nice_to_have",
+      "category": "副作用",
+      "title": "DB保存される promptData.options[].label が不完全になる点の影響の明示不足",
+      "description": "response-poller.ts (567行目) と claude-poller.ts (243行目) は、detectPrompt() の結果である promptDetection.promptData をそのまま createMessage() に渡してDBに保存する。また promptDetection.cleanContent を content フィールドとして保存する。\n\n修正後、折り返しを含むmultiple choiceプロンプトが正しく検出されるようになるが、options[1].label は折り返し前の部分テキストのみ（例: \"Yes, and don't ask again for curl and python3 commands in\"）となる。この不完全なラベルがDBの prompt_data カラムにJSON形式で永続化される。\n\nこれは設計書セクション11の制約事項1で言及されているが、DBに永続化される点は明示されていない。将来ラベル連結機能を追加した場合、既にDBに保存された過去のデータとの整合性を考慮する必要がある。",
+      "suggestion": "セクション11の制約事項1に以下を追記する。\n\n「この不完全なラベルはDBの chat_messages.prompt_data カラムにJSONとして永続化される（response-poller.ts 567行目, claude-poller.ts 243行目）。将来ラベル連結対応を行う場合、既存のDB保存データとの整合性を考慮する必要がある（マイグレーション不要だが、表示上の不一致が残存する可能性がある）。」",
+      "affected_files": [
+        "src/lib/response-poller.ts",
+        "src/lib/claude-poller.ts",
+        "src/lib/db.ts"
+      ],
+      "location": "設計書 セクション11 制約事項1"
+    },
+    {
+      "id": "DR3-F004",
+      "severity": "nice_to_have",
+      "category": "影響範囲の漏れ",
+      "title": "useAutoYes.ts とクライアント側 PromptData 消費チェーンの記載が不十分",
+      "description": "設計書セクション3.3に useAutoYes.ts が記載されているが、PromptData の消費チェーンはさらに広い。具体的には以下のファイルも PromptData 型を参照し、options の label フィールドにアクセスする可能性がある。\n\n- src/hooks/useWorktreeUIState.ts (196行目, 260行目: showPrompt(data: PromptData, ...))\n- src/types/ui-state.ts (45行目: data: PromptData | null)\n- src/types/ui-actions.ts (27行目: SHOW_PROMPT action)\n- src/components/worktree/WorktreeDetailRefactored.tsx (67行目: promptData?: PromptData)\n\nこれらは型構造に変更がないため実質的な影響はないが、PromptData の消費パスを網羅的に把握するためには記載があるとよい。ただし、これらは全て型の伝搬のみであり、label フィールドを直接処理するロジックは含まないため、影響は限定的である。",
+      "suggestion": "セクション3.3にPromptDataの型伝搬チェーンとして以下を追記する（任意）。\n\n| ファイル | 使用内容 | 備考 |\n|---------|---------|------|\n| src/hooks/useWorktreeUIState.ts | PromptData型の受け渡し | 型構造変更なしのため影響なし |\n| src/types/ui-state.ts | PromptData型の参照 | 同上 |\n| src/types/ui-actions.ts | SHOW_PROMPTアクション型 | 同上 |\n| src/components/worktree/WorktreeDetailRefactored.tsx | PromptData propsの受け渡し | 同上 |",
+      "affected_files": [
+        "src/hooks/useWorktreeUIState.ts",
+        "src/types/ui-state.ts",
+        "src/types/ui-actions.ts",
+        "src/components/worktree/WorktreeDetailRefactored.tsx"
+      ],
+      "location": "設計書 セクション3.3"
+    },
+    {
+      "id": "DR3-F005",
+      "severity": "must_fix",
+      "category": "影響範囲の漏れ",
+      "title": "detectPrompt() 内部で lastLines (last 10) を作成するが detectMultipleChoicePrompt() には full output を渡す設計の説明不足",
+      "description": "設計書の影響分析において、detectPrompt() 関数の内部動作に関する重要な設計ポイントが明確に説明されていない。\n\ndetectPrompt() は48行目で lastLines = lines.slice(-10).join('\\n') を作成し、Pattern 1-5（yes/no系）の検出には lastLines を使用する。一方、Pattern 0（multiple choice）の検出では56行目で detectMultipleChoicePrompt(output) に元の output 全体を渡す。\n\nこの二重構造は、呼び出し元ごとに detectPrompt() に渡される output のサイズが異なることと相互作用する。\n\n- auto-yes-manager.ts: captureSessionOutput() の結果（最大5000バイト）を渡す\n- response-poller.ts (248行目): 全出力（stripAnsi済み）を渡す\n- response-poller.ts (442行目): lines.join('\\n') を渡す\n- response-poller.ts (556行目): result.response を渡す\n- claude-poller.ts (164行目): fullOutput を渡す\n- claude-poller.ts (232行目): result.response を渡す\n- worktrees/route.ts: captureSessionOutput() 結果（100バイト）を渡す\n- worktrees/[id]/route.ts: captureSessionOutput() 結果（100バイト）を渡す\n- worktrees/[id]/current-output/route.ts: 全出力（stripAnsi済み）を渡す\n- status-detector.ts: last 15 lines を渡す\n\n特に worktrees/route.ts と worktrees/[id]/route.ts は captureSessionOutput() を timeout=100 で呼び出しており、取得できる出力が非常に短い可能性がある。multiple choice プロンプトが折り返しを含む場合、100ms のタイムアウトで取得できる出力量が十分でない可能性がある。この制約は本修正固有ではないが、本修正で検出対象が広がることで、この既存制約が顕在化する可能性がある。",
+      "suggestion": "セクション6.1の影響分析に以下の補足を追加する。\n\n「detectPrompt() は Pattern 1-5 (yes/no系) には lastLines (最後10行) を使用し、Pattern 0 (multiple choice) には引数 output 全体を detectMultipleChoicePrompt() に渡す。呼び出し元によって output のサイズが異なる点に注意が必要。\n\n- 全出力を渡す呼び出し元（response-poller.ts, claude-poller.ts, current-output/route.ts）: 本修正の効果が最大限発揮される\n- 限定的な出力を渡す呼び出し元: \n  - status-detector.ts: last 15 lines（Issue #181シナリオでは十分）\n  - auto-yes-manager.ts: 最大5000バイト（通常十分）\n  - worktrees/route.ts, worktrees/[id]/route.ts: captureSessionOutput(timeout=100)の結果（出力量が限定的な可能性があるが、これは既存の制約であり本修正固有ではない）\n\nいずれの呼び出し元も、本修正による悪影響（regression）は発生しない。効果の範囲が呼び出し元により異なるのみである。」",
+      "affected_files": [
+        "src/lib/prompt-detector.ts",
+        "src/lib/status-detector.ts",
+        "src/lib/auto-yes-manager.ts",
+        "src/app/api/worktrees/route.ts",
+        "src/app/api/worktrees/[id]/route.ts"
+      ],
+      "location": "設計書 セクション6.1"
+    },
+    {
+      "id": "DR3-F006",
+      "severity": "nice_to_have",
+      "category": "デプロイ考慮",
+      "title": "デプロイ・マイグレーション考慮事項のセクションが存在しない",
+      "description": "設計書にデプロイやマイグレーションに関する考慮事項のセクションが存在しない。本修正は以下の点でデプロイ上のリスクが低い。\n\n- DBスキーマ変更なし\n- 環境変数変更なし\n- 設定ファイル変更なし\n- npm パッケージ依存関係の変更なし\n- ビルド手順の変更なし\n\nしかし、設計書にこれらを明示的に「変更なし」と記述しておくことで、レビューアーの確認工数を削減できる。",
+      "suggestion": "セクション6にサブセクション「6.4 デプロイ・マイグレーション考慮事項」を追加する。\n\n| 項目 | 影響 |\n|------|------|\n| DBスキーマ | 変更なし。既存のchat_messages.prompt_dataカラムのJSON構造は不変 |\n| 環境変数 | 変更なし |\n| npm依存関係 | 変更なし |\n| ビルド手順 | 変更なし。通常の npm run build で反映される |\n| ダウンタイム | 不要。サーバー再起動のみで反映 |\n| ロールバック | 変更前のコードに戻すだけで完了。DB上のデータに影響なし |",
+      "affected_files": [],
+      "location": "設計書 セクション6"
+    },
+    {
+      "id": "DR3-F007",
+      "severity": "should_fix",
+      "category": "副作用",
+      "title": "cleanContent の変化による DB 保存 content の差異分析が不足",
+      "description": "detectMultipleChoicePrompt() が isPrompt: true を返す場合、cleanContent は question.trim() となる（287行目）。isPrompt: false の場合は output.trim() となる（246行目）。\n\n修正前: 折り返しを含むmultiple choiceプロンプトが検出されない場合、detectPrompt() は後続のyes/noパターンも不一致となり、最終的に isPrompt: false, cleanContent: output.trim() を返す。\n\n修正後: 同じ入力に対して isPrompt: true, cleanContent: question.trim()（例: 'Do you want to proceed?'）を返す。\n\nこの差異は response-poller.ts（565行目）と claude-poller.ts（241行目）で createMessage() の content フィールドに影響する。修正前は全出力テキストが content に保存されていたが、修正後は質問文のみが保存される。これはDBに保存されるデータの変化であり、UIでのメッセージ表示内容に影響する。\n\nなお、これは「バグの修正」であるため正しい動作への変更であり、問題ではない。しかし、この動作変化を設計書で明示しておくべきである。",
+      "suggestion": "セクション6.1に以下の分析を追加する。\n\n「cleanContent の変化: 修正前は折り返しを含むmultiple choiceプロンプトが検出されず、detectPrompt() が isPrompt: false を返すため cleanContent = output.trim()（全出力テキスト）がDBのcontent列に保存されていた。修正後は isPrompt: true となり、cleanContent = question.trim()（質問文のみ、例: 'Do you want to proceed?'）が保存される。これは正しい動作への変更であり、messageType も 'normal' から 'prompt' に変わるため、UI側で適切なプロンプト表示が行われるようになる。」",
+      "affected_files": [
+        "src/lib/response-poller.ts",
+        "src/lib/claude-poller.ts"
+      ],
+      "location": "設計書 セクション6.1"
+    },
+    {
+      "id": "DR3-F008",
+      "severity": "nice_to_have",
+      "category": "影響範囲の漏れ",
+      "title": "既存テストファイルにmultiple choice関連テストが存在する他ファイルの記載がない",
+      "description": "設計書セクション7は tests/unit/prompt-detector.test.ts のみにテスト追加を記載しているが、以下のテストファイルにも multiple choice プロンプトに関連するテストが存在する。\n\n- tests/unit/lib/auto-yes-resolver.test.ts: resolveAutoAnswer() のmultiple choiceテスト\n- tests/unit/components/PromptPanel.test.tsx: PromptPanelのmultiple choice表示テスト\n- tests/unit/components/mobile/MobilePromptSheet.test.tsx: MobilePromptSheetのmultiple choiceテスト\n- tests/unit/components/worktree/MessageListOptimistic.test.tsx: MessageListのプロンプト表示テスト\n\nこれらのテストは型構造やコンポーネント動作のテストであり、本修正で変更は不要だが、回帰テスト実行時の確認対象として設計書に記載しておくと有用である。",
+      "suggestion": "セクション7.2のテスト実行方法に以下を追記する。\n\n```bash\n# 関連テストの回帰確認（全テストの一部として自動実行）\nnpm run test:unit -- tests/unit/lib/auto-yes-resolver.test.ts\nnpm run test:unit -- tests/unit/components/PromptPanel.test.tsx\nnpm run test:unit -- tests/unit/components/mobile/MobilePromptSheet.test.tsx\n```\n\nこれらは既存テストであり変更不要だが、multiple choice プロンプトに関連するため回帰確認の対象とする。",
+      "affected_files": [
+        "tests/unit/lib/auto-yes-resolver.test.ts",
+        "tests/unit/components/PromptPanel.test.tsx",
+        "tests/unit/components/mobile/MobilePromptSheet.test.tsx",
+        "tests/unit/components/worktree/MessageListOptimistic.test.tsx"
+      ],
+      "location": "設計書 セクション7.2"
+    }
+  ],
+  "summary": {
+    "total_findings": 8,
+    "must_fix": 1,
+    "should_fix": 3,
+    "nice_to_have": 4,
+    "overall_assessment": "設計書の影響分析は全体として高品質であり、直接的な変更対象ファイルと主要な呼び出しチェーンは正確に記載されている。detectPrompt() の8つの呼び出し元のうち7つ（respond/route.ts は getAnswerInput() のみ使用のため正しく分離されている）が全て識別されており、関数シグネチャ・型構造に変更がないという「no breaking changes」の主張はコード調査により確認できた。\n\nただし、以下の3点で影響範囲の記載に漏れがある。(1) option.label をUIに表示する4つのコンポーネント（特にPromptMessage.tsx, MessageList.tsx）が間接影響ファイルに記載されていない（DR3-F001）。(2) 呼び出し元ごとに detectPrompt() に渡されるoutputサイズが異なる点の分析が不十分であり、特にstatus-detector.ts の15行制限とAPI routeの100msタイムアウト制約が明示されていない（DR3-F002, DR3-F005）。(3) 修正によりDBに保存されるcontentとpromptDataの内容が変化する点が明示されていない（DR3-F003, DR3-F007）。\n\nこれらはいずれも本修正の実装を妨げるものではなく、設計書の網羅性を向上させるための指摘である。Must Fixに分類したDR3-F005は、detectPrompt() の内部的な output 伝搬構造が影響分析の根幹であるため、設計書に明記することが望ましい。"
+  }
+}

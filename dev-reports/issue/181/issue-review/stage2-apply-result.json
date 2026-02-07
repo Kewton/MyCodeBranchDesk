@@ -1,0 +1,60 @@
+{
+  "stage": 2,
+  "stage_name": "指摘事項反映（1回目）",
+  "iteration": 1,
+  "apply_date": "2026-02-07",
+  "applied_findings": [
+    {
+      "finding_id": "S1-F001",
+      "severity": "should_fix",
+      "status": "applied",
+      "action_taken": "行番号の参照を「line 293-295」から「line 226-228」に修正。実際のソースコード src/lib/prompt-detector.ts で hasLeadingSpaces, isShortFragment, isContinuationLine の定義が226-228行目にあることを確認済み。修正案セクションのコメントにも正しい行番号を追記。"
+    },
+    {
+      "finding_id": "S1-F002",
+      "severity": "should_fix",
+      "status": "applied",
+      "action_taken": "実在しない関数 isConsecutiveFromOne([3]) の記載を削除し、実際の検証ロジック（options.length < 2 の検証、243行目）に置き換え。補足Noteで実際のコード動作（options.length < 2 チェックとデフォルトインジケータ検証）を正確に説明。"
+    },
+    {
+      "finding_id": "S1-F003",
+      "severity": "nice_to_have",
+      "status": "applied",
+      "action_taken": "スクリーンショットセクションに補足Noteを追加し、ターミナル幅による折り返しを再現したテキスト表現であり、実際のターミナルでは表示幅に応じて折り返し位置が異なる場合があることを明記。"
+    },
+    {
+      "finding_id": "S1-F004",
+      "severity": "should_fix",
+      "status": "applied",
+      "action_taken": "修正案セクションに「偽陽性リスク分析」サブセクションを新規追加。(1) /^[\\/~]/ パターンの低リスク評価、(2) /^[a-zA-Z0-9_-]+$/ パターンの偽陽性リスク（単一単語マッチ）と緩和要因（options.length > 0 ガード内のみ）、(3) 代替アプローチ（全非オプション行を継続行扱い）とのトレードオフを具体的に記載。"
+    },
+    {
+      "finding_id": "S1-F005",
+      "severity": "nice_to_have",
+      "status": "applied",
+      "action_taken": "「テスト要件」セクションを新規追加。(1) 正常系：複数行オプション検出、(2) 正常系：パス以外の継続行、(3) 偽陽性テスト、(4) 回帰テストの4カテゴリのテストケースを明記。既存テスト tests/unit/prompt-detector.test.ts にmultiple choiceテストが不足していることも言及。"
+    },
+    {
+      "finding_id": "S1-F006",
+      "severity": "nice_to_have",
+      "status": "applied",
+      "action_taken": "「受け入れ条件」セクションを新規追加。チェックリスト形式で5項目を記載：(1) 複数行オプション検出、(2) Auto-Yes動作、(3) UI表示、(4) 既存プロンプト検出の退行防止、(5) テストケース追加。"
+    },
+    {
+      "finding_id": "S1-F007",
+      "severity": "must_fix",
+      "status": "applied",
+      "action_taken": "根本原因分析の「検出アルゴリズムの問題」セクションを大幅に拡充。逆順スキャンの全行について処理結果を説明：(1) ndmate-issue-161 で中断、(2) /Users/...comma 行は未評価だが仮に行2が修正されても同様の問題が発生すること、(3) 修正は複数行の連続的な継続行を全て処理する必要があることを明記。提案された isPathContinuation の /^[\\/~]/ が /Users/... 行をカバーしていることも確認記載。"
+    }
+  ],
+  "summary": {
+    "total_findings": 7,
+    "applied": 7,
+    "skipped": 0,
+    "issue_updated": true
+  },
+  "github_update": {
+    "status": "success",
+    "issue_url": "https://github.com/Kewton/CommandMate/issues/181"
+  }
+}

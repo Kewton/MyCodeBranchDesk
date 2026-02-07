@@ -1,0 +1,94 @@
+{
+  "stage": 4,
+  "stage_name": "セキュリティレビュー",
+  "focus_area": "セキュリティ",
+  "findings": [
+    {
+      "id": "DR4-F001",
+      "severity": "nice_to_have",
+      "category": "ReDoS",
+      "title": "追加正規表現パターンのReDoSリスク評価: 安全",
+      "description": "設計書セクション10で記載されている通り、追加パターン `/^[\\/~]/` と `/^[a-zA-Z0-9_-]+$/` はいずれもReDoSに対して安全である。`/^[\\/~]/` は先頭1文字のみの固定チェックでありバックトラッキングは発生しない。`/^[a-zA-Z0-9_-]+$/` は文字クラスの繰り返しだが、アンカー `^` と `$` で囲まれた単一の量指定子であるため、catastrophic backtracking が発生するパターン（ネストされた量指定子や選択肢の重複）には該当しない。ただし、設計書セクション10のReDoS評価は結論のみ記載されており、上記のような技術的根拠の記述がない。",
+      "suggestion": "設計書セクション10のReDoS評価に、「単一の文字クラスと量指定子のみで構成され、ネストされた量指定子や重複する選択肢がないためバックトラッキングが発生しない」旨の技術的根拠を1行追記すると、レビューアにとってより明確になる。実装への影響はない。",
+      "owasp_reference": "",
+      "location": "設計書セクション10 ReDoS行"
+    },
+    {
+      "id": "DR4-F002",
+      "severity": "should_fix",
+      "category": "データ整合性",
+      "title": "偽陽性による意図しないAuto-Yesコマンド実行のリスク分析が不十分",
+      "description": "設計書セクション5.2で `/^[a-zA-Z0-9_-]+$/` パターンの偽陽性リスクについて分析されているが、セキュリティ観点から最も重要な「偽陽性が発生した場合にAuto-Yesが意図しないコマンドを承認してしまうリスク」の分析が不十分である。具体的なシナリオ: (1) Claude CLIが通常のテキスト出力中に単一単語行（例: `Proceed`）を出力し、(2) その直前に偶然 numbered list 形式のテキストが存在し、(3) そのうち1つが `❯` を含む場合、Auto-Yesが誤ったコマンドを自動承認する可能性がある。設計書は `❯` インジケータ必須条件で緩和されると述べているが、`❯` 文字 (U+276F) がClaude CLIの通常出力に含まれる可能性については検討されていない。Auto-Yesの場合、`resolveAutoAnswer()` は default option の number を返すため、誤検出時に送信される入力は数字1桁（`1`, `2` 等）に限定され、大きな被害にはつながりにくいが、意図しない選択肢の送信はCLIの動作を予測不能にする。",
+      "suggestion": "設計書セクション5.2またはセクション10に、Auto-Yesコンテキストでの偽陽性の影響分析を追記する。以下の点を明記すべき: (1) Auto-Yesが送信するのは数字文字列のみであり任意のコマンド実行にはつながらない、(2) `❯` (U+276F) は一般的なUnicode文字ではなくClaude CLIの選択インジケータとして使用される特殊文字であるため通常出力に含まれる可能性は極めて低い、(3) 万が一偽陽性でAuto-Yes応答が発生しても、Claude CLIがプロンプト状態でなければ入力は無視されるか通常テキストとして処理される。",
+      "owasp_reference": "A08",
+      "location": "設計書セクション5.2, セクション10"
+    },
+    {
+      "id": "DR4-F003",
+      "severity": "nice_to_have",
+      "category": "インジェクション",
+      "title": "tmux sendKeysへの入力が数値文字列に限定されていることの明示",
+      "description": "Auto-Yesフロー（`auto-yes-manager.ts` 302行目）では、`sendKeys(sessionName, answer, false)` を呼び出して応答を送信する。`answer` は `resolveAutoAnswer()` の戻り値であり、yes/no プロンプトでは `'y'`、multiple choice では `target.number.toString()` である。`sendKeys()` は内部で `keys.replace(/'/g, \"'\\\\''\")` によるシングルクォートエスケープを行い、`tmux send-keys -t \"session\" 'escaped_keys'` の形式でコマンドを構築している。本修正は `detectPrompt()` の検出ロジックのみの変更であり、`resolveAutoAnswer()` や `sendKeys()` には変更がないため、コマンドインジェクションリスクは増加しない。しかし、設計書セクション10の「コマンドインジェクション」欄では、送信値が「数値文字列」に限定される根拠として `resolveAutoAnswer()` の具体的なコードパスが参照されているものの、手動応答パス（`respond/route.ts` 97-100行目のカスタムテキスト入力）との違いが明記されていない。",
+      "suggestion": "設計書セクション10のコマンドインジェクション欄に「Auto-Yesフローでは `resolveAutoAnswer()` の戻り値のみが送信され、ユーザー入力は経由しない。手動応答パス（respond API）は本修正のスコープ外であり変更なし」の旨を明記する。これにより、2つの応答パスのセキュリティ境界が明確になる。",
+      "owasp_reference": "A03",
+      "location": "設計書セクション10 コマンドインジェクション行"
+    },
+    {
+      "id": "DR4-F004",
+      "severity": "nice_to_have",
+      "category": "XSS",
+      "title": "不完全なラベルテキストのUI表示におけるXSSリスク: 問題なし",
+      "description": "設計書セクション10でXSSリスクが「影響なし」と評価されているのは正しい。ラベルテキストはtmuxの端末出力をANSIストリップした文字列であり、ユーザーが直接制御できる値ではない。UIコンポーネント（`PromptMessage.tsx`, `MessageList.tsx`, `PromptPanel.tsx`, `MobilePromptSheet.tsx`）ではReactのJSXテンプレート内で `{option.label}` として展開されるため、React の自動エスケープによりXSSは防止される。本修正によりラベルが不完全（折り返し前の部分のみ）になるが、これはXSSリスクを増加させない。また、ラベルはDBの `chat_messages.prompt_data` カラムにJSON形式で保存されるが、保存時にJSON.stringifyが適用され、読み出し時にJSON.parseで構造化データとして復元されるため、保存経由のXSSリスクもない。",
+      "suggestion": "対応不要。設計書セクション10の記載は適切。",
+      "owasp_reference": "A03",
+      "location": "設計書セクション10 XSS行"
+    },
+    {
+      "id": "DR4-F005",
+      "severity": "nice_to_have",
+      "category": "ログ",
+      "title": "継続行判定の新条件追加に関するデバッグログの不在",
+      "description": "現在の `detectMultipleChoicePrompt()` 関数は `logger.debug()` を直接呼び出していない（呼び出し元の `detectPrompt()` が44行目と158行目でログを出力するのみ）。本修正で `isPathContinuation` 条件が追加されるが、この条件がどの行に対してマッチしたかを記録するログは存在しない。デバッグ時に「なぜこの行が継続行として扱われたか」を追跡するのが困難になる。ただし、これは既存の問題であり本修正固有ではない。また、ポーリング間隔が2秒であるため、各ポーリングサイクルで詳細ログを出力するとログ量が増大する懸念がある。",
+      "suggestion": "将来のデバッグ効率向上のため、`detectMultipleChoicePrompt()` 内の継続行スキップ処理（230-232行目の `if (isContinuationLine)` ブロック）に `logger.debug()` を追加し、どの条件（`hasLeadingSpaces`, `isShortFragment`, `isPathContinuation`）でマッチしたかを記録することを検討する。ただし、本Issueのスコープでは必須ではなく、将来のIssueで対応しても良い。",
+      "owasp_reference": "A09",
+      "location": "設計書セクション10（ログに関する記載なし）, src/lib/prompt-detector.ts 230-232行目"
+    },
+    {
+      "id": "DR4-F006",
+      "severity": "should_fix",
+      "category": "データ整合性",
+      "title": "50行逆順スキャン制限と継続行スキップの組み合わせによるスキャン範囲拡大の安全性分析",
+      "description": "設計書セクション11制約事項3で「既存の50行制限を維持する」と記載されている。しかし、`isPathContinuation` の追加により、従来スキャンが中断していた行が `continue` でスキップされるようになるため、実質的なスキャン範囲が広がる。50行のウィンドウ内で多くの行が継続行としてスキップされると、スキャンがより古い行まで到達し、関係のないテキストがオプションや質問文として誤認識されるリスクがある。例えば、Claude CLIの出力に偶然 numbered list + `❯` 文字を含むテキストブロックが存在し、その間に多数のパス断片行（英数字・ハイフン・アンダースコアのみ）が挟まっている場合、スキャンがそのブロックまで到達する可能性がある。リスクは低いが、セキュリティ上「スキャン範囲拡大がAuto-Yesの誤動作につながらない」ことの根拠を設計書に明記すべきである。",
+      "suggestion": "設計書セクション8（リスク分析）の「逆順スキャン範囲拡大による意図しない行の取り込み」行に、以下の安全性根拠を追記する: (1) スキャンは最大50行という絶対的な上限で保護されており、50行を超える遡りは発生しない、(2) 継続行はスキップされるのみでオプション数には寄与しないため、偽のオプション行が2つ以上かつ `❯` インジケータ付きで存在しない限り誤検出は起こらない、(3) Auto-Yesが送信する値は数字1桁に限定されるため仮に誤検出が起きても被害は限定的。",
+      "owasp_reference": "A08",
+      "location": "設計書セクション8 リスク分析表, セクション11 制約事項3"
+    },
+    {
+      "id": "DR4-F007",
+      "severity": "nice_to_have",
+      "category": "インジェクション",
+      "title": "手動応答パス（respond API）のカスタムテキスト入力によるtmuxコマンドインジェクションリスク（既存問題、本修正のスコープ外）",
+      "description": "本修正とは直接関係ないが、セキュリティレビューの一環として記録する。`respond/route.ts` の97-100行目では、multiple choice のカスタムテキスト入力（`requiresTextInput` が true のオプション選択時）において、ユーザー入力が `input = answer` として直接設定され、149行目で `sendKeys(sessionName, input, false)` に渡される。`sendKeys()` はシングルクォートエスケープ（`keys.replace(/'/g, \"'\\\\''\")` -- 213行目）を適用するが、tmux send-keys のシングルクォート内では大部分のシェルメタ文字は無害化される。ただし、入力のバリデーション（長さ制限、制御文字の除去等）が行われていない。本修正は `detectPrompt()` のみの変更であり、この既存の手動応答パスには影響しない。",
+      "suggestion": "本Issueでの対応は不要。将来のセキュリティ改善Issueとして、`respond/route.ts` のカスタムテキスト入力に対する (1) 長さ制限（例: 1000文字）、(2) 制御文字（\\x00-\\x1f）の除去、(3) 入力ログ記録 を検討することを推奨する。",
+      "owasp_reference": "A03",
+      "location": "src/app/api/worktrees/[id]/respond/route.ts 97-100行目（本修正のスコープ外）"
+    },
+    {
+      "id": "DR4-F008",
+      "severity": "nice_to_have",
+      "category": "データ整合性",
+      "title": "requiresTextInput判定がラベル不完全性により誤動作する可能性",
+      "description": "設計書セクション4.4およびセクション11制約事項1で、継続行がラベルに連結されないことが記載されている。`TEXT_INPUT_PATTERNS` は `opt.label` に対して適用される（prompt-detector.ts 274行目）。ラベルが折り返しにより不完全になった場合、本来 `requiresTextInput` が true になるべきオプションのラベルが途中で切れ、パターンマッチに失敗する可能性がある。例えば、ラベルが `'Enter a custom value or type here to'` のようなテキストで、折り返し位置が `'Enter a custom value or'` と `'type here to...'` の間であった場合、trim後のラベルは `'Enter a custom value or'` となり `type\\s+here` パターンにマッチしない。この場合、Auto-Yesがテキスト入力が必要なオプションに対して数字を送信してしまう。ただし、Claude CLIの現在のmultiple choiceプロンプトでテキスト入力オプションが折り返されるケースは実際にはほぼ存在しない（オプションのテキスト長は通常短い）。",
+      "suggestion": "設計書セクション11の制約事項にサブ項目として追記: 「ラベルの不完全性により `requiresTextInput` の判定精度が低下する可能性がある。ただし、テキスト入力を要求するオプション（`type here`, `tell me` 等を含む）は通常短いテキストであり、折り返しが発生する可能性は極めて低い」。",
+      "owasp_reference": "A08",
+      "location": "設計書セクション11 制約事項1, src/lib/prompt-detector.ts 274行目"
+    }
+  ],
+  "summary": {
+    "total_findings": 8,
+    "must_fix": 0,
+    "should_fix": 2,
+    "nice_to_have": 6,
+    "overall_assessment": "設計書のセキュリティ考慮事項（セクション10）は主要なリスク項目（ReDoS、コマンドインジェクション、XSS、入力検証）を網羅しており、本修正のセキュリティリスクは全体的に低い。本修正はパターンマッチングロジックの拡張のみであり、新しい外部入力パス・認証パス・データフローの追加はない。追加される正規表現はReDoSに対して安全であり、Auto-Yesが送信する値は `resolveAutoAnswer()` により数字文字列に限定されるためコマンドインジェクションリスクの増加はない。ただし、(1) 偽陽性によるAuto-Yes誤動作のリスク分析をAuto-Yesコンテキストで明示的に記述すること（DR4-F002）、(2) スキャン範囲拡大の安全性根拠を明記すること（DR4-F006）の2点は設計書の品質向上のために対応を推奨する。本ツールはローカル開発環境で動作するツールであり、ネットワーク経由の攻撃面は限定的である点も考慮し、must_fix レベルの指摘はない。"
+  }
+}

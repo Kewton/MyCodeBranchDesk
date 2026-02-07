@@ -1,0 +1,70 @@
+{
+  "issue_number": 181,
+  "acceptance_criteria": [
+    "複数行にまたがるオプションテキストを含むmultiple choiceプロンプトが正しく検出されること",
+    "Auto-Yesが当該プロンプトで動作すること",
+    "UIにプロンプトメッセージとボタンが表示されること",
+    "既存のプロンプト検出（yes/no、標準的なmultiple choice）が退行しないこと",
+    "テスト要件セクションに記載のテストケースが追加されていること"
+  ],
+  "implementation_tasks": [
+    "src/lib/prompt-detector.ts の226-228行目に isPathContinuation 条件を追加: const isPathContinuation = /^[\\/~]/.test(line) || /^[a-zA-Z0-9_-]+$/.test(line); を追加し、isContinuationLine の条件にOR結合する",
+    "src/lib/prompt-detector.ts の223-225行目のコメントを更新（新しい継続行条件の説明を追記）",
+    "tests/unit/prompt-detector.test.ts に 'Pattern 0: Multiple choice (numbered options)' describeブロックを追加し、10件のテストケースを追加"
+  ],
+  "target_coverage": 80,
+  "design_doc_path": "dev-reports/design/issue-181-multiline-option-detection-design-policy.md",
+  "work_plan_path": "dev-reports/issue/181/work-plan.md",
+  "test_cases": [
+    {
+      "name": "should detect multiple choice prompt with multi-line wrapped options",
+      "category": "正常系",
+      "description": "Issue #181の再現シナリオ - パスの折り返しを含むmultiple choice"
+    },
+    {
+      "name": "should detect standard multiple choice prompt without wrapping",
+      "category": "正常系",
+      "description": "折り返しなしの標準的なmultiple choice"
+    },
+    {
+      "name": "should detect prompt with path starting with ~",
+      "category": "正常系",
+      "description": "~で始まるパス継続行"
+    },
+    {
+      "name": "should not detect normal text with numbered list as multiple choice",
+      "category": "偽陽性",
+      "description": "番号付きリストがmultiple choiceとして誤検出されないこと"
+    },
+    {
+      "name": "should still detect yes/no prompt when numbered list exists above",
+      "category": "交差影響",
+      "description": "numbered list上部でもyes/noプロンプトが正常検出"
+    },
+    {
+      "name": "should detect existing yes/no prompts without regression",
+      "category": "回帰",
+      "description": "既存yes/noプロンプト検出の回帰確認"
+    },
+    {
+      "name": "should not detect normal output as prompt (regression)",
+      "category": "回帰",
+      "description": "通常出力の非検出回帰確認"
+    },
+    {
+      "name": "should handle wide terminal with no wrapping",
+      "category": "ターミナル幅",
+      "description": "広いターミナルで折り返しなし"
+    },
+    {
+      "name": "should handle path continuation lines from terminal wrapping",
+      "category": "ターミナル幅",
+      "description": "Issue再現パターン - パス継続行"
+    },
+    {
+      "name": "should handle multiple path continuation lines",
+      "category": "ターミナル幅",
+      "description": "複数のパス継続行"
+    }
+  ]
+}

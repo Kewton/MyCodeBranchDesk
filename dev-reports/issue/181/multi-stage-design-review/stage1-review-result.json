@@ -1,0 +1,77 @@
+{
+  "stage": 1,
+  "stage_name": "通常レビュー（設計原則）",
+  "focus_area": "設計原則",
+  "findings": [
+    {
+      "id": "DR1-F001",
+      "severity": "must_fix",
+      "category": "設計判断",
+      "title": "テストケース 7.1.5 の「don't ask again」継続行が提案パターンにマッチしない",
+      "description": "セクション 7.1.5 のテストケース「should handle option wrapped at different terminal widths」で、継続行 \"don't ask again\" は提案されたどの継続行条件にもマッチしない。hasLeadingSpaces: rawLineに先頭スペースがないためfalse。isShortFragment: trimmed lengthが14のためfalse。isPathContinuation /^[\\/~]/: 'd'で始まるためfalse。isPathContinuation /^[a-zA-Z0-9_-]+$/: アポストロフィ(')とスペースを含むためfalse。結果として、この行でスキャンが中断し、option 2のみが検出され（options.length < 2ではないが1つしかない場合もある）、テストが失敗する可能性が高い。",
+      "suggestion": "このテストケースを設計書から削除するか、提案するパターンを見直す必要がある。実際のClaude CLIの折り返し挙動を再調査し、「スペースを含む一般的な英文テキスト」の継続行が現れるケースが実在するなら、追加の継続行条件（例: 句読点やスペースを含む行でも、質問文の特徴（?で終わる等）がなければ継続行とみなす）が必要。ただし、Issue再現シナリオ（セクション4.2）で実際に問題になるのはパス系の折り返しのみなので、このテストケース自体がYAGNIに反している可能性がある。テストケースを現実の再現ケースに限定することを推奨する。",
+      "location": "セクション 7.1.5「should handle option wrapped at different terminal widths」および「should handle multiple continuation lines from narrow terminal」"
+    },
+    {
+      "id": "DR1-F002",
+      "severity": "must_fix",
+      "category": "設計判断",
+      "title": "テストケース 7.1.5 の「curl and python3 commands in」継続行もパターンにマッチしない",
+      "description": "セクション 7.1.5 の「should handle multiple continuation lines from narrow terminal」テストで、継続行 \"curl and python3 commands in\" はスペースを含むため /^[a-zA-Z0-9_-]+$/ にマッチせず、'/'や'~'で始まらないため /^[\\/~]/ にもマッチしない。先頭スペースもないためhasLeadingSpacesもfalse。5文字以上のためisShortFragmentもfalse。このテストケースは確実に失敗する。",
+      "suggestion": "このテストケースは、提案された修正の範囲を超えたシナリオを検証している。修正の範囲を「パス系折り返し」に限定するなら、このテストケースは除外すべき。あるいは、より広範な継続行検出が必要なら設計を再検討すべきだが、それはKISS原則に反する可能性がある。Issue #181の再現シナリオに限定したテストケース（パス系の折り返しのみ）で十分である。",
+      "location": "セクション 7.1.5「should handle multiple continuation lines from narrow terminal」内の \"curl and python3 commands in\" 行"
+    },
+    {
+      "id": "DR1-F003",
+      "severity": "should_fix",
+      "category": "KISS",
+      "title": "/^[a-zA-Z0-9_-]+$/ パターンの適用範囲が広すぎる可能性",
+      "description": "パターン /^[a-zA-Z0-9_-]+$/ は「英数字・ハイフン・アンダースコアのみで構成される行」全般にマッチする。設計書セクション5.2で偽陽性リスクが「中」と評価されており、「Proceed」「Continue」等の単語にもマッチすることが認識されている。偽陽性発生時の影響は限定的（continueでスキップされるのみ）だが、スキャン範囲の拡大は予期しない副作用を生む可能性がある。例えば、通常のテキスト出力に含まれる単一単語行が継続行として扱われ、その先のnumbered listが誤ってmultiple choiceプロンプトとして検出されるケースが考えられる。",
+      "suggestion": "パターンをより限定的にすることを検討する。例えば、パス断片に特化して /^[a-zA-Z0-9_.-]+$/ のままでよいが、最小長の条件（line.length >= 3 等）を追加するか、直前に検出済みのオプションのラベルにパス文字列（'/'）が含まれる場合のみこの条件を有効にする等。ただし、これはKISS原則とのトレードオフであり、現状の偽陽性リスクが実用上許容可能であれば現行案のままでもよい。",
+      "location": "セクション 4.3 修正案 isPathContinuation の2番目のパターン"
+    },
+    {
+      "id": "DR1-F004",
+      "severity": "nice_to_have",
+      "category": "OCP",
+      "title": "OCP適用の記述は正確だが、将来の拡張ポイントの明示が望ましい",
+      "description": "設計書はOCP原則に基づき、既存条件を変更せず新しい条件を追加する方針を示しており、これは適切である。しかし、継続行検出条件が3つ（hasLeadingSpaces, isShortFragment, isPathContinuation）に増えた現在、今後さらに条件が追加される可能性がある場合、条件判定をストラテジーパターンや条件リストとして構造化する拡張ポイントを設計書に記載しておくと、将来の保守性が向上する。",
+      "suggestion": "セクション11の制約事項またはセクション2.1に「将来的に継続行の判定条件が増加する場合は、条件をリスト化して反復処理するリファクタリングを検討する」旨のメモを追加する。ただし、現時点では3条件のOR結合で十分にシンプルであり、過度な抽象化は不要（YAGNI）。",
+      "location": "セクション 2.1 適用する設計原則"
+    },
+    {
+      "id": "DR1-F005",
+      "severity": "nice_to_have",
+      "category": "DRY",
+      "title": "テストケースにおけるプロンプト出力文字列の重複",
+      "description": "セクション7.1のテストケースで、multiple choiceプロンプトの基本構造（質問文 + ❯ 1. Yes + 2. ... + 3. No の形式）が複数のテストケースで繰り返されている。テストヘルパー関数を導入することで、テストの保守性と可読性が向上する。",
+      "suggestion": "テストファイル内にヘルパー関数（例: buildMultipleChoiceOutput(options, wrappedLines?)）を作成し、テストケース間でプロンプト構造の生成を共通化する。ただし、テストの可読性を優先して各テストケースが自己完結的であることも重要なので、これは優先度が低い。",
+      "location": "セクション 7.1 追加テストケース全般"
+    },
+    {
+      "id": "DR1-F006",
+      "severity": "nice_to_have",
+      "category": "YAGNI",
+      "title": "ドット(.)を含むパス断片への対応漏れの可能性",
+      "description": "パターン /^[a-zA-Z0-9_-]+$/ はドット(.)を含まないため、「file.txt」のようなファイル名断片や「v1.2.3」のようなバージョン文字列はマッチしない。Issue #181の再現シナリオではドットを含む断片は出現していないが、パスの折り返しで「package.json」のようなファイル名が断片行になるケースは理論上あり得る。",
+      "suggestion": "パターンを /^[a-zA-Z0-9_.-]+$/ に拡張してドットを含めることを検討する。ただし、現在のIssueの再現ケースではドット付き断片は出現しておらず、YAGNI原則に基づけば現時点では不要。将来のIssueで対応する余地として制約事項に記載するのみで十分。",
+      "location": "セクション 4.3 修正案の /^[a-zA-Z0-9_-]+$/ パターン"
+    },
+    {
+      "id": "DR1-F007",
+      "severity": "nice_to_have",
+      "category": "SRP",
+      "title": "detectMultipleChoicePrompt関数の責務が徐々に拡大している",
+      "description": "detectMultipleChoicePrompt()は現在、(1)オプション行の検出、(2)継続行の判別、(3)質問文の抽出、(4)テキスト入力パターンの判定、という4つの責務を持っている。本修正は(2)に新しい条件を追加するだけで関数の責務を増やしてはいないが、関数全体の行数（約100行）と条件分岐の複雑さが増加傾向にある点は認識しておくべきである。",
+      "suggestion": "現時点での修正範囲では問題ないが、今後さらに継続行パターンが増える場合は、継続行判定を独立した関数（isContinuationLine(line, rawLine)）として抽出するリファクタリングを検討する。本Issueのスコープでは不要。",
+      "location": "src/lib/prompt-detector.ts detectMultipleChoicePrompt関数全体"
+    }
+  ],
+  "summary": {
+    "total_findings": 7,
+    "must_fix": 2,
+    "should_fix": 1,
+    "nice_to_have": 4,
+    "overall_assessment": "設計方針書は全体として高品質であり、問題の分析、修正案、影響範囲分析、セキュリティ考慮事項が網羅的に記述されている。OCP原則に基づく既存コード非変更の方針、KISS原則に基づく最小限の正規表現追加という設計判断は適切である。ただし、must_fixとして指摘した通り、セクション7.1.5のテストケースのうち少なくとも2件（「don't ask again」と「curl and python3 commands in」を含む継続行）は、提案された修正パターンでは実際にはマッチしないため、テストが失敗する。設計書のテストケースと修正案の整合性を確認し、実際の再現シナリオに基づいたテストケースに修正する必要がある。コア修正（isPathContinuationの2パターン追加）自体はIssue #181の再現シナリオを正しく解決するものであり、方向性は正しい。"
+  }
+}

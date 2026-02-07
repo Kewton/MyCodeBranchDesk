@@ -1,0 +1,33 @@
+{
+  "issue_number": 181,
+  "feature_summary": "fix: 複数行オプションを含むmultiple choiceプロンプトが検出されない",
+  "acceptance_criteria": [
+    "複数行にまたがるオプションテキストを含むmultiple choiceプロンプトが正しく検出されること",
+    "Auto-Yesが当該プロンプトで動作すること（resolveAutoAnswerがoption.numberを使用するため、ラベル不完全でも問題ない）",
+    "UIにプロンプトメッセージとボタンが表示されること（型構造PromptDetectionResult, PromptDataに変更なし）",
+    "既存のプロンプト検出（yes/no、標準的なmultiple choice）が退行しないこと",
+    "テスト要件セクションに記載のテストケースが追加されていること（10件）"
+  ],
+  "test_scenarios": [
+    "シナリオ1: Issue再現パターン - パスの折り返しを含む3択プロンプトが検出される",
+    "シナリオ2: 標準multiple choiceプロンプト（折り返しなし）が引き続き検出される",
+    "シナリオ3: ~で始まるパス継続行を含むプロンプトが検出される",
+    "シナリオ4: 番号付きリスト（❯インジケータなし）がmultiple choiceとして誤検出されない",
+    "シナリオ5: numbered list + yes/noプロンプトの交差影響なし",
+    "シナリオ6: 既存yes/noプロンプト検出の回帰なし",
+    "シナリオ7: 通常出力が非検出の回帰なし",
+    "シナリオ8: 広いターミナル（折り返しなし）での検出",
+    "シナリオ9: 複数パス継続行の検出",
+    "シナリオ10: 全品質チェック（lint, tsc, test:unit, build）がパスすること"
+  ],
+  "implementation_files": [
+    "src/lib/prompt-detector.ts",
+    "tests/unit/prompt-detector.test.ts"
+  ],
+  "regression_test_files": [
+    "tests/unit/lib/auto-yes-resolver.test.ts",
+    "tests/unit/components/PromptPanel.test.tsx",
+    "tests/unit/components/mobile/MobilePromptSheet.test.tsx",
+    "tests/unit/components/worktree/MessageListOptimistic.test.tsx"
+  ]
+}

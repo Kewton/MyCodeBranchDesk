@@ -1,0 +1,93 @@
+{
+  "issue_number": 181,
+  "stage": 4,
+  "stage_name": "セキュリティレビュー",
+  "status": "success",
+  "design_policy_updated": true,
+  "reflected_items": {
+    "must_fix": [],
+    "should_fix": [
+      {
+        "id": "DR4-F002",
+        "item": "偽陽性による意図しないAuto-Yesコマンド実行のリスク分析が不十分",
+        "section_updated": "セクション5.2 偽陽性リスク分析",
+        "status": "reflected",
+        "details": "Auto-Yesコンテキストでの偽陽性影響分析を3項目追記: (1) 数字文字列のみ送信、(2) U+276F特殊文字の性質、(3) 非プロンプト状態での無害性"
+      },
+      {
+        "id": "DR4-F006",
+        "item": "50行逆順スキャン制限と継続行スキップの組み合わせによるスキャン範囲拡大の安全性分析",
+        "section_updated": "セクション8 リスク分析",
+        "status": "reflected",
+        "details": "リスク分析表の該当行に安全性根拠を追記: (1) 50行絶対上限、(2) 継続行はオプション数非寄与、(3) Auto-Yes送信値は数字1桁限定"
+      }
+    ],
+    "nice_to_have": [
+      {
+        "id": "DR4-F001",
+        "item": "追加正規表現パターンのReDoSリスク評価: 安全",
+        "section_updated": "セクション10 セキュリティ考慮事項",
+        "status": "reflected",
+        "details": "ReDoS行に技術的根拠を追記: 単一文字クラス・量指定子のみ、ネストなし、catastrophic backtracking不発生"
+      },
+      {
+        "id": "DR4-F003",
+        "item": "tmux sendKeysへの入力が数値文字列に限定されていることの明示",
+        "section_updated": "セクション10 セキュリティ考慮事項",
+        "status": "reflected",
+        "details": "コマンドインジェクション行にAuto-Yesフローと手動応答パスのセキュリティ境界を明記"
+      },
+      {
+        "id": "DR4-F004",
+        "item": "不完全なラベルテキストのUI表示におけるXSSリスク: 問題なし",
+        "section_updated": "N/A",
+        "status": "skipped",
+        "details": "レビュー結果で対応不要と判定。設計書セクション10の記載は適切"
+      },
+      {
+        "id": "DR4-F005",
+        "item": "継続行判定の新条件追加に関するデバッグログの不在",
+        "section_updated": "セクション11 制約事項",
+        "status": "reflected",
+        "details": "制約事項8として追記。将来の別Issueでのログ追加検討を記録"
+      },
+      {
+        "id": "DR4-F007",
+        "item": "手動応答パスのカスタムテキスト入力によるtmuxコマンドインジェクションリスク",
+        "section_updated": "N/A",
+        "status": "skipped",
+        "details": "本修正スコープ外の既存問題。将来のセキュリティ改善Issueとして記録"
+      },
+      {
+        "id": "DR4-F008",
+        "item": "requiresTextInput判定がラベル不完全性により誤動作する可能性",
+        "section_updated": "セクション11 制約事項",
+        "status": "reflected",
+        "details": "制約事項9として追記。テキスト入力オプションは通常短いため折り返し可能性は極めて低い旨を明記"
+      }
+    ]
+  },
+  "skipped": [
+    {
+      "id": "DR4-F004",
+      "item": "不完全なラベルテキストのUI表示におけるXSSリスク: 問題なし",
+      "reason": "レビュー結果で対応不要と判定（設計書の記載は適切）"
+    },
+    {
+      "id": "DR4-F007",
+      "item": "手動応答パスのカスタムテキスト入力によるtmuxコマンドインジェクションリスク",
+      "reason": "本修正スコープ外の既存問題。レビューで対応不要と判定"
+    }
+  ],
+  "design_doc_path": "dev-reports/design/issue-181-multiline-option-detection-design-policy.md",
+  "sections_updated": [
+    "セクション5.2 偽陽性リスク分析（DR4-F002）",
+    "セクション8 リスク分析（DR4-F006）",
+    "セクション10 セキュリティ考慮事項（DR4-F001, DR4-F003）",
+    "セクション11 制約事項（DR4-F005, DR4-F008）",
+    "セクション13 レビュー指摘事項サマリー（Stage 4追加）",
+    "セクション15 レビュー履歴（Stage 4追加）",
+    "セクション16 変更履歴（Stage 4反映記録追加）"
+  ],
+  "timestamp": "2026-02-07T00:00:00Z"
+}

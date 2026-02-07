@@ -1,0 +1,23 @@
+{
+  "issue_number": 181,
+  "refactor_targets": [
+    "src/lib/prompt-detector.ts",
+    "tests/unit/prompt-detector.test.ts"
+  ],
+  "quality_metrics": {
+    "before_coverage": 80.0,
+    "tests_passing": 2660,
+    "lint_errors": 0,
+    "type_errors": 0
+  },
+  "improvement_goals": [
+    "コードの可読性確認（コメントが正確か）",
+    "テストの保守性確認（テストケースの構造が適切か）",
+    "SOLID原則に基づく品質確認"
+  ],
+  "constraints": [
+    "YAGNI: 変更は最小限。設計方針書にて「現時点では3条件のOR結合で十分にシンプル」と明記",
+    "スコープ限定: パス系折り返し行の検出に限定。一般英文テキストの折り返しは対象外",
+    "型変更禁止: PromptDetectionResult, PromptData, MultipleChoiceOption は変更不可"
+  ]
+}

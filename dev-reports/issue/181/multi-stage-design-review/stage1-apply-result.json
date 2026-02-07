@@ -1,0 +1,80 @@
+{
+  "issue_number": 181,
+  "stage": 1,
+  "stage_name": "通常レビュー（設計原則）",
+  "status": "success",
+  "design_policy_updated": true,
+  "reflected_items": {
+    "must_fix": [
+      {
+        "id": "DR1-F001",
+        "item": "テストケース「don't ask again」継続行が提案パターンにマッチしない",
+        "section_updated": "セクション7.1.5, セクション7.1.6, セクション11（制約事項4）",
+        "status": "reflected",
+        "action_taken": "一般テキスト折り返しのテストケースを削除し、パス系折り返しのみに限定。検出対象外パターンをセクション7.1.6に明記。制約事項4として追加"
+      },
+      {
+        "id": "DR1-F002",
+        "item": "テストケース「curl and python3 commands in」もマッチしない",
+        "section_updated": "セクション7.1.5, セクション7.1.6, セクション11（制約事項5）",
+        "status": "reflected",
+        "action_taken": "スペースを含む英文断片のテストケースを除外。検出対象外パターンをセクション7.1.6に明記。制約事項5として追加"
+      }
+    ],
+    "should_fix": [
+      {
+        "id": "DR1-F003",
+        "item": "/^[a-zA-Z0-9_-]+$/ の偽陽性リスク",
+        "section_updated": "セクション5.2",
+        "status": "reflected",
+        "action_taken": "潜在的な副作用シナリオと将来的改善案（最小長条件、コンテキスト依存有効化）をセクション5.2に追記。現時点ではKISS原則とのトレードオフにより現行案を採用"
+      }
+    ],
+    "nice_to_have": [
+      {
+        "id": "DR1-F004",
+        "item": "将来の拡張ポイントの明示（OCP）",
+        "section_updated": "セクション2.1",
+        "status": "reflected",
+        "action_taken": "将来の条件リスト化リファクタリングに関する注記をセクション2.1に追加"
+      },
+      {
+        "id": "DR1-F005",
+        "item": "テストケースにおけるプロンプト出力文字列の重複（DRY）",
+        "section_updated": "セクション7.1",
+        "status": "reflected",
+        "action_taken": "テストヘルパー関数導入の検討ノートをセクション7.1に追加"
+      },
+      {
+        "id": "DR1-F006",
+        "item": "ドット(.)を含むパス断片への対応漏れ（YAGNI）",
+        "section_updated": "セクション11（制約事項6）",
+        "status": "reflected",
+        "action_taken": "制約事項6として明記。YAGNI原則に基づき現時点では対応しない旨を記載"
+      },
+      {
+        "id": "DR1-F007",
+        "item": "detectMultipleChoicePrompt関数の責務拡大（SRP）",
+        "section_updated": "セクション11（制約事項7）",
+        "status": "reflected",
+        "action_taken": "制約事項7として明記。将来のリファクタリング候補として記録"
+      }
+    ]
+  },
+  "skipped": [],
+  "design_doc_path": "dev-reports/design/issue-181-multiline-option-detection-design-policy.md",
+  "sections_updated": [
+    "セクション2.1（設計原則 - YAGNI追加、将来の拡張注記）",
+    "セクション5.2（偽陽性リスク分析の詳細化）",
+    "セクション7.1（テスト保守性ノート追加）",
+    "セクション7.1.5（テストケース修正 - パス系のみに限定）",
+    "セクション7.1.6（検出対象外パターン追加）",
+    "セクション9（受け入れ条件の修正）",
+    "セクション11（制約事項4-7追加）",
+    "セクション13（レビュー指摘事項サマリー追加）",
+    "セクション14（実装チェックリスト追加）",
+    "セクション15（レビュー履歴追加）",
+    "セクション16（変更履歴更新）"
+  ],
+  "timestamp": "2026-02-07T00:00:00Z"
+}
