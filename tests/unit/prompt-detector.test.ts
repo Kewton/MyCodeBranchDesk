@@ -668,6 +668,127 @@ Are you sure you want to continue? (yes/no)
   });
 
   // ==========================================================================
+  // Issue #181: Multiline option continuation detection
+  // Tests for detecting multiple choice prompts when option text wraps
+  // across multiple lines due to terminal width.
+  // ==========================================================================
+  describe('Issue #181: Multiline option continuation detection', () => {
+    it('should detect multiple choice with multiline option text (path wrapping)', () => {
+      const output = [
+        'Do you want to proceed?',
+        '❯ 1. Yes',
+        "  2. Yes, and don't ask again for curl and python3 commands in",
+        '/Users/maenokota/share/work/github_kewton/comma',
+        'ndmate-issue-161',
+        '  3. No',
+        '',
+        'Esc to cancel · Tab to amend · ctrl+e to explain',
+      ].join('\n');
+
+      const result = detectPrompt(output);
+
+      expect(result.isPrompt).toBe(true);
+      if (isMultipleChoicePrompt(result.promptData)) {
+        expect(result.promptData.options).toHaveLength(3);
+        expect(result.promptData.options[0].label).toBe('Yes');
+        expect(result.promptData.options[0].isDefault).toBe(true);
+        expect(result.promptData.options[1].label).toBe(
+          "Yes, and don't ask again for curl and python3 commands in"
+        );
+        expect(result.promptData.options[2].label).toBe('No');
+      }
+    });
+
+    it('should not concatenate continuation line text to option labels', () => {
+      const output = [
+        'Do you want to proceed?',
+        '❯ 1. Yes',
+        "  2. Yes, and don't ask again for curl and python3 commands in",
+        '/Users/maenokota/share/work/github_kewton/comma',
+        'ndmate-issue-161',
+        '  3. No',
+      ].join('\n');
+
+      const result = detectPrompt(output);
+
+      expect(result.isPrompt).toBe(true);
+      if (isMultipleChoicePrompt(result.promptData)) {
+        // Label should only contain the text before the line break (continuation lines are not concatenated)
+        expect(result.promptData.options[1].label).not.toContain('ndmate-issue-161');
+        expect(result.promptData.options[1].label).not.toContain('/Users/');
+      }
+    });
+
+    it('should detect yes/no prompt with path lines (not false-positive multiple choice)', () => {
+      const output = [
+        'File /Users/maenokota/share/work/github_kewton/comma',
+        'ndmate-issue-161/src/lib/test.ts already exists',
+        'Do you want to overwrite? (y/n)',
+      ].join('\n');
+
+      const result = detectPrompt(output);
+
+      expect(result.isPrompt).toBe(true);
+      expect(result.promptData?.type).toBe('yes_no');
+    });
+
+    it('should not false-positive on English word-only lines between options', () => {
+      // "Options", "Proceed" etc. should not cause false-positive multiple choice detection
+      const output = [
+        'Some output text',
+        'Options',
+        'Proceed',
+        'Do you want to continue? (y/n)',
+      ].join('\n');
+
+      const result = detectPrompt(output);
+
+      // English word-only lines should not be falsely detected as multiple choice
+      if (result.isPrompt) {
+        expect(result.promptData?.type).not.toBe('multiple_choice');
+      }
+    });
+
+    it('should treat single character lines correctly with minimum length check', () => {
+      // 'Y' is 1 char and matches isShortFragment (line.length < 5), so it gets
+      // skipped as continuation regardless of SF-001 minimum length check.
+      const output = [
+        'Do you want to proceed?',
+        '❯ 1. Option A',
+        'Y',
+        '  2. Option B',
+      ].join('\n');
+
+      const result = detectPrompt(output);
+
+      // 'Y' is skipped by isShortFragment, so Option A and Option B are detected
+      expect(result.isPrompt).toBe(true);
+      if (isMultipleChoicePrompt(result.promptData)) {
+        expect(result.promptData.options).toHaveLength(2);
+      }
+    });
+
+    it('should exclude single character from isPathContinuation via minimum length check (SF-001)', () => {
+      // 'SomeFragment' (12 chars) is not isShortFragment but matches isPathContinuation,
+      // so it gets skipped as continuation line
+      const output = [
+        'Do you want to proceed?',
+        '❯ 1. Option A',
+        'SomeFragment',
+        '  2. Option B',
+      ].join('\n');
+
+      const result = detectPrompt(output);
+
+      // 'SomeFragment' is skipped by isPathContinuation, so Option A and Option B are detected
+      expect(result.isPrompt).toBe(true);
+      if (isMultipleChoicePrompt(result.promptData)) {
+        expect(result.promptData.options).toHaveLength(2);
+      }
+    });
+  });
+
+  // ==========================================================================
   // Issue #161: 50-line Window Boundary Tests (Section 5.4)
   // Tests for the 50-line scan window boundary conditions.
   // ==========================================================================
