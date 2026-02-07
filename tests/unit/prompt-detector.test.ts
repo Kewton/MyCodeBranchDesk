@@ -161,6 +161,163 @@ Approve?
       });
     });
 
+    describe('Pattern 0: Multiple choice (numbered options)', () => {
+      it('should detect multiple choice prompt with multi-line wrapped options', () => {
+        const output = [
+          'Do you want to proceed?',
+          '❯ 1. Yes',
+          '  2. Yes, and don\'t ask again for curl and python3 commands in',
+          '/Users/maenokota/share/work/github_kewton/comma',
+          'ndmate-issue-161',
+          '  3. No',
+          '',
+          'Esc to cancel · Tab to amend · ctrl+e to explain',
+        ].join('\n');
+
+        const result = detectPrompt(output);
+
+        expect(result.isPrompt).toBe(true);
+        expect(result.promptData?.type).toBe('multiple_choice');
+        expect(result.promptData?.options).toHaveLength(3);
+        expect(result.promptData?.options[0]).toMatchObject({
+          number: 1, label: 'Yes', isDefault: true
+        });
+        expect(result.promptData?.options[2]).toMatchObject({
+          number: 3, label: 'No', isDefault: false
+        });
+      });
+
+      it('should detect standard multiple choice prompt without wrapping', () => {
+        const output = [
+          'Do you want to proceed?',
+          '❯ 1. Yes',
+          '  2. No',
+          '  3. Cancel',
+        ].join('\n');
+
+        const result = detectPrompt(output);
+
+        expect(result.isPrompt).toBe(true);
+        expect(result.promptData?.type).toBe('multiple_choice');
+        expect(result.promptData?.options).toHaveLength(3);
+      });
+
+      it('should detect prompt with path starting with ~', () => {
+        const output = [
+          'Do you want to proceed?',
+          '❯ 1. Yes',
+          '  2. Yes, and don\'t ask again for commands in',
+          '~/projects/my-project',
+          '  3. No',
+        ].join('\n');
+
+        const result = detectPrompt(output);
+
+        expect(result.isPrompt).toBe(true);
+        expect(result.promptData?.type).toBe('multiple_choice');
+        expect(result.promptData?.options).toHaveLength(3);
+      });
+
+      it('should not detect normal text with numbered list as multiple choice', () => {
+        const output = [
+          'Here are the steps:',
+          '1. First, install dependencies',
+          '2. Then run the build',
+          '3. Finally deploy',
+        ].join('\n');
+
+        const result = detectPrompt(output);
+
+        // No ❯ indicator, so should not be detected as multiple choice
+        expect(result.isPrompt).toBe(false);
+      });
+
+      it('should still detect yes/no prompt when numbered list exists above', () => {
+        const output = [
+          'Steps completed:',
+          '1. Built successfully',
+          '2. Tests passed',
+          'Do you want to deploy? (y/n)',
+        ].join('\n');
+
+        const result = detectPrompt(output);
+
+        expect(result.isPrompt).toBe(true);
+        expect(result.promptData?.type).toBe('yes_no');
+      });
+
+      it('should detect existing yes/no prompts without regression', () => {
+        const output = 'Would you like to continue? (y/n)';
+        const result = detectPrompt(output);
+
+        expect(result.isPrompt).toBe(true);
+        expect(result.promptData?.type).toBe('yes_no');
+      });
+
+      it('should not detect normal output as prompt (regression)', () => {
+        const output = 'This is just normal output without any prompt';
+        const result = detectPrompt(output);
+
+        expect(result.isPrompt).toBe(false);
+      });
+
+      it('should handle wide terminal with no wrapping', () => {
+        const output = [
+          'Do you want to proceed?',
+          '❯ 1. Yes',
+          '  2. Yes, and don\'t ask again for curl and python3 commands in /Users/maenokota/share/work/github_kewton/commandmate-issue-161',
+          '  3. No',
+        ].join('\n');
+
+        const result = detectPrompt(output);
+
+        expect(result.isPrompt).toBe(true);
+        expect(result.promptData?.type).toBe('multiple_choice');
+        expect(result.promptData?.options).toHaveLength(3);
+      });
+
+      it('should handle path continuation lines from terminal wrapping', () => {
+        // This test covers the actual Issue #181 reproduction scenario:
+        // Only path-based continuation lines (/path/..., fragment-only lines) are detected.
+        // General English text wrapping is NOT covered by isPathContinuation.
+        const output = [
+          'Do you want to proceed?',
+          '❯ 1. Yes',
+          '  2. Yes, and don\'t ask again for curl and python3 commands in',
+          '/Users/maenokota/share/work/github_kewton/comma',
+          'ndmate-issue-161',
+          '  3. No',
+          '',
+          'Esc to cancel · Tab to amend · ctrl+e to explain',
+        ].join('\n');
+
+        const result = detectPrompt(output);
+
+        expect(result.isPrompt).toBe(true);
+        expect(result.promptData?.type).toBe('multiple_choice');
+        expect(result.promptData?.options).toHaveLength(3);
+      });
+
+      it('should handle multiple path continuation lines', () => {
+        // Multiple path-based continuation lines: all match isPathContinuation patterns
+        const output = [
+          'Do you want to proceed?',
+          '❯ 1. Yes',
+          '  2. Yes, and don\'t ask again for commands in',
+          '/Users/maenokota/share/work/',
+          'github_kewton/comma',
+          'ndmate-issue-161',
+          '  3. No',
+        ].join('\n');
+
+        const result = detectPrompt(output);
+
+        expect(result.isPrompt).toBe(true);
+        expect(result.promptData?.type).toBe('multiple_choice');
+        expect(result.promptData?.options).toHaveLength(3);
+      });
+    });
+
     describe('Non-prompt detection', () => {
       it('should not detect normal text as prompt', () => {
         const output = 'This is just normal output without any prompt';

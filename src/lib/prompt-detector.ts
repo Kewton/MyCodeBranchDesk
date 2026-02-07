@@ -220,12 +220,16 @@ function detectMultipleChoicePrompt(output: string): PromptDetectionResult {
         firstOptionIndex = i;
       }
     } else if (options.length > 0 && line && !line.match(/^[-─]+$/)) {
-      // Check if this is a continuation line (indented line between options)
-      // Continuation lines typically start with spaces (like "  work/github...")
-      // Also treat very short lines (< 5 chars) as potential word-wrap fragments
+      // Check if this is a continuation line (indented line between options or word-wrap fragments)
+      // Continuation lines include:
+      // - Lines with leading spaces (like "  work/github...")
+      // - Very short lines (< 5 chars) as potential word-wrap fragments
+      // - Path continuations starting with / or ~ (terminal line-wrap of file paths)
+      // - Path fragment lines containing only alphanumeric, hyphen, underscore, slash chars
       const hasLeadingSpaces = rawLine.match(/^\s{2,}[^\d]/) && !rawLine.match(/^\s*\d+\./);
       const isShortFragment = line.length < 5 && !line.endsWith('?');
-      const isContinuationLine = hasLeadingSpaces || isShortFragment;
+      const isPathContinuation = /^[\/~]/.test(line) || /^[a-zA-Z0-9_\/-]+$/.test(line);
+      const isContinuationLine = hasLeadingSpaces || isShortFragment || isPathContinuation;
 
       if (isContinuationLine) {
         // Skip continuation lines and continue scanning for more options
