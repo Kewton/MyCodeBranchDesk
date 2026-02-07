@@ -7,13 +7,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbInstance } from '@/lib/db-instance';
 import { getWorktreeById } from '@/lib/db';
-import { sendMessageWithEnter } from '@/lib/tmux';
+import { sendKeys } from '@/lib/tmux';
 import { CLIToolManager } from '@/lib/cli-tools/manager';
 import type { CLIToolType } from '@/lib/cli-tools/types';
 import { captureSessionOutput } from '@/lib/cli-session';
 import { detectPrompt } from '@/lib/prompt-detector';
 import { stripAnsi } from '@/lib/cli-patterns';
-import { getErrorMessage, DANGEROUS_CONTROL_CHARS, MAX_ANSWER_LENGTH } from '@/lib/utils';
 
 interface PromptResponseRequest {
   answer: string;
@@ -32,21 +31,6 @@ export async function POST(
     if (!answer) {
       return NextResponse.json(
         { error: 'answer is required' },
-        { status: 400 }
-      );
-    }
-
-    // Answer field validation (SEC-009)
-    if (typeof answer !== 'string' || answer.length > MAX_ANSWER_LENGTH) {
-      return NextResponse.json(
-        { error: `Answer must be a string of at most ${MAX_ANSWER_LENGTH} characters` },
-        { status: 400 }
-      );
-    }
-
-    if (DANGEROUS_CONTROL_CHARS.test(answer)) {
-      return NextResponse.json(
-        { error: 'Answer contains prohibited control characters' },
         { status: 400 }
       );
     }
@@ -102,11 +86,18 @@ export async function POST(
       console.warn('[prompt-response] Failed to verify prompt state, proceeding with send');
     }
 
-    // Send answer to tmux using unified pattern (Task-PRE-003)
+    // Send answer to tmux
     try {
-      await sendMessageWithEnter(sessionName, answer, 100);
+      // Send the answer
+      await sendKeys(sessionName, answer, false);
+
+      // Wait a moment for the input to be processed
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Send Enter
+      await sendKeys(sessionName, '', true);
     } catch (error: unknown) {
-      const errorMessage = getErrorMessage(error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return NextResponse.json(
         { error: `Failed to send answer to tmux: ${errorMessage}` },
         { status: 500 }
@@ -119,7 +110,7 @@ export async function POST(
     });
   } catch (error: unknown) {
     console.error('Failed to respond to prompt:', error);
-    const errorMessage = getErrorMessage(error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
       { error: errorMessage },
       { status: 500 }

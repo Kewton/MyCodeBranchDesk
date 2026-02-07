@@ -13,7 +13,6 @@ import type { Worktree, ChatMessage } from '@/types/models';
 // Mock tmux
 vi.mock('@/lib/tmux', () => ({
   sendKeys: vi.fn(() => Promise.resolve()),
-  sendMessageWithEnter: vi.fn(() => Promise.resolve()),
 }));
 
 // Mock claude-poller
@@ -118,9 +117,9 @@ describe('POST /api/worktrees/:id/respond - CLI Tool Support', () => {
 
       expect(response.status).toBe(200);
 
-      // Verify tmux sendMessageWithEnter was called with correct session name (Task-PRE-003)
-      const { sendMessageWithEnter } = await import('@/lib/tmux');
-      expect(sendMessageWithEnter).toHaveBeenCalledWith('mcbd-claude-claude-test', 'y', 100);
+      // Verify tmux sendKeys was called with correct session name
+      const { sendKeys } = await import('@/lib/tmux');
+      expect(sendKeys).toHaveBeenCalledWith('mcbd-claude-claude-test', 'y', true);
     });
   });
 
@@ -169,9 +168,9 @@ describe('POST /api/worktrees/:id/respond - CLI Tool Support', () => {
 
       expect(response.status).toBe(200);
 
-      // Verify tmux sendMessageWithEnter was called with correct session name (Task-PRE-003)
-      const { sendMessageWithEnter } = await import('@/lib/tmux');
-      expect(sendMessageWithEnter).toHaveBeenCalledWith('mcbd-codex-codex-test', '1', 100);
+      // Verify tmux sendKeys was called with correct session name
+      const { sendKeys } = await import('@/lib/tmux');
+      expect(sendKeys).toHaveBeenCalledWith('mcbd-codex-codex-test', '1', true);
     });
   });
 
@@ -217,9 +216,9 @@ describe('POST /api/worktrees/:id/respond - CLI Tool Support', () => {
 
       expect(response.status).toBe(200);
 
-      // Verify tmux sendMessageWithEnter was called with correct session name (Task-PRE-003)
-      const { sendMessageWithEnter } = await import('@/lib/tmux');
-      expect(sendMessageWithEnter).toHaveBeenCalledWith('mcbd-gemini-gemini-test', 'n', 100);
+      // Verify tmux sendKeys was called with correct session name
+      const { sendKeys } = await import('@/lib/tmux');
+      expect(sendKeys).toHaveBeenCalledWith('mcbd-gemini-gemini-test', 'n', true);
     });
   });
 

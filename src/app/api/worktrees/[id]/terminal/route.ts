@@ -6,7 +6,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as tmux from '@/lib/tmux';
 import type { CLIToolType } from '@/lib/cli-tools/types';
-import { getSessionNameUtil } from '@/lib/session-name';
+
+// Helper function to get session name
+function getSessionName(worktreeId: string, cliToolId: CLIToolType): string {
+  return `mcbd-${cliToolId}-${worktreeId}`;
+}
 
 export async function POST(
   req: NextRequest,
@@ -22,7 +26,7 @@ export async function POST(
       );
     }
 
-    const sessionName = getSessionNameUtil(params.id, cliToolId as CLIToolType);
+    const sessionName = getSessionName(params.id, cliToolId as CLIToolType);
 
     // Check if session exists
     const sessionExists = await tmux.hasSession(sessionName);
