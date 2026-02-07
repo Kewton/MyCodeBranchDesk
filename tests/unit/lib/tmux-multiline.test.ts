@@ -3,7 +3,7 @@
  * [Issue #163] Multiline message support for Claude CLI
  *
  * Tests the behavior of sendMessageWithEnter() when handling messages
- * containing newline characters, using tmux set-buffer + paste-buffer.
+ * containing newline characters, using spawn-based tmux send-keys -l.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -95,11 +95,10 @@ describe('sendMessageWithEnter - multiline support [Issue #163]', () => {
     });
   });
 
-  describe('multiline messages (paste-buffer path)', () => {
-    it('should use set-buffer + paste-buffer for multiline messages', async () => {
+  describe('multiline messages (new spawn-based path)', () => {
+    it('should use spawn with send-keys -l for multiline messages', async () => {
       const { spawn } = await import('child_process');
-      // Return a NEW mock process for each spawn call
-      vi.mocked(spawn).mockImplementation(() => createMockChildProcess(0));
+      vi.mocked(spawn).mockReturnValue(createMockChildProcess(0));
 
       // Mock exec for the Enter key send
       vi.mocked(exec).mockImplementation((_cmd, _options, callback: any) => {
@@ -110,27 +109,16 @@ describe('sendMessageWithEnter - multiline support [Issue #163]', () => {
       const multilineMessage = 'line 1\nline 2\nline 3';
       await sendMessageWithEnter('test-session', multilineMessage);
 
-      // Should call spawn twice: once for set-buffer, once for paste-buffer
-      expect(spawn).toHaveBeenCalledTimes(2);
-
-      // First spawn call: set-buffer with content
-      expect(spawn).toHaveBeenNthCalledWith(
-        1,
+      // Should call spawn with send-keys -l
+      expect(spawn).toHaveBeenCalledWith(
         'tmux',
-        ['set-buffer', '--', multilineMessage]
-      );
-
-      // Second spawn call: paste-buffer with -dp (delete + bracketed paste)
-      expect(spawn).toHaveBeenNthCalledWith(
-        2,
-        'tmux',
-        ['paste-buffer', '-dp', '-t', 'test-session']
+        ['send-keys', '-l', '-t', 'test-session', multilineMessage]
       );
     });
 
-    it('should send Enter key after paste-buffer', async () => {
+    it('should send Enter key after multiline content', async () => {
       const { spawn } = await import('child_process');
-      vi.mocked(spawn).mockImplementation(() => createMockChildProcess(0));
+      vi.mocked(spawn).mockReturnValue(createMockChildProcess(0));
 
       vi.mocked(exec).mockImplementation((_cmd, _options, callback: any) => {
         callback(null, { stdout: '', stderr: '' });
@@ -139,7 +127,7 @@ describe('sendMessageWithEnter - multiline support [Issue #163]', () => {
 
       await sendMessageWithEnter('test-session', 'line 1\nline 2');
 
-      // After paste-buffer, should send Enter via exec (sendKeys)
+      // After spawn, should send Enter via exec (sendKeys)
       expect(exec).toHaveBeenCalledWith(
         expect.stringContaining('C-m'),
         expect.any(Object),
@@ -149,7 +137,7 @@ describe('sendMessageWithEnter - multiline support [Issue #163]', () => {
 
     it('should handle special shell characters safely via spawn', async () => {
       const { spawn } = await import('child_process');
-      vi.mocked(spawn).mockImplementation(() => createMockChildProcess(0));
+      vi.mocked(spawn).mockReturnValue(createMockChildProcess(0));
 
       vi.mocked(exec).mockImplementation((_cmd, _options, callback: any) => {
         callback(null, { stdout: '', stderr: '' });
@@ -160,15 +148,14 @@ describe('sendMessageWithEnter - multiline support [Issue #163]', () => {
       const dangerousMessage = 'const x = `hello ${world}`;\nconst y = "test $PATH";';
       await sendMessageWithEnter('test-session', dangerousMessage);
 
-      // spawn passes the message as argument array element, no shell interpretation
-      expect(spawn).toHaveBeenNthCalledWith(
-        1,
+      // spawn passes the message as an argument array element, no shell interpretation
+      expect(spawn).toHaveBeenCalledWith(
         'tmux',
-        ['set-buffer', '--', dangerousMessage]
+        ['send-keys', '-l', '-t', 'test-session', dangerousMessage]
       );
     });
 
-    it('should propagate set-buffer error', async () => {
+    it('should propagate spawn error', async () => {
       const { spawn } = await import('child_process');
       vi.mocked(spawn).mockReturnValue(
         createMockErrorProcess(new Error('spawn ENOENT'))
@@ -176,61 +163,23 @@ describe('sendMessageWithEnter - multiline support [Issue #163]', () => {
 
       await expect(
         sendMessageWithEnter('test-session', 'line1\nline2')
-      ).rejects.toThrow('Failed to set tmux buffer');
+      ).rejects.toThrow('Failed to send multiline message');
     });
 
-    it('should propagate set-buffer non-zero exit code', async () => {
+    it('should propagate spawn non-zero exit code', async () => {
       const { spawn } = await import('child_process');
       vi.mocked(spawn).mockReturnValue(createMockChildProcess(1));
 
       await expect(
         sendMessageWithEnter('test-session', 'line1\nline2')
-      ).rejects.toThrow('tmux set-buffer exited with code 1');
-    });
-
-    it('should propagate paste-buffer error', async () => {
-      const { spawn } = await import('child_process');
-      let callCount = 0;
-      vi.mocked(spawn).mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          // set-buffer succeeds
-          return createMockChildProcess(0);
-        } else {
-          // paste-buffer fails
-          return createMockErrorProcess(new Error('paste failed'));
-        }
-      });
-
-      await expect(
-        sendMessageWithEnter('test-session', 'line1\nline2')
-      ).rejects.toThrow('Failed to paste buffer');
-    });
-
-    it('should propagate paste-buffer non-zero exit code', async () => {
-      const { spawn } = await import('child_process');
-      let callCount = 0;
-      vi.mocked(spawn).mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          // set-buffer succeeds
-          return createMockChildProcess(0);
-        } else {
-          // paste-buffer exits with non-zero
-          return createMockChildProcess(1);
-        }
-      });
-
-      await expect(
-        sendMessageWithEnter('test-session', 'line1\nline2')
-      ).rejects.toThrow('tmux paste-buffer exited with code 1');
+      ).rejects.toThrow('tmux send-keys -l exited with code 1');
     });
   });
 
   describe('validation (applies to both paths)', () => {
     it('should reject empty string with newline only', async () => {
       const { spawn } = await import('child_process');
-      vi.mocked(spawn).mockImplementation(() => createMockChildProcess(0));
+      vi.mocked(spawn).mockReturnValue(createMockChildProcess(0));
 
       vi.mocked(exec).mockImplementation((_cmd, _options, callback: any) => {
         callback(null, { stdout: '', stderr: '' });
@@ -283,7 +232,7 @@ describe('sendMessageWithEnter - multiline support [Issue #163]', () => {
   describe('delay handling for multiline', () => {
     it('should apply delay between content send and Enter send', async () => {
       const { spawn } = await import('child_process');
-      vi.mocked(spawn).mockImplementation(() => createMockChildProcess(0));
+      vi.mocked(spawn).mockReturnValue(createMockChildProcess(0));
 
       vi.mocked(exec).mockImplementation((_cmd, _options, callback: any) => {
         callback(null, { stdout: '', stderr: '' });
@@ -296,14 +245,14 @@ describe('sendMessageWithEnter - multiline support [Issue #163]', () => {
       await vi.advanceTimersByTimeAsync(300);
       await promise;
 
-      // Both spawn (set-buffer + paste-buffer) and exec (for Enter) should have been called
-      expect(spawn).toHaveBeenCalledTimes(2);
+      // Both spawn and exec (for Enter) should have been called
+      expect(spawn).toHaveBeenCalled();
       expect(exec).toHaveBeenCalled();
     });
 
     it('should skip delay when delay is 0', async () => {
       const { spawn } = await import('child_process');
-      vi.mocked(spawn).mockImplementation(() => createMockChildProcess(0));
+      vi.mocked(spawn).mockReturnValue(createMockChildProcess(0));
 
       vi.mocked(exec).mockImplementation((_cmd, _options, callback: any) => {
         callback(null, { stdout: '', stderr: '' });
@@ -312,7 +261,7 @@ describe('sendMessageWithEnter - multiline support [Issue #163]', () => {
 
       await sendMessageWithEnter('test-session', 'line1\nline2', 0);
 
-      expect(spawn).toHaveBeenCalledTimes(2);
+      expect(spawn).toHaveBeenCalled();
       expect(exec).toHaveBeenCalled();
     });
   });
