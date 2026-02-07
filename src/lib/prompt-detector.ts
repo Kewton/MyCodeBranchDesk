@@ -211,6 +211,37 @@ function isConsecutiveFromOne(numbers: number[]): boolean {
 }
 
 /**
+ * Continuation line detection for multiline option text wrapping.
+ * Detects lines that are part of a previous option's text, wrapped due to terminal width.
+ *
+ * Called within detectMultipleChoicePrompt() Pass 2 reverse scan, only when
+ * options.length > 0 (at least one option already detected):
+ *   const rawLine = lines[i];       // Original line with indentation preserved
+ *   const line = lines[i].trim();   // Trimmed line
+ *   if (options.length > 0 && line && !line.match(/^[-─]+$/)) {
+ *     if (isContinuationLine(rawLine, line)) { continue; }
+ *   }
+ *
+ * Each condition's responsibility:
+ *   - hasLeadingSpaces: Indented non-option line (label text wrapping with indentation)
+ *   - isShortFragment: Short fragment (< 5 chars, e.g., filename tail)
+ *   - isPathContinuation: Path string continuation (Issue #181)
+ *
+ * @param rawLine - Original line with indentation preserved (lines[i])
+ * @param line - Trimmed line (lines[i].trim())
+ * @returns true if the line should be treated as a continuation of a previous option
+ */
+function isContinuationLine(rawLine: string, line: string): boolean {
+  // Indented non-option line
+  const hasLeadingSpaces = rawLine.match(/^\s{2,}[^\d]/) && !rawLine.match(/^\s*\d+\./);
+  // Short fragment (< 5 chars, excluding question-ending lines)
+  const isShortFragment = line.length < 5 && !line.endsWith('?');
+  // Path string continuation: lines starting with / or ~, or alphanumeric-only fragments (2+ chars)
+  const isPathContinuation = /^[\/~]/.test(line) || (line.length >= 2 && /^[a-zA-Z0-9_-]+$/.test(line));
+  return !!(hasLeadingSpaces) || isShortFragment || isPathContinuation;
+}
+
+/**
  * Detect multiple choice prompts (numbered list with ❯ indicator)
  *
  * Uses a 2-pass detection approach (Issue #161):
@@ -286,15 +317,10 @@ function detectMultipleChoicePrompt(output: string): PromptDetectionResult {
 
     // Non-option line handling
     if (options.length > 0 && line && !line.match(/^[-─]+$/)) {
-      // Check if this is a continuation line (indented line between options)
-      // Continuation lines typically start with spaces (like "  work/github...")
-      // Also treat very short lines (< 5 chars) as potential word-wrap fragments
+      // Check if this is a continuation line (indented line between options,
+      // or path/filename fragments from terminal width wrapping - Issue #181)
       const rawLine = lines[i]; // Original line with indentation preserved
-      const hasLeadingSpaces = rawLine.match(/^\s{2,}[^\d]/) && !rawLine.match(/^\s*\d+\./);
-      const isShortFragment = line.length < 5 && !line.endsWith('?');
-      const isContinuationLine = hasLeadingSpaces || isShortFragment;
-
-      if (isContinuationLine) {
+      if (isContinuationLine(rawLine, line)) {
         // Skip continuation lines and continue scanning for more options
         continue;
       }
