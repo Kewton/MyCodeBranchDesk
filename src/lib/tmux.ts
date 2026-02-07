@@ -3,7 +3,7 @@
  * Provides functions to manage tmux sessions for Claude CLI integration
  */
 
-import { getErrorMessage } from './utils';
+import { getErrorMessage, DANGEROUS_CONTROL_CHARS } from './utils';
 import { validateSessionName } from './cli-tools/validation';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -487,8 +487,6 @@ export async function sendMessageWithEnter(
   }
 
   // Reject dangerous control characters (allow \t, \n, \r)
-  // eslint-disable-next-line no-control-regex
-  const DANGEROUS_CONTROL_CHARS = /[\x00-\x08\x0B\x0C\x0E-\x1F]/;
   if (DANGEROUS_CONTROL_CHARS.test(message)) {
     throw new Error('Message contains prohibited control characters');
   }
