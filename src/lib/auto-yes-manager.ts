@@ -67,6 +67,17 @@ export const MAX_CONCURRENT_POLLERS = 50;
 /** Timeout duration: 1 hour in milliseconds */
 const AUTO_YES_TIMEOUT_MS = 3600000;
 
+/**
+ * Number of lines from the end to check for thinking indicators (Issue #191)
+ * Matches detectPrompt()'s multiple_choice scan range (50 lines in prompt-detector.ts)
+ * to ensure Issue #161 Layer 1 defense covers the same scope as prompt detection.
+ *
+ * IMPORTANT: This value is semantically coupled to the hardcoded 50 in
+ * prompt-detector.ts detectMultipleChoicePrompt() (L268: Math.max(0, lines.length - 50)).
+ * See SF-001 in Stage 1 review. A cross-reference test validates this coupling.
+ */
+export const THINKING_CHECK_LINE_COUNT = 50;
+
 /** Worktree ID validation pattern (security: prevent command injection) */
 const WORKTREE_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
@@ -281,7 +292,23 @@ async function pollAutoYes(worktreeId: string, cliToolId: CLIToolType): Promise<
     // 2.5. Skip prompt detection during thinking state (Issue #161, Layer 1)
     // This prevents false positive detection of numbered lists in CLI output
     // while Claude is actively processing (thinking/planning).
-    if (detectThinking(cliToolId, cleanOutput)) {
+    //
+    // Issue #191: Apply windowing to detectThinking() to prevent stale thinking
+    // summary lines (e.g., "· Simmering…") from blocking prompt detection.
+    // Window size matches detectPrompt()'s multiple_choice scan range (50 lines).
+    //
+    // Safety: Claude CLI does not emit prompts during thinking, so narrowing
+    // the window cannot cause false auto-responses (see IA-003 in design doc).
+    //
+    // Processing order: stripAnsi -> split -> slice -> join
+    // stripAnsi is applied BEFORE split to ensure ANSI escape sequences spanning
+    // line boundaries do not affect line counting (IA-002).
+    //
+    // Boundary case: if buffer has fewer than 50 lines, slice(-50) returns the
+    // entire array (Array.prototype.slice specification), which is safe degradation
+    // equivalent to pre-fix behavior (IA-001).
+    const recentLines = cleanOutput.split('\n').slice(-THINKING_CHECK_LINE_COUNT).join('\n');
+    if (detectThinking(cliToolId, recentLines)) {
       scheduleNextPoll(worktreeId, cliToolId);
       return;
     }

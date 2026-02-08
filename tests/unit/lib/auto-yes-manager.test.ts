@@ -16,6 +16,7 @@ import {
   POLLING_INTERVAL_MS,
   MAX_BACKOFF_MS,
   MAX_CONSECUTIVE_ERRORS,
+  THINKING_CHECK_LINE_COUNT,
   type AutoYesState,
 } from '@/lib/auto-yes-manager';
 
@@ -495,6 +496,155 @@ describe('auto-yes-manager', () => {
       stopAutoYesPolling('wt-normal');
       vi.mocked(captureSessionOutput).mockReset();
       vi.mocked(sendKeys).mockReset();
+    });
+  });
+
+  // ==========================================================================
+  // Issue #191: detectThinking windowing
+  // Verifies that detectThinking() only scans the last THINKING_CHECK_LINE_COUNT
+  // lines of the buffer, preventing stale thinking summary lines from blocking
+  // prompt detection.
+  // ==========================================================================
+  describe('Issue #191: detectThinking windowing', () => {
+    it('should detect prompt when stale thinking summary exists in early buffer lines (Issue #191)', async () => {
+      const { captureSessionOutput } = await import('@/lib/cli-session');
+      const { sendKeys } = await import('@/lib/tmux');
+
+      vi.useFakeTimers();
+      const now = Date.now();
+      vi.setSystemTime(now);
+
+      // Setup: enable auto-yes and start polling
+      setAutoYesEnabled('wt-stale-thinking', true);
+      startAutoYesPolling('wt-stale-thinking', 'claude');
+
+      // 5000-line buffer:
+      // - First 100 lines: stale thinking summary lines (would match CLAUDE_THINKING_PATTERN)
+      // - Middle ~4890 lines: normal output
+      // - Last 10 lines: yes/no prompt
+      const staleThinkingLines = Array(100).fill('\u00B7 Simmering\u2026 (4m 16s \u00B7 \u2193 8.0k tokens \u00B7 thought for 53s)');
+      const normalLines = Array(4890).fill('normal output line');
+      const promptLines = [
+        'Do you want to proceed?',
+        '',
+        '  Yes / No',
+        '',
+        'Do you want to proceed? (y/n)',
+        '',
+        '',
+        '',
+        '',
+        '',
+      ];
+      const fullBuffer = [...staleThinkingLines, ...normalLines, ...promptLines].join('\n');
+
+      vi.mocked(captureSessionOutput).mockResolvedValue(fullBuffer);
+      vi.mocked(sendKeys).mockResolvedValue(undefined);
+
+      // Advance timer to trigger pollAutoYes
+      await vi.advanceTimersByTimeAsync(POLLING_INTERVAL_MS + 100);
+
+      // Verify: captureSessionOutput was called (poll ran)
+      expect(captureSessionOutput).toHaveBeenCalled();
+
+      // Verify: sendKeys WAS called, meaning the stale thinking lines did NOT
+      // block prompt detection. Before Issue #191 fix, detectThinking() would
+      // match the stale lines in the first 100 lines and skip prompt detection.
+      expect(sendKeys).toHaveBeenCalled();
+
+      // Cleanup
+      stopAutoYesPolling('wt-stale-thinking');
+      vi.mocked(captureSessionOutput).mockReset();
+      vi.mocked(sendKeys).mockReset();
+    });
+
+    it('should skip prompt detection when thinking pattern is within last 50 lines (Issue #191)', async () => {
+      const { captureSessionOutput } = await import('@/lib/cli-session');
+      const { sendKeys } = await import('@/lib/tmux');
+
+      vi.useFakeTimers();
+      const now = Date.now();
+      vi.setSystemTime(now);
+
+      // Setup: enable auto-yes and start polling
+      setAutoYesEnabled('wt-recent-thinking', true);
+      startAutoYesPolling('wt-recent-thinking', 'claude');
+
+      // 5000-line buffer with thinking pattern within last 50 lines:
+      // - First 4970 lines: normal output
+      // - Line 4971: active thinking pattern (within last 30 lines of buffer)
+      // - Last 29 lines: some output (no prompt)
+      const normalLines = Array(4970).fill('normal output');
+      const thinkingLine = '\u2733 Analyzing\u2026';
+      const recentLines = Array(29).fill('some output');
+      const fullBuffer = [...normalLines, thinkingLine, ...recentLines].join('\n');
+
+      vi.mocked(captureSessionOutput).mockResolvedValue(fullBuffer);
+
+      // Advance timer to trigger pollAutoYes
+      await vi.advanceTimersByTimeAsync(POLLING_INTERVAL_MS + 100);
+
+      // Verify: captureSessionOutput was called (poll ran)
+      expect(captureSessionOutput).toHaveBeenCalled();
+
+      // Verify: sendKeys was NOT called, confirming that thinking pattern
+      // within the last 50 lines correctly blocks prompt detection.
+      expect(sendKeys).not.toHaveBeenCalled();
+
+      // Cleanup
+      stopAutoYesPolling('wt-recent-thinking');
+      vi.mocked(captureSessionOutput).mockReset();
+    });
+
+    it('should have THINKING_CHECK_LINE_COUNT matching prompt-detector multiple_choice scan window (SF-001)', async () => {
+      // SF-001: Verify that THINKING_CHECK_LINE_COUNT and prompt-detector.ts's
+      // detectMultipleChoicePrompt() window size (50 lines) are consistent.
+      // This ensures Issue #161 Layer 1 defense covers the same scope as prompt detection.
+      //
+      // Verification approach:
+      // 1. Direct: Assert THINKING_CHECK_LINE_COUNT value
+      // 2. Indirect: Create a buffer where a multiple_choice prompt is placed
+      //    exactly at the Nth line from end (N = THINKING_CHECK_LINE_COUNT),
+      //    verify detectPrompt detects it, confirming both windows are aligned.
+
+      const { detectPrompt } = await import('@/lib/prompt-detector');
+
+      // Part 1: Direct value assertion
+      expect(THINKING_CHECK_LINE_COUNT).toBe(50);
+
+      // Part 2: Indirect verification - place options at exactly the boundary
+      // of detectMultipleChoicePrompt's scan window (last 50 lines).
+      // The multiple_choice prompt options should be detectable at this boundary.
+      const paddingLines = Array(100).fill('padding line');
+      // Place options starting at line (total - 50) from end
+      const optionLines = [
+        'Do you want to proceed?',
+        '\u276F 1. Yes',
+        '  2. No',
+      ];
+      // Fill remaining lines to push options to exactly the 50-line boundary
+      const trailingLines = Array(50 - optionLines.length).fill('');
+      const buffer = [...paddingLines, ...optionLines, ...trailingLines].join('\n');
+
+      const result = detectPrompt(buffer);
+
+      // The prompt should be detected because the options fall within
+      // the last 50 lines (matching THINKING_CHECK_LINE_COUNT scope).
+      expect(result.isPrompt).toBe(true);
+      expect(result.promptData?.type).toBe('multiple_choice');
+
+      // Verify that options placed OUTSIDE the 50-line window are NOT detected
+      const outsideOptionLines = [
+        'Do you want to proceed?',
+        '\u276F 1. Yes',
+        '  2. No',
+      ];
+      const moreTrailingLines = Array(50).fill('trailing line');
+      const outsideBuffer = [...paddingLines, ...outsideOptionLines, ...moreTrailingLines].join('\n');
+
+      const outsideResult = detectPrompt(outsideBuffer);
+      // Options are pushed outside the 50-line window, so should NOT be detected
+      expect(outsideResult.isPrompt).toBe(false);
     });
   });
 });
