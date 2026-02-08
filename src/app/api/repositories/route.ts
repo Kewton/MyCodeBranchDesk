@@ -2,6 +2,7 @@
  * API Route: DELETE /api/repositories
  * Deletes a repository and all its worktrees from the database
  * Issue #69: Repository delete feature
+ * Issue #190: Repository exclusion on sync (disableRepository before worktree check)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -10,6 +11,8 @@ import {
   getWorktreeIdsByRepository,
   deleteRepositoryWorktrees,
 } from '@/lib/db';
+import { resolveRepositoryPath, disableRepository } from '@/lib/db-repository';
+import { isSystemDirectory } from '@/config/system-directories';
 import { cleanupMultipleWorktrees } from '@/lib/session-cleanup';
 import { cleanupRooms, broadcastMessage } from '@/lib/ws-server';
 import { CLIToolManager } from '@/lib/cli-tools/manager';
@@ -65,7 +68,28 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    // Path traversal validation (SEC-MF-001)
+    if (repositoryPath.includes('\0')) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid repository path' },
+        { status: 400 }
+      );
+    }
+
+    const resolvedPath = resolveRepositoryPath(repositoryPath);
+
+    if (isSystemDirectory(resolvedPath)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid repository path' },
+        { status: 400 }
+      );
+    }
+
     const db = getDbInstance();
+
+    // Issue #190: Disable repository BEFORE worktreeIds check (SF-C01)
+    // This ensures exclusion registration even when worktrees table has no records
+    disableRepository(db, repositoryPath);
 
     // Get all worktree IDs for this repository
     const worktreeIds = getWorktreeIdsByRepository(db, repositoryPath);

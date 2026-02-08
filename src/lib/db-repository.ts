@@ -4,6 +4,7 @@
  */
 
 import { randomUUID } from 'crypto';
+import path from 'path';
 import Database from 'better-sqlite3';
 import type { CloneJobStatus } from '@/types/clone';
 
@@ -285,6 +286,153 @@ export function getAllRepositories(
 
   const rows = stmt.all() as RepositoryRow[];
   return rows.map(mapRepositoryRow);
+}
+
+// ============================================================
+// Repository Exclusion Operations (Issue #190)
+// ============================================================
+
+/**
+ * Maximum number of disabled repositories allowed.
+ * Prevents unlimited record accumulation from malicious or buggy DELETE requests.
+ * SEC-SF-004
+ */
+export const MAX_DISABLED_REPOSITORIES = 1000;
+
+/**
+ * Resolve and normalize a repository path.
+ * All path normalization is centralized here to prevent inconsistencies.
+ *
+ * NOTE: path.resolve() removes trailing slashes and resolves relative paths
+ * but does NOT resolve symlinks. For symlink resolution, use fs.realpathSync().
+ * See design policy Section 7 for the symlink handling policy.
+ *
+ * SF-001: DRY - centralized path normalization
+ */
+export function resolveRepositoryPath(repoPath: string): string {
+  return path.resolve(repoPath);
+}
+
+/**
+ * Register environment variable repositories to the repositories table.
+ * Idempotent: already registered repositories are skipped (regardless of enabled status).
+ *
+ * NOTE (MF-C01): createRepository() treats enabled as follows:
+ *   - true  -> SQLite 1 (enabled)
+ *   - false -> SQLite 0 (disabled)
+ *   - undefined -> SQLite 1 (enabled, due to `data.enabled !== false ? 1 : 0` logic)
+ * We explicitly pass enabled: true to avoid relying on the implicit default.
+ *
+ * MF-001: SRP - registration logic separated from sync route
+ */
+export function ensureEnvRepositoriesRegistered(
+  db: Database.Database,
+  repositoryPaths: string[]
+): void {
+  for (const repoPath of repositoryPaths) {
+    const resolvedPath = resolveRepositoryPath(repoPath);
+    const existing = getRepositoryByPath(db, resolvedPath);
+    if (!existing) {
+      createRepository(db, {
+        name: path.basename(resolvedPath),
+        path: resolvedPath,
+        cloneSource: 'local',
+        isEnvManaged: true,
+        enabled: true,  // Explicit: do not rely on undefined -> 1 default
+      });
+    }
+  }
+}
+
+/**
+ * Filter out excluded repository paths.
+ * Exclusion logic is encapsulated here, so changes to exclusion criteria
+ * (e.g., pattern-based exclusion, temporary exclusion) only affect this function.
+ *
+ * NOTE (SEC-SF-002): Array.includes() performs case-sensitive string comparison.
+ * On macOS (case-insensitive filesystem), paths with different casing would not match.
+ * resolveRepositoryPath() normalization on both sides mitigates most cases.
+ * On Linux (case-sensitive filesystem), the behavior is consistent.
+ *
+ * SF-003: OCP - exclusion logic encapsulated
+ */
+export function filterExcludedPaths(
+  db: Database.Database,
+  repositoryPaths: string[]
+): string[] {
+  const excludedPaths = getExcludedRepositoryPaths(db);
+  return repositoryPaths.filter(p =>
+    !excludedPaths.includes(resolveRepositoryPath(p))
+  );
+}
+
+/**
+ * Disable a repository by setting enabled=0.
+ * If the repository is not registered, create it with enabled=0.
+ * All internal logic (lookup + update/create) is encapsulated.
+ *
+ * NOTE (MF-C01): Explicitly passes enabled: false to createRepository().
+ * The internal mapping `data.enabled !== false ? 1 : 0` will correctly
+ * store 0 in SQLite. Do NOT pass undefined for enabled.
+ *
+ * NOTE (SEC-SF-004): When creating a new record, checks the count of
+ * disabled repositories against MAX_DISABLED_REPOSITORIES to prevent
+ * unlimited record accumulation from malicious or buggy DELETE requests.
+ *
+ * SF-002: SRP - disable logic encapsulated
+ */
+export function disableRepository(db: Database.Database, repositoryPath: string): void {
+  const resolvedPath = resolveRepositoryPath(repositoryPath);
+  const repo = getRepositoryByPath(db, resolvedPath);
+  if (repo) {
+    updateRepository(db, repo.id, { enabled: false });
+  } else {
+    // SEC-SF-004: Check disabled repository count limit before creating new record
+    const disabledCount = db.prepare(
+      'SELECT COUNT(*) as count FROM repositories WHERE enabled = 0'
+    ).get() as { count: number };
+    if (disabledCount.count >= MAX_DISABLED_REPOSITORIES) {
+      throw new Error('Disabled repository limit exceeded');
+    }
+    createRepository(db, {
+      name: path.basename(resolvedPath),
+      path: resolvedPath,
+      cloneSource: 'local',
+      isEnvManaged: false,
+      enabled: false,  // Explicit: do not rely on undefined -> 1 default
+    });
+  }
+}
+
+/**
+ * Get paths of excluded (enabled=0) repositories
+ */
+export function getExcludedRepositoryPaths(db: Database.Database): string[] {
+  const stmt = db.prepare('SELECT path FROM repositories WHERE enabled = 0');
+  const rows = stmt.all() as { path: string }[];
+  return rows.map(r => r.path);
+}
+
+/**
+ * Get excluded repositories with full details
+ */
+export function getExcludedRepositories(db: Database.Database): Repository[] {
+  const stmt = db.prepare('SELECT * FROM repositories WHERE enabled = 0 ORDER BY name ASC');
+  const rows = stmt.all() as RepositoryRow[];
+  return rows.map(mapRepositoryRow);
+}
+
+/**
+ * Restore an excluded repository by setting enabled=1
+ *
+ * @returns Restored Repository object, or null if not found
+ */
+export function restoreRepository(db: Database.Database, repoPath: string): Repository | null {
+  const resolvedPath = resolveRepositoryPath(repoPath);
+  const repo = getRepositoryByPath(db, resolvedPath);
+  if (!repo) return null;
+  updateRepository(db, repo.id, { enabled: true });
+  return { ...repo, enabled: true };
 }
 
 // ============================================================

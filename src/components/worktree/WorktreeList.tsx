@@ -8,21 +8,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { WorktreeCard } from './WorktreeCard';
 import { Button, Badge } from '@/components/ui';
-import { worktreeApi, repositoryApi, handleApiError, type RepositorySummary } from '@/lib/api-client';
+import { worktreeApi, repositoryApi, handleApiError, type RepositorySummary, type ExcludedRepository } from '@/lib/api-client';
 import { useWebSocket, type WebSocketMessage, type SessionStatusPayload, type BroadcastPayload } from '@/hooks/useWebSocket';
 import type { Worktree } from '@/types/models';
-
-/**
- * Check if a repository path is configured in WORKTREE_REPOS environment variable
- * This is used to show a warning icon for repositories that will be re-registered on Sync All
- */
-function isInEnvVar(repositoryPath: string): boolean {
-  // Environment variable is exposed via next.config.js as NEXT_PUBLIC_WORKTREE_REPOS
-  const envRepos = process.env.NEXT_PUBLIC_WORKTREE_REPOS;
-  if (!envRepos) return false;
-  const envPaths = envRepos.split(',').map(p => p.trim());
-  return envPaths.includes(repositoryPath);
-}
 
 export type SortOption = 'name' | 'updated' | 'favorite';
 export type SortDirection = 'asc' | 'desc';
@@ -51,6 +39,24 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
   const [selectedRepository, setSelectedRepository] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<'todo' | 'doing' | 'done' | 'unset' | null>(null);
   const [deletingRepository, setDeletingRepository] = useState<string | null>(null);
+  const [excludedRepositories, setExcludedRepositories] = useState<ExcludedRepository[]>([]);
+  const [excludedExpanded, setExcludedExpanded] = useState(false);
+  const [restoringRepository, setRestoringRepository] = useState<string | null>(null);
+
+  /**
+   * Fetch excluded repositories
+   * Issue #190: Repository exclusion on sync
+   */
+  const fetchExcludedRepositories = useCallback(async () => {
+    try {
+      const data = await repositoryApi.getExcluded();
+      if (data.success) {
+        setExcludedRepositories(data.repositories);
+      }
+    } catch {
+      // Silently fail - excluded list is optional UI
+    }
+  }, []);
 
   /**
    * Fetch worktrees from API
@@ -110,7 +116,8 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
     if (!initialWorktrees.length) {
       fetchWorktrees();
     }
-  }, [initialWorktrees.length, fetchWorktrees]);
+    fetchExcludedRepositories();
+  }, [initialWorktrees.length, fetchWorktrees, fetchExcludedRepositories]);
 
   // Auto-refresh worktrees every 5 seconds (silent mode)
   useEffect(() => {
@@ -213,28 +220,42 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
    * Handle repository deletion
    * Shows a confirmation dialog requiring 'delete' input
    */
+  /**
+   * Handle restoring an excluded repository
+   * Issue #190: Repository exclusion on sync
+   */
+  const handleRestoreRepository = async (repositoryPath: string) => {
+    setRestoringRepository(repositoryPath);
+    try {
+      const result = await repositoryApi.restore(repositoryPath);
+      if (result.warning) {
+        setError(result.warning);
+      }
+      // Refresh both lists
+      await fetchWorktrees();
+      await fetchExcludedRepositories();
+    } catch (err) {
+      setError(handleApiError(err));
+    } finally {
+      setRestoringRepository(null);
+    }
+  };
+
   const handleDeleteRepository = async (repositoryPath: string, repositoryName: string) => {
     const worktreeCount = repositories.find(r => r.path === repositoryPath)?.worktreeCount || 0;
-    const isEnvConfigured = isInEnvVar(repositoryPath);
 
-    let confirmMessage = `Delete repository "${repositoryName}"?
+    const confirmMessage = `Delete repository "${repositoryName}"?
 
 This will delete:
 - ${worktreeCount} worktree(s)
 - Related chat history
 - Related memos
 
-* Log files will be preserved`;
+* Log files will be preserved
 
-    if (isEnvConfigured) {
-      confirmMessage += `
-
-WARNING: This repository is configured in environment variable (WORKTREE_REPOS).
-It will be re-registered when you run "Sync All".
-To permanently remove it, also update the environment variable.`;
-    }
-
-    confirmMessage += `
+This repository will be added to the exclusion list.
+It will NOT be re-registered when you run "Sync All".
+You can restore it from the excluded repositories list.
 
 Type "delete" to confirm:`;
 
@@ -252,8 +273,9 @@ Type "delete" to confirm:`;
         setSelectedRepository(null);
       }
 
-      // Refresh worktree list
+      // Refresh worktree list and excluded list
       await fetchWorktrees();
+      await fetchExcludedRepositories();
     } catch (err) {
       setError(handleApiError(err));
     } finally {
@@ -314,11 +336,6 @@ Type "delete" to confirm:`;
                 className="pr-6"
               >
                 {repo.name} ({repo.worktreeCount})
-                {isInEnvVar(repo.path) && (
-                  <span title="Configured in environment variable" className="ml-1 text-amber-500">
-                    !
-                  </span>
-                )}
               </Button>
               <button
                 className="absolute right-1 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity px-1"
@@ -469,6 +486,43 @@ Type "delete" to confirm:`;
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Excluded Repositories Section - Issue #190 */}
+      {excludedRepositories.length > 0 && (
+        <div className="border border-gray-200 rounded-lg">
+          <button
+            className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
+            onClick={() => setExcludedExpanded(!excludedExpanded)}
+          >
+            <span className="text-sm font-medium text-gray-700">
+              Excluded Repositories ({excludedRepositories.length})
+            </span>
+            <span className="text-gray-400 text-sm">
+              {excludedExpanded ? 'Hide' : 'Show'}
+            </span>
+          </button>
+          {excludedExpanded && (
+            <div className="border-t border-gray-200 divide-y divide-gray-100">
+              {excludedRepositories.map((repo) => (
+                <div key={repo.id} className="flex items-center justify-between p-4">
+                  <div>
+                    <span className="text-sm font-medium text-gray-700">{repo.name}</span>
+                    <span className="text-xs text-gray-500 ml-2">{repo.path}</span>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleRestoreRepository(repo.path)}
+                    disabled={restoringRepository === repo.path}
+                  >
+                    {restoringRepository === repo.path ? 'Restoring...' : 'Restore'}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -1,6 +1,7 @@
 /**
  * API repository delete integration tests
  * Issue #69: Repository delete feature
+ * Issue #190: Repository exclusion on sync (disableRepository, security validation)
  * TDD Approach: Write tests first (Red), then implement (Green), then refactor
  */
 
@@ -10,6 +11,7 @@ import Database from 'better-sqlite3';
 import { DELETE } from '@/app/api/repositories/route';
 import { runMigrations } from '@/lib/db-migrations';
 import { upsertWorktree, createMessage, getWorktrees } from '@/lib/db';
+import { getRepositoryByPath } from '@/lib/db-repository';
 
 // Mock db-instance to use test database
 let testDb: Database.Database;
@@ -282,5 +284,76 @@ describe('DELETE /api/repositories', () => {
       'SELECT * FROM chat_messages WHERE worktree_id = ?'
     ).all('wt-1');
     expect(messages).toHaveLength(0);
+  });
+
+  // ============================================================
+  // Issue #190: Repository exclusion on sync
+  // ============================================================
+
+  it('should create disabled repository record on delete (Issue #190)', async () => {
+    const repoPath = '/path/to/repo';
+
+    upsertWorktree(testDb, {
+      id: 'wt-1',
+      name: 'main',
+      path: '/path/to/repo/main',
+      repositoryPath: repoPath,
+      repositoryName: 'repo',
+    });
+
+    const request = new NextRequest('http://localhost:3000/api/repositories', {
+      method: 'DELETE',
+      body: JSON.stringify({ repositoryPath: repoPath }),
+    });
+
+    await DELETE(request);
+
+    // Verify repositories table has enabled=0 record
+    const repo = getRepositoryByPath(testDb, repoPath);
+    expect(repo).not.toBeNull();
+    expect(repo!.enabled).toBe(false);
+  });
+
+  it('should disable repository even when returning 404 for no worktrees (Issue #190 SF-C01)', async () => {
+    const repoPath = '/path/to/no-worktrees-repo';
+
+    const request = new NextRequest('http://localhost:3000/api/repositories', {
+      method: 'DELETE',
+      body: JSON.stringify({ repositoryPath: repoPath }),
+    });
+
+    const response = await DELETE(request);
+    expect(response.status).toBe(404);
+
+    // Despite 404, repository should be disabled in repositories table
+    const repo = getRepositoryByPath(testDb, repoPath);
+    expect(repo).not.toBeNull();
+    expect(repo!.enabled).toBe(false);
+  });
+
+  it('should return 400 for null byte in repositoryPath (SEC-MF-001)', async () => {
+    const request = new NextRequest('http://localhost:3000/api/repositories', {
+      method: 'DELETE',
+      body: JSON.stringify({ repositoryPath: '/path/to/repo\0malicious' }),
+    });
+
+    const response = await DELETE(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Invalid repository path');
+  });
+
+  it('should return 400 for system directory path (SEC-MF-001)', async () => {
+    const request = new NextRequest('http://localhost:3000/api/repositories', {
+      method: 'DELETE',
+      body: JSON.stringify({ repositoryPath: '/etc/passwd' }),
+    });
+
+    const response = await DELETE(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Invalid repository path');
   });
 });
