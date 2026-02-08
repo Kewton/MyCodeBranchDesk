@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-02-08
+
 ### Changed
 - **BREAKING**: Removed `CM_AUTH_TOKEN` authentication mechanism (Issue #179)
   - `src/middleware.ts` deleted (Next.js authentication middleware)
@@ -18,6 +20,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Client-side `api-client.ts` no longer sends Authorization header
 
 ### Added
+- Codex CLI support (Issue #4)
+  - Codex tab in WorktreeDetail
+  - Per-CLI tool status indicators in sidebar and tabs
+  - Individual session termination with confirmation dialog
+  - Mobile CLI tab switcher inline with Auto Yes toggle
+  - CLI tool-specific slash command filtering (Claude: 16, Codex: 10)
+  - Response saving fix for tmux buffer empty line padding
+- Multiline message support via tmux `paste-buffer` (Issue #163)
+  - `sendTextViaBuffer()` for accurate multiline text delivery
+  - Single-line uses `sendKeys`, multiline uses `paste-buffer`
+- App version display in info tab (Issue #159)
+  - Desktop (InfoModal) and mobile (MobileInfoContent) support
+  - Build-time `NEXT_PUBLIC_APP_VERSION` from `package.json`
 - New security guide: `docs/security-guide.md` (Issue #179)
   - Threat model for localhost vs external access
   - Nginx + Basic Auth configuration example
@@ -25,6 +40,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Migration steps from CM_AUTH_TOKEN
   - Security checklist for external deployment
 - `src/cli/config/security-messages.ts` with shared REVERSE_PROXY_WARNING constant (Issue #179)
+
+### Fixed
+- Auto-Yes false positive detection of numbered lists as multiple_choice prompts (Issue #161)
+  - Two-pass `❯` detection to prevent misidentification
+  - Thinking state pre-check skips prompt detection
+  - Consecutive number validation as defensive measure
+  - Prompt re-verification before sendKeys in prompt-response API
+- Status display inconsistency: UI showing "running"/"waiting" when CLI is idle (Issue #180)
+  - Consolidated inline logic into `detectSessionStatus()` in `status-detector.ts`
+  - 15-line windowing to prevent past prompt false positives
+- Multiline option text detection in multiple choice prompts (Issue #181)
+- Deleted repositories reappearing after Sync All (Issue #190)
+  - `enabled=0` exclusion marking on delete
+  - Excluded repository list UI with restore button
+  - New APIs: `GET /api/repositories/excluded`, `PUT /api/repositories/restore`
+- File tree directory expand state lost after file operations
 
 ### Removed
 - `CM_AUTH_TOKEN` / `MCBD_AUTH_TOKEN` environment variable support (Issue #179)
@@ -300,7 +331,8 @@ _No changes recorded._
   - `MCBD_DB_PATH` -> `CM_DB_PATH`
 - `NEXT_PUBLIC_MCBD_AUTH_TOKEN` -> `NEXT_PUBLIC_CM_AUTH_TOKEN`
 
-[unreleased]: https://github.com/Kewton/CommandMate/compare/v0.1.12...HEAD
+[unreleased]: https://github.com/Kewton/CommandMate/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Kewton/CommandMate/compare/v0.1.12...v0.2.0
 [0.1.12]: https://github.com/Kewton/CommandMate/compare/v0.1.11...v0.1.12
 [0.1.11]: https://github.com/Kewton/CommandMate/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/Kewton/CommandMate/compare/v0.1.9...v0.1.10
