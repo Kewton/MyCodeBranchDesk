@@ -286,7 +286,6 @@ export async function waitForPrompt(
  * await startClaudeSession({
  *   worktreeId: 'feature-foo',
  *   worktreePath: '/path/to/worktree',
- *   baseUrl: 'http://localhost:3000',
  * });
  * ```
  */
@@ -494,7 +493,6 @@ export async function stopClaudeSession(worktreeId: string): Promise<boolean> {
  * await restartClaudeSession({
  *   worktreeId: 'feature-foo',
  *   worktreePath: '/path/to/worktree',
- *   baseUrl: 'http://localhost:3000',
  * });
  * ```
  */

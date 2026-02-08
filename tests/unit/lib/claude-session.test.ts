@@ -168,10 +168,13 @@ describe('claude-session - Issue #152 improvements', () => {
       const timeout = 1000;
       const promise = waitForPrompt(sessionName, timeout);
 
+      // Attach rejection handler before advancing timers to prevent unhandled rejection
+      const assertion = expect(promise).rejects.toThrow(`Prompt detection timeout (${timeout}ms)`);
+
       // Advance past timeout
       await vi.advanceTimersByTimeAsync(timeout + 100);
 
-      await expect(promise).rejects.toThrow(`Prompt detection timeout (${timeout}ms)`);
+      await assertion;
     });
 
     it('should use default timeout when not specified', async () => {
@@ -180,10 +183,13 @@ describe('claude-session - Issue #152 improvements', () => {
 
       const promise = waitForPrompt(sessionName);
 
+      // Attach rejection handler before advancing timers to prevent unhandled rejection
+      const assertion = expect(promise).rejects.toThrow(`Prompt detection timeout (${CLAUDE_PROMPT_WAIT_TIMEOUT}ms)`);
+
       // Advance past default timeout (CLAUDE_PROMPT_WAIT_TIMEOUT = 5000ms)
       await vi.advanceTimersByTimeAsync(CLAUDE_PROMPT_WAIT_TIMEOUT + 100);
 
-      await expect(promise).rejects.toThrow(`Prompt detection timeout (${CLAUDE_PROMPT_WAIT_TIMEOUT}ms)`);
+      await assertion;
     });
   });
 
@@ -204,10 +210,13 @@ describe('claude-session - Issue #152 improvements', () => {
 
       const promise = startClaudeSession(options);
 
+      // Attach rejection handler before advancing timers to prevent unhandled rejection
+      const assertion = expect(promise).rejects.toThrow('Claude initialization timeout');
+
       // Advance past CLAUDE_INIT_TIMEOUT
       await vi.advanceTimersByTimeAsync(CLAUDE_INIT_TIMEOUT + 1000);
 
-      await expect(promise).rejects.toThrow('Claude initialization timeout');
+      await assertion;
     });
 
     it('should detect prompt using CLAUDE_PROMPT_PATTERN (DRY-001)', async () => {
@@ -245,11 +254,13 @@ describe('claude-session - Issue #152 improvements', () => {
 
       const promise = startClaudeSession(options);
 
+      // Attach rejection handler before advancing timers to prevent unhandled rejection
+      const assertion = expect(promise).rejects.toThrow('Claude initialization timeout');
+
       // Advance past CLAUDE_INIT_TIMEOUT
       await vi.advanceTimersByTimeAsync(CLAUDE_INIT_TIMEOUT + 1000);
 
-      // Use partial match: actual error is wrapped as 'Failed to start Claude session: Claude initialization timeout (...)'
-      await expect(promise).rejects.toThrow('Claude initialization timeout');
+      await assertion;
     });
 
     it('should wait CLAUDE_POST_PROMPT_DELAY after prompt detection (CONS-007)', async () => {
@@ -356,10 +367,13 @@ describe('claude-session - Issue #152 improvements', () => {
 
       const promise = sendMessageToClaude('test-worktree', 'Hello');
 
+      // Attach rejection handler before advancing timers to prevent unhandled rejection
+      const assertion = expect(promise).rejects.toThrow(`Prompt detection timeout (${CLAUDE_SEND_PROMPT_WAIT_TIMEOUT}ms)`);
+
       // Advance past CLAUDE_SEND_PROMPT_WAIT_TIMEOUT
       await vi.advanceTimersByTimeAsync(CLAUDE_SEND_PROMPT_WAIT_TIMEOUT + 100);
 
-      await expect(promise).rejects.toThrow(`Prompt detection timeout (${CLAUDE_SEND_PROMPT_WAIT_TIMEOUT}ms)`);
+      await assertion;
       // Verify sendKeys was NOT called (message not sent on timeout)
       expect(sendKeys).not.toHaveBeenCalled();
     });
