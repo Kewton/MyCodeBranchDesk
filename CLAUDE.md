@@ -141,7 +141,7 @@ src/
 | `src/lib/session-cleanup.ts` | セッション/ポーラー停止の一元管理（Facade パターン） |
 | `src/lib/url-normalizer.ts` | Git URL正規化（重複検出用） |
 | `src/lib/clone-manager.ts` | クローン処理管理（DBベース排他制御） |
-| `src/lib/db-repository.ts` | リポジトリDB操作関数群 |
+| `src/lib/db-repository.ts` | リポジトリDB操作関数群（Issue #190: 除外・復活・パス正規化・バリデーション関数追加） |
 | `src/types/sidebar.ts` | サイドバーステータス判定 |
 | `src/types/clone.ts` | クローン関連型定義（CloneJob, CloneError等） |
 | `src/lib/file-operations.ts` | ファイル操作（読取/更新/作成/削除/リネーム） |
@@ -374,6 +374,30 @@ commandmate status --all                   # 全サーバー状態確認
 ---
 
 ## 最近の実装機能
+
+### Issue #190: リポジトリ削除後のSync All復活防止
+- **バグ修正**: UIで削除したリポジトリがSync All実行時に再スキャン・再登録されて復活する問題を修正
+- **根本原因**: `syncWorktreesToDB()`が環境変数パスを毎回スキャンし、削除されたリポジトリを除外する仕組みがなかった
+- **修正方針**: 既存`repositories.enabled`カラム（Migration #14）を活用し、削除時に`enabled=0`で除外マーク。Sync All時に`enabled=0`のパスを除外フィルタリング
+- **主要な変更点**:
+  - `db-repository.ts`に7関数追加: `resolveRepositoryPath()`, `ensureEnvRepositoriesRegistered()`, `filterExcludedPaths()`, `disableRepository()`, `getExcludedRepositoryPaths()`, `getExcludedRepositories()`, `restoreRepository()`, `validateRepositoryPath()`
+  - DELETE APIで`disableRepository()`を`worktreeIds`チェック前に配置（未Syncリポジトリも除外対応）
+  - Sync APIで`ensureEnvRepositoriesRegistered()` + `filterExcludedPaths()`による除外フィルタリング
+  - 新規API: `GET /api/repositories/excluded`（除外一覧）、`PUT /api/repositories/restore`（復活+自動sync）
+  - UIに除外リポジトリ一覧セクション追加（折りたたみ形式、「再登録」ボタン付き）
+- **セキュリティ対策**:
+  - パストラバーサル防御（null byte + `isSystemDirectory()`チェック）
+  - `MAX_DISABLED_REPOSITORIES = 1000`（DoS防止）
+  - 固定エラーメッセージ（情報漏洩防止）
+- **主要コンポーネント**:
+  - `src/lib/db-repository.ts` - 除外・復活・パス正規化・バリデーション関数群
+  - `src/app/api/repositories/route.ts` - DELETE handler修正
+  - `src/app/api/repositories/sync/route.ts` - Sync handler修正
+  - `src/app/api/repositories/excluded/route.ts` - 新規: 除外リポジトリ一覧API
+  - `src/app/api/repositories/restore/route.ts` - 新規: 復活API
+  - `src/lib/api-client.ts` - `getExcluded()`, `restore()`メソッド追加
+  - `src/components/worktree/WorktreeList.tsx` - 削除ダイアログ更新、除外リポジトリセクション追加
+- 詳細: [設計書](./dev-reports/design/issue-190-repository-exclusion-on-sync-design-policy.md)
 
 ### Issue #159: infoタブにてアプリバージョン表示
 - **機能追加**: Worktree詳細画面のinfoタブ（デスクトップ: InfoModal、モバイル: MobileInfoContent）にCommandMateのアプリバージョンを表示
