@@ -10,10 +10,11 @@
 
 import type { CLIToolType } from './cli-tools/types';
 import { captureSessionOutput } from './cli-session';
+import { detectPrompt } from './prompt-detector';
 import { resolveAutoAnswer } from './auto-yes-resolver';
 import { sendKeys } from './tmux';
 import { CLIToolManager } from './cli-tools/manager';
-import { stripAnsi, detectThinking, detectPromptForCli } from './cli-patterns';
+import { stripAnsi, detectThinking } from './cli-patterns';
 
 /** Auto yes state for a worktree */
 export interface AutoYesState {
@@ -285,8 +286,8 @@ async function pollAutoYes(worktreeId: string, cliToolId: CLIToolType): Promise<
       return;
     }
 
-    // 3. Detect prompt (Issue #193: use CLI-specific patterns)
-    const promptDetection = detectPromptForCli(cleanOutput, cliToolId);
+    // 3. Detect prompt
+    const promptDetection = detectPrompt(cleanOutput);
 
     if (!promptDetection.isPrompt || !promptDetection.promptData) {
       // No prompt detected, schedule next poll
