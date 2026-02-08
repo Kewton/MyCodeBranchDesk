@@ -134,7 +134,7 @@ CommandMate は、以下のような方に最適です：
 | **マルチワークツリー管理** | ブランチごとに独立した AI セッション |
 | **スマホ最適 UI** | タッチ操作に最適化されたチャットインターフェース |
 | **リアルタイムステータス** | AI の状態（処理中/待機中/完了）を即座に把握 |
-| **CLI サポート** | Claude Code |
+| **CLI サポート** | Claude Code, Codex CLI |
 | **ログ管理** | 詳細な会話履歴を Markdown で保存 |
 | **LAN アクセス** | 同一ネットワーク内のスマホからアクセス可能 |
 
@@ -147,7 +147,7 @@ CommandMate は、以下のような方に最適です：
 - **データベース**: SQLite
 - **セッション管理**: tmux
 - **リアルタイム通信**: WebSocket
-- **対応 CLI**: Claude Code
+- **対応 CLI**: Claude Code, Codex CLI
 
 ---
 
@@ -162,7 +162,7 @@ npm install
 # 設定（.env）
 CM_ROOT_DIR=/path/to/your/repos
 CM_BIND=0.0.0.0
-CM_AUTH_TOKEN=your-secret-token
+# External access: configure reverse proxy authentication (see docs/security-guide.md)
 
 # 起動
 npm run build && npm start

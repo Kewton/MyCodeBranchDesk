@@ -131,16 +131,17 @@ src/
 | `src/config/system-directories.ts` | システムディレクトリ定数（SYSTEM_DIRECTORIES、isSystemDirectory()） |
 | `src/config/status-colors.ts` | ステータス色の一元管理 |
 | `src/lib/cli-patterns.ts` | CLIツール別パターン定義 |
+| `src/lib/status-detector.ts` | セッションステータス検出の共通関数（Issue #180: route.tsインラインロジック統合、hasActivePrompt、15行ウィンドウイング） |
 | `src/lib/claude-session.ts` | Claude CLI tmuxセッション管理（Issue #152で改善: プロンプト検出強化、タイムアウトエラー、waitForPrompt()） |
-| `src/lib/prompt-detector.ts` | プロンプト検出ロジック |
-| `src/lib/auto-yes-manager.ts` | Auto-Yes状態管理とサーバー側ポーリング（Issue #138） |
+| `src/lib/prompt-detector.ts` | プロンプト検出ロジック（Issue #161: 2パス❯検出方式で誤検出防止、連番検証） |
+| `src/lib/auto-yes-manager.ts` | Auto-Yes状態管理とサーバー側ポーリング（Issue #138）、thinking状態のprompt検出スキップ（Issue #161） |
 | `src/lib/auto-yes-resolver.ts` | Auto-Yes自動応答判定ロジック |
 | `src/hooks/useAutoYes.ts` | Auto-Yesクライアント側フック（重複応答防止対応） |
 | `src/lib/cli-tools/` | CLIツール抽象化（Strategy パターン） |
 | `src/lib/session-cleanup.ts` | セッション/ポーラー停止の一元管理（Facade パターン） |
 | `src/lib/url-normalizer.ts` | Git URL正規化（重複検出用） |
 | `src/lib/clone-manager.ts` | クローン処理管理（DBベース排他制御） |
-| `src/lib/db-repository.ts` | リポジトリDB操作関数群 |
+| `src/lib/db-repository.ts` | リポジトリDB操作関数群（Issue #190: 除外・復活・パス正規化・バリデーション関数追加） |
 | `src/types/sidebar.ts` | サイドバーステータス判定 |
 | `src/types/clone.ts` | クローン関連型定義（CloneJob, CloneError等） |
 | `src/lib/file-operations.ts` | ファイル操作（読取/更新/作成/削除/リネーム） |
@@ -339,6 +340,7 @@ commandmate status --all                   # 全サーバー状態確認
 | `/refactoring` | リファクタリング実行 |
 | `/acceptance-test` | 受け入れテスト |
 | `/issue-create` | Issue一括作成 |
+| `/issue-enhance` | Issueの対話的補完（不足情報をユーザーに質問して補完） |
 | `/issue-split` | Issue分割計画 |
 | `/architecture-review` | アーキテクチャレビュー（サブエージェント対応） |
 | `/apply-review` | レビュー指摘事項の実装反映 |
@@ -372,6 +374,71 @@ commandmate status --all                   # 全サーバー状態確認
 ---
 
 ## 最近の実装機能
+
+### Issue #190: リポジトリ削除後のSync All復活防止
+- **バグ修正**: UIで削除したリポジトリがSync All実行時に再スキャン・再登録されて復活する問題を修正
+- **根本原因**: `syncWorktreesToDB()`が環境変数パスを毎回スキャンし、削除されたリポジトリを除外する仕組みがなかった
+- **修正方針**: 既存`repositories.enabled`カラム（Migration #14）を活用し、削除時に`enabled=0`で除外マーク。Sync All時に`enabled=0`のパスを除外フィルタリング
+- **主要な変更点**:
+  - `db-repository.ts`に7関数追加: `resolveRepositoryPath()`, `ensureEnvRepositoriesRegistered()`, `filterExcludedPaths()`, `disableRepository()`, `getExcludedRepositoryPaths()`, `getExcludedRepositories()`, `restoreRepository()`, `validateRepositoryPath()`
+  - DELETE APIで`disableRepository()`を`worktreeIds`チェック前に配置（未Syncリポジトリも除外対応）
+  - Sync APIで`ensureEnvRepositoriesRegistered()` + `filterExcludedPaths()`による除外フィルタリング
+  - 新規API: `GET /api/repositories/excluded`（除外一覧）、`PUT /api/repositories/restore`（復活+自動sync）
+  - UIに除外リポジトリ一覧セクション追加（折りたたみ形式、「再登録」ボタン付き）
+- **セキュリティ対策**:
+  - パストラバーサル防御（null byte + `isSystemDirectory()`チェック）
+  - `MAX_DISABLED_REPOSITORIES = 1000`（DoS防止）
+  - 固定エラーメッセージ（情報漏洩防止）
+- **主要コンポーネント**:
+  - `src/lib/db-repository.ts` - 除外・復活・パス正規化・バリデーション関数群
+  - `src/app/api/repositories/route.ts` - DELETE handler修正
+  - `src/app/api/repositories/sync/route.ts` - Sync handler修正
+  - `src/app/api/repositories/excluded/route.ts` - 新規: 除外リポジトリ一覧API
+  - `src/app/api/repositories/restore/route.ts` - 新規: 復活API
+  - `src/lib/api-client.ts` - `getExcluded()`, `restore()`メソッド追加
+  - `src/components/worktree/WorktreeList.tsx` - 削除ダイアログ更新、除外リポジトリセクション追加
+- 詳細: [設計書](./dev-reports/design/issue-190-repository-exclusion-on-sync-design-policy.md)
+
+### Issue #159: infoタブにてアプリバージョン表示
+- **機能追加**: Worktree詳細画面のinfoタブ（デスクトップ: InfoModal、モバイル: MobileInfoContent）にCommandMateのアプリバージョンを表示
+- **ビルド時環境変数方式**: `next.config.js` の `env` ブロックで `package.json` の `version` を `NEXT_PUBLIC_APP_VERSION` として公開
+- **DRY対応**: モジュールレベル定数 `APP_VERSION_DISPLAY` で `v` プレフィックス付与・フォールバック `-` を集約
+- **主要コンポーネント**:
+  - `next.config.js` - `env.NEXT_PUBLIC_APP_VERSION` 追加
+  - `src/components/worktree/WorktreeDetailRefactored.tsx` - InfoModal・MobileInfoContent にバージョン表示セクション追加
+- 詳細: [設計書](./dev-reports/design/issue-159-info-tab-app-version-design-policy.md)
+
+### Issue #180: ステータス表示の不整合修正
+- **問題解決**: CLIがidle状態（`❯`プロンプト表示）であるにも関わらず、UIが「running」（スピナー）や「waiting」（黄色）ステータスを誤表示する問題を修正
+- **根本原因**: `route.ts`の`detectPrompt()`に`cleanOutput`全文（最大100行）を渡していたため、スクロールバックに残る過去の`(y/n)`プロンプトを現在アクティブなプロンプトとして誤検出
+- **修正方針**: `status-detector.ts`の`detectSessionStatus()`を共通関数として活用し、`route.ts`x2のインラインロジックを統合（DRY原則）
+- **主要な変更点**:
+  - `StatusDetectionResult`に`hasActivePrompt: boolean`フィールド追加（SRP遵守、カプセル化維持）
+  - `detectSessionStatus()`が生のtmux出力を受け取る入力契約を明確化（stripAnsi二重呼び出し防止）
+  - 15行ウィンドウイングにより過去のプロンプト誤検出を防止
+- **主要コンポーネント**:
+  - `src/lib/status-detector.ts` - セッションステータス検出共通関数（hasActivePrompt追加）
+  - `src/app/api/worktrees/route.ts` - インラインロジック→detectSessionStatus()呼び出しに統合
+  - `src/app/api/worktrees/[id]/route.ts` - 同上
+- 詳細: [設計書](./dev-reports/design/issue-180-status-display-inconsistency-design-policy.md)
+
+### Issue #161: Auto-Yes誤検出修正（番号付きリストの誤検出防止）
+- **問題解決**: Auto-Yesモード有効時、Claude CLIの通常出力に含まれる番号付きリスト（例：「1. ファイルを作成」「2. テストを実行」）がmultiple_choiceプロンプトとして誤検出され、「1」が自動送信される問題を修正
+- **根本原因**: `detectMultipleChoicePrompt`の`optionPattern`の`[❯ ]`文字クラスが空白文字も許容し、通常の番号付きリストが選択肢として蓄積されていた
+- **2パス❯検出方式**（多層防御Layer 2）:
+  - パス1: 50行ウィンドウ内で❯インジケーターの存在を確認
+  - パス2: ❯が存在する場合のみ選択肢行を収集
+  - ❯が存在しない場合、通常の番号付きリストは一切検出されない
+- **thinking状態スキップ**（多層防御Layer 1）:
+  - `auto-yes-manager.ts`の`pollAutoYes()`で`detectThinking()`による事前チェック
+  - thinking中は`detectPrompt()`をスキップ
+- **連番検証**（多層防御Layer 3、防御的措置）:
+  - `isConsecutiveFromOne()`で選択肢番号が1始まり連番であることを検証
+- **設計原則準拠**: prompt-detector.tsのCLIツール非依存性を維持（CLAUDE_THINKING_PATTERNをimportしない）
+- **主要コンポーネント**:
+  - `src/lib/prompt-detector.ts` - 2パス検出方式、連番検証（防御的措置）
+  - `src/lib/auto-yes-manager.ts` - thinking状態のprompt検出スキップ
+- 詳細: [設計書](./dev-reports/design/issue-161-auto-yes-false-positive-design-policy.md)
 
 ### Issue #151: worktree-cleanup サーバー検出機能改善
 - **問題解決**: `/worktree-cleanup` スキル実行時、`npm run dev` で直接起動したサーバーを検出・停止できない問題を修正
@@ -771,10 +838,9 @@ commandmate status --all                   # 全サーバー状態確認
 
 ### Issue #76: 環境変数フォールバック（CommandMateリネーム Phase 1）
 - **フォールバック機能**: 新名称`CM_*`と旧名称`MCBD_*`の両方をサポート
-- **対象環境変数**: 8種類（ROOT_DIR, PORT, BIND, AUTH_TOKEN, LOG_LEVEL, LOG_FORMAT, LOG_DIR, DB_PATH）
-- **クライアント側**: `NEXT_PUBLIC_CM_AUTH_TOKEN` / `NEXT_PUBLIC_MCBD_AUTH_TOKEN`のフォールバック
+- **対象環境変数**: 7種類（ROOT_DIR, PORT, BIND, LOG_LEVEL, LOG_FORMAT, LOG_DIR, DB_PATH）
 - **Deprecation警告**: 旧名称使用時にログ出力（同一キー1回のみ）
-- **セキュリティ**: `CM_AUTH_TOKEN`マスキングパターンを`logger.ts`に追加
+- **Note**: AUTH_TOKEN関連はIssue #179で廃止済み。リバースプロキシ認証を推奨
 - **コアモジュール**: `src/lib/env.ts`に`getEnvWithFallback()`, `getEnvByKey()`関数追加
 - **CHANGELOG**: Keep a Changelogフォーマットで新規作成
 - 詳細: [設計書](./dev-reports/design/issue-76-env-fallback-design-policy.md)
@@ -809,9 +875,34 @@ commandmate status --all                   # 全サーバー状態確認
 - **ブランチ一覧**: リアルタイムステータス付き
 - **ソート機能**: 更新日時、リポジトリ名、ブランチ名、ステータス
 
-### Issue #4: CLIツールサポート
-- **対応ツール**: Claude Code
-- **Strategy パターン**: 拡張可能な設計
+### Issue #4: CLIツールサポート（Codex CLI追加）
+- **対応ツール**: Claude Code, Codex CLI
+- **Strategy パターン**: 拡張可能な設計（BaseCLITool抽象クラス）
+- **Codexタブ有効化**: WorktreeDetailにCodexタブを追加
+- **個別セッション終了**: Claude/Codex/Geminiを個別に終了可能（確認ダイアログ付き）
+- **セッション終了確認ダイアログ**: ENDボタン押下時にModal確認ダイアログを表示（誤操作防止）
+- **CLI別ステータスドット**: サイドバーとCLIタブにClaude/Codex個別のステータスインジケータを表示
+- **モバイルCLIタブ切替**: モバイル表示でAuto Yesトグルとインラインで配置
+- **レスポンス保存バグ修正**: tmuxバッファの空行パディングによる行数不整合を修正（assistant-response-saver.ts）
+- **セキュリティ対策**: sessionName検証によるコマンドインジェクション防止
+- **パターン拡張**: CODEX_THINKING_PATTERNにRan, Deciding追加
+- **スラッシュコマンドフィルタリング**: CLIツール別にスラッシュコマンドをフィルタリング
+  - Claude標準（16）: 既存コマンドを維持（`/clear`, `/compact`, `/resume`, `/rewind`, `/config`, `/model`, `/permissions`, `/status`, `/context`, `/cost`, `/review`, `/pr-comments`, `/help`, `/doctor`, `/export`, `/todos`）
+  - Codex専用（10）: `/new`, `/undo`, `/logout`, `/quit`, `/approvals`, `/diff`, `/mention`, `/mcp`, `/init`, `/feedback`
+- **主要コンポーネント**:
+  - `src/lib/cli-tools/validation.ts` - sessionName検証（SESSION_NAME_PATTERN）
+  - `src/lib/cli-tools/types.ts` - CLI_TOOL_IDS定数、CLIToolType派生
+  - `src/lib/cli-tools/manager.ts` - stopPollers()メソッド追加
+  - `src/lib/cli-patterns.ts` - Codexパターン拡張
+  - `src/lib/standard-commands.ts` - CLIツール別コマンド定義
+  - `src/lib/command-merger.ts` - filterCommandsByCliTool()関数
+  - `src/app/api/worktrees/[id]/kill-session/route.ts` - cliToolパラメータ対応
+  - `src/app/api/worktrees/[id]/slash-commands/route.ts` - cliToolクエリパラメータ対応
+  - `src/components/worktree/WorktreeDetailRefactored.tsx` - 確認ダイアログ、CLI別ステータスドット
+  - `src/components/sidebar/BranchListItem.tsx` - サイドバーCLI別ステータスドット
+  - `src/types/sidebar.ts` - deriveCliStatus()、SidebarBranchItem.cliStatus拡張
+  - `src/lib/assistant-response-saver.ts` - tmuxバッファ行数トリミング修正
+- 詳細: [設計書](./dev-reports/design/issue-4-codex-cli-support-design-policy.md)
 
 ---
 

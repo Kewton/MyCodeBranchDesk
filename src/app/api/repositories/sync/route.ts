@@ -1,11 +1,13 @@
 /**
  * API Route: POST /api/repositories/sync
  * Re-scans all configured repositories and syncs worktrees to database
+ * Issue #190: Filter excluded repositories before scanning
  */
 
 import { NextResponse } from 'next/server';
 import { getDbInstance } from '@/lib/db-instance';
 import { getRepositoryPaths, scanMultipleRepositories, syncWorktreesToDB } from '@/lib/worktrees';
+import { ensureEnvRepositoriesRegistered, filterExcludedPaths } from '@/lib/db-repository';
 
 export async function POST() {
   try {
@@ -19,11 +21,18 @@ export async function POST() {
       );
     }
 
-    // Scan all repositories
-    const allWorktrees = await scanMultipleRepositories(repositoryPaths);
+    const db = getDbInstance();
+
+    // Issue #190: Register environment variable repositories to repositories table (idempotent)
+    ensureEnvRepositoriesRegistered(db, repositoryPaths);
+
+    // Issue #190: Filter out excluded (enabled=0) repositories
+    const filteredPaths = filterExcludedPaths(db, repositoryPaths);
+
+    // Scan filtered repositories (excluded repos are skipped)
+    const allWorktrees = await scanMultipleRepositories(filteredPaths);
 
     // Sync to database
-    const db = getDbInstance();
     syncWorktreesToDB(db, allWorktrees);
 
     // Get unique repository count

@@ -81,7 +81,7 @@ commandmate start --daemon    # バックグラウンドで起動
 
 ### モバイルからのアクセス
 
-`commandmate init` で外部アクセスを有効にすると、`CM_BIND=0.0.0.0` と `CM_AUTH_TOKEN` が自動設定されます。同一LAN内から `http://<PCのIP>:3000` にアクセスします。
+`commandmate init` で外部アクセスを有効にすると、`CM_BIND=0.0.0.0` が設定されます。同一LAN内から `http://<PCのIP>:3000` にアクセスします。外部公開時はリバースプロキシでの認証を推奨します。詳細は [セキュリティガイド](./docs/security-guide.md) を参照してください。
 
 ## 開発者向けセットアップ
 
@@ -125,7 +125,7 @@ A: Claude Code 自体の権限設定がそのまま適用されます。本ツ�
 A: 現時点では非対応です。tmux に依存しているため macOS / Linux が必要です。WSL2 上での動作は未検証です。
 
 **Q: Claude Code 以外の CLI ツールに対応している？**
-A: 現時点では Claude Code のみ対応しています。
+A: Claude Code と Codex CLI に対応しています。Strategy パターンによる拡張可能な設計のため、今後他のツールも追加可能です。
 
 **Q: 複数人で使える？**
 A: 現時点では個人利用を想定しています。複数人での同時利用は未対応です。
