@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-02-08
+
 ### Changed
 - **BREAKING**: Removed `CM_AUTH_TOKEN` authentication mechanism (Issue #179)
   - `src/middleware.ts` deleted (Next.js authentication middleware)
@@ -300,7 +302,8 @@ _No changes recorded._
   - `MCBD_DB_PATH` -> `CM_DB_PATH`
 - `NEXT_PUBLIC_MCBD_AUTH_TOKEN` -> `NEXT_PUBLIC_CM_AUTH_TOKEN`
 
-[unreleased]: https://github.com/Kewton/CommandMate/compare/v0.1.12...HEAD
+[unreleased]: https://github.com/Kewton/CommandMate/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Kewton/CommandMate/compare/v0.1.12...v0.2.0
 [0.1.12]: https://github.com/Kewton/CommandMate/compare/v0.1.11...v0.1.12
 [0.1.11]: https://github.com/Kewton/CommandMate/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/Kewton/CommandMate/compare/v0.1.9...v0.1.10
