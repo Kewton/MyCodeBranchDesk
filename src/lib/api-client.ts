@@ -217,6 +217,21 @@ export const worktreeApi = {
 };
 
 /**
+ * Excluded repository from API
+ * Issue #190: Repository exclusion on sync
+ */
+export interface ExcludedRepository {
+  id: string;
+  name: string;
+  path: string;
+  enabled: boolean;
+  cloneSource: string;
+  isEnvManaged: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
  * Delete repository response type
  */
 export interface DeleteRepositoryResponse {
@@ -326,6 +341,35 @@ export const repositoryApi = {
    */
   async getCloneStatus(jobId: string): Promise<CloneStatusResponse> {
     return fetchApi<CloneStatusResponse>(`/api/repositories/clone/${jobId}`);
+  },
+
+  /**
+   * Get excluded (disabled) repositories
+   * Issue #190: Repository exclusion on sync
+   *
+   * @returns List of excluded repositories
+   */
+  async getExcluded(): Promise<{ success: boolean; repositories: ExcludedRepository[] }> {
+    return fetchApi('/api/repositories/excluded');
+  },
+
+  /**
+   * Restore an excluded repository
+   * Issue #190: Repository exclusion on sync
+   *
+   * @param repositoryPath - Path of the repository to restore
+   * @returns Restore result with worktree count
+   */
+  async restore(repositoryPath: string): Promise<{
+    success: boolean;
+    worktreeCount: number;
+    message?: string;
+    warning?: string;
+  }> {
+    return fetchApi('/api/repositories/restore', {
+      method: 'PUT',
+      body: JSON.stringify({ repositoryPath }),
+    });
   },
 };
 
