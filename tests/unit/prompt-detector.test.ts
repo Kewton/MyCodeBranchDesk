@@ -393,6 +393,20 @@ Are you sure you want to continue? (yes/no)
         expect(getAnswerInput('\t\tno\t\t')).toBe('n');
       });
     });
+
+    describe('Valid multiple choice inputs', () => {
+      it('should return number string for valid single digit', () => {
+        expect(getAnswerInput('1', 'multiple_choice')).toBe('1');
+      });
+
+      it('should return number string for multi-digit input', () => {
+        expect(getAnswerInput('12', 'multiple_choice')).toBe('12');
+      });
+
+      it('should return number string with leading/trailing whitespace trimmed', () => {
+        expect(getAnswerInput('  3  ', 'multiple_choice')).toBe('3');
+      });
+    });
   });
 
   describe('Integration scenarios', () => {
