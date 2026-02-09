@@ -416,6 +416,50 @@ export function filterExcludedPaths(
 }
 
 /**
+ * Summary of repository exclusion filtering results.
+ * Provides structured data for logging and audit purposes.
+ */
+export interface ExclusionSummary {
+  /** Repository paths that passed filtering (enabled repositories) */
+  filteredPaths: string[];
+  /** Repository paths that were excluded (disabled repositories) */
+  excludedPaths: string[];
+  /** Number of excluded repositories */
+  excludedCount: number;
+}
+
+/**
+ * Register environment variable repositories and filter out excluded ones.
+ * Encapsulates the ordering constraint: registration MUST happen before filtering.
+ *
+ * This function combines ensureEnvRepositoriesRegistered() and filterExcludedPaths()
+ * into a single atomic operation to prevent callers from accidentally reversing the order.
+ *
+ * DRY: Used by server.ts initializeWorktrees() and POST /api/repositories/sync
+ *
+ * @param db - Database instance
+ * @param repositoryPaths - Array of repository paths from environment variables
+ * @returns ExclusionSummary with filtered paths, excluded paths, and count
+ */
+export function registerAndFilterRepositories(
+  db: Database.Database,
+  repositoryPaths: string[]
+): ExclusionSummary {
+  // Step 1: Register (must be before filter - see design policy Section 4)
+  ensureEnvRepositoriesRegistered(db, repositoryPaths);
+
+  // Step 2: Filter
+  const filteredPaths = filterExcludedPaths(db, repositoryPaths);
+  const excludedPaths = repositoryPaths.filter(p => !filteredPaths.includes(p));
+
+  return {
+    filteredPaths,
+    excludedPaths,
+    excludedCount: excludedPaths.length,
+  };
+}
+
+/**
  * Disable a repository by setting enabled=0.
  * If the repository is not registered, create it with enabled=0.
  * All internal logic (lookup + update/create) is encapsulated.
