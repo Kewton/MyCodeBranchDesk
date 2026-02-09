@@ -104,19 +104,48 @@ export async function POST(
         const defaultNum = defaultOption?.number ?? 1;
         const offset = targetNum - defaultNum;
 
-        const keys: string[] = [];
+        // Detect multi-select (checkbox) prompts by checking for [ ] in option labels.
+        // Multi-select prompts require: Space to toggle checkbox → navigate to "Next" → Enter.
+        // Single-select prompts require: navigate to option → Enter.
+        const isMultiSelect = mcOptions.some(o => /^\[[ x]\] /.test(o.label));
 
-        // Navigate to the target option with arrow keys
-        if (offset > 0) {
-          for (let i = 0; i < offset; i++) keys.push('Down');
-        } else if (offset < 0) {
-          for (let i = 0; i < Math.abs(offset); i++) keys.push('Up');
+        if (isMultiSelect) {
+          // Multi-select: toggle checkbox, then navigate to "Next" and submit
+          const checkboxCount = mcOptions.filter(o => /^\[[ x]\] /.test(o.label)).length;
+
+          const keys: string[] = [];
+
+          // 1. Navigate to target option
+          if (offset > 0) {
+            for (let i = 0; i < offset; i++) keys.push('Down');
+          } else if (offset < 0) {
+            for (let i = 0; i < Math.abs(offset); i++) keys.push('Up');
+          }
+
+          // 2. Space to toggle checkbox
+          keys.push('Space');
+
+          // 3. Navigate to "Next" button (positioned right after all checkbox options)
+          const downToNext = checkboxCount - targetNum + 1;
+          for (let i = 0; i < downToNext; i++) keys.push('Down');
+
+          // 4. Enter to submit
+          keys.push('Enter');
+
+          await sendSpecialKeys(sessionName, keys);
+        } else {
+          // Single-select: navigate and Enter to select
+          const keys: string[] = [];
+
+          if (offset > 0) {
+            for (let i = 0; i < offset; i++) keys.push('Down');
+          } else if (offset < 0) {
+            for (let i = 0; i < Math.abs(offset); i++) keys.push('Up');
+          }
+
+          keys.push('Enter');
+          await sendSpecialKeys(sessionName, keys);
         }
-
-        // Enter to select the highlighted option
-        keys.push('Enter');
-
-        await sendSpecialKeys(sessionName, keys);
       } else {
         // Standard CLI prompt: send text + Enter (y/n, Approve?, etc.)
         await sendKeys(sessionName, answer, false);

@@ -350,14 +350,46 @@ async function pollAutoYes(worktreeId: string, cliToolId: CLIToolType): Promise<
       const defaultNum = defaultOption?.number ?? 1;
       const offset = targetNum - defaultNum;
 
-      const keys: string[] = [];
-      if (offset > 0) {
-        for (let i = 0; i < offset; i++) keys.push('Down');
-      } else if (offset < 0) {
-        for (let i = 0; i < Math.abs(offset); i++) keys.push('Up');
+      // Detect multi-select (checkbox) prompts by checking for [ ] in option labels.
+      const isMultiSelect = mcOptions.some(o => /^\[[ x]\] /.test(o.label));
+
+      if (isMultiSelect) {
+        // Multi-select: toggle checkbox, then navigate to "Next" and submit
+        const checkboxCount = mcOptions.filter(o => /^\[[ x]\] /.test(o.label)).length;
+
+        const keys: string[] = [];
+
+        // 1. Navigate to target option
+        if (offset > 0) {
+          for (let i = 0; i < offset; i++) keys.push('Down');
+        } else if (offset < 0) {
+          for (let i = 0; i < Math.abs(offset); i++) keys.push('Up');
+        }
+
+        // 2. Space to toggle checkbox
+        keys.push('Space');
+
+        // 3. Navigate to "Next" button (positioned right after all checkbox options)
+        const downToNext = checkboxCount - targetNum + 1;
+        for (let i = 0; i < downToNext; i++) keys.push('Down');
+
+        // 4. Enter to submit
+        keys.push('Enter');
+
+        await sendSpecialKeys(sessionName, keys);
+      } else {
+        // Single-select: navigate and Enter to select
+        const keys: string[] = [];
+
+        if (offset > 0) {
+          for (let i = 0; i < offset; i++) keys.push('Down');
+        } else if (offset < 0) {
+          for (let i = 0; i < Math.abs(offset); i++) keys.push('Up');
+        }
+
+        keys.push('Enter');
+        await sendSpecialKeys(sessionName, keys);
       }
-      keys.push('Enter');
-      await sendSpecialKeys(sessionName, keys);
     } else {
       // Standard CLI prompt: send text + Enter (y/n, Approve?, etc.)
       await sendKeys(sessionName, answer, false);
