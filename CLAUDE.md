@@ -408,6 +408,10 @@ commandmate status --all                   # 全サーバー状態確認
   - **追加修正**: `isContinuationLine()`の`hasLeadingSpaces`に`!line.endsWith('?')`を追加し、`?`終端の質問行をcontinuation lineから除外（`isShortFragment`の既存`!line.endsWith('?')`除外との一貫性）
   - **追加テスト**: `tests/unit/prompt-detector.test.ts`（4テスト追加）- インデント質問+選択肢検出、長い折り返しオプション付き検出、非質問インデント行の回帰テスト、`?`終端行の境界テスト。`tests/unit/lib/status-detector.test.ts`（1テスト追加）- 15行ウィンドウ内インデント質問のwaiting判定
   - **JSDoc文書化**: `isContinuationLine()`のhasLeadingSpaces説明に`?`終端除外の設計根拠を追記
+- **追加修正2（2026-02-09）: tmuxターミナルパディング空行によるウィンドウ無効化修正**:
+  - **追加バグ2**: tmuxバッファ末尾に約33行のターミナルパディング空行が存在し、`status-detector.ts`の`lines.slice(-15)`で取得する15行が全て空行になる。プロンプトがウィンドウに含まれず検出不可
+  - **追加修正2**: `detectSessionStatus()`でウィンドウスライス前に末尾空行をトリムし、実コンテンツ末尾からウィンドウを取得するよう変更
+  - **追加テスト2**: `tests/unit/lib/status-detector.test.ts`（2テスト追加）- tmuxパディング付きプロンプトの検出テスト、入力プロンプト+空行パディングのready検出テスト
 - 詳細: [設計書](./dev-reports/design/issue-188-thinking-indicator-false-detection-design-policy.md)
 
 ### Issue #193: Claude Code複数選択肢プロンプト検出

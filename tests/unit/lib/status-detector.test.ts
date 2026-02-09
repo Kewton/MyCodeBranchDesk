@@ -241,15 +241,33 @@ describe('status-detector', () => {
   });
 
   describe('Issue #188 SF-002 (S3): prompt outside 15-line STATUS_CHECK_LINE_COUNT window', () => {
-    it('should not detect prompt when it is beyond 15 lines from end', () => {
-      // Known behavior: STATUS_CHECK_LINE_COUNT=15 means prompts more than 15 lines
-      // from the end are not detected. This is acceptable because stale prompts
-      // that far back are unlikely to be currently active.
+    it('should detect input prompt even when followed by trailing empty lines (tmux padding)', () => {
+      // Trailing empty lines (tmux terminal padding) are stripped before windowing,
+      // so the input prompt remains within the detection window.
+      // Note: ❯ alone is an input prompt (ready), not an interactive prompt (waiting).
       const lines: string[] = [];
       lines.push('Content');
-      lines.push(`${PROMPT} `);  // prompt at position 2 (will be >15 lines from end)
+      lines.push(`${PROMPT} `);  // input prompt followed by empty padding
       for (let i = 0; i < 16; i++) {
-        lines.push('');          // 16 empty lines push prompt outside window
+        lines.push('');          // 16 empty lines (tmux terminal padding)
+      }
+
+      const output = lines.join('\n');
+      const result = detectSessionStatus(output, 'claude');
+
+      expect(result.hasActivePrompt).toBe(false);
+      expect(result.status).toBe('ready');
+      expect(result.reason).toBe('input_prompt');
+    });
+
+    it('should not detect prompt when it is beyond 15 non-empty lines from end', () => {
+      // When actual content (not empty padding) pushes the prompt outside the
+      // STATUS_CHECK_LINE_COUNT window, it should not be detected.
+      const lines: string[] = [];
+      lines.push('Content');
+      lines.push(`${PROMPT} `);  // prompt at position 2
+      for (let i = 0; i < 16; i++) {
+        lines.push(`Output line ${i}`);  // 16 non-empty lines push prompt outside window
       }
 
       const output = lines.join('\n');
@@ -261,7 +279,29 @@ describe('status-detector', () => {
     });
   });
 
-  describe('Bug fix: indented question + choices -> waiting status', () => {
+  describe('Bug fix: trailing empty lines and indented prompts', () => {
+    it('should detect multiple choice prompt with trailing tmux padding empty lines', () => {
+      // Real-world scenario: Claude Bash tool prompt followed by tmux terminal padding.
+      // Trailing empty lines are stripped before windowing so the prompt is detected.
+      const lines: string[] = [];
+      lines.push('Bash command output');
+      lines.push(' Do you want to proceed?');
+      lines.push(' \u276F 1. Yes');
+      lines.push('   2. No');
+      lines.push('   3. Cancel');
+      lines.push('');
+      lines.push(' Esc to cancel \u00B7 Tab to amend');
+      // Add 30+ trailing empty lines (tmux padding)
+      for (let i = 0; i < 33; i++) {
+        lines.push('');
+      }
+      const output = lines.join('\n');
+      const result = detectSessionStatus(output, 'claude');
+      expect(result.status).toBe('waiting');
+      expect(result.hasActivePrompt).toBe(true);
+      expect(result.reason).toBe('prompt_detected');
+    });
+
     it('should detect waiting status for 2-space indented question with numbered choices in 15-line window', () => {
       // Claude Bash tool format: question and options are 2-space indented
       // detectSessionStatus uses buildDetectPromptOptions('claude') which sets

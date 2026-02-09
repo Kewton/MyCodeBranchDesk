@@ -117,9 +117,17 @@ export function detectSessionStatus(
   // Strip ANSI codes and get last N lines for analysis
   const cleanOutput = stripAnsi(output);
   const lines = cleanOutput.split('\n');
-  const lastLines = lines.slice(-STATUS_CHECK_LINE_COUNT).join('\n');
+  // Strip trailing empty lines (tmux terminal padding) before windowing.
+  // tmux buffers often end with many empty padding lines that would otherwise
+  // fill the entire detection window, hiding the actual prompt/status content.
+  let lastNonEmptyIndex = lines.length - 1;
+  while (lastNonEmptyIndex >= 0 && lines[lastNonEmptyIndex].trim() === '') {
+    lastNonEmptyIndex--;
+  }
+  const contentLines = lines.slice(0, lastNonEmptyIndex + 1);
+  const lastLines = contentLines.slice(-STATUS_CHECK_LINE_COUNT).join('\n');
   // DR-003: Separate thinking detection window (5 lines) from prompt detection window (15 lines)
-  const thinkingLines = lines.slice(-STATUS_THINKING_LINE_COUNT).join('\n');
+  const thinkingLines = contentLines.slice(-STATUS_THINKING_LINE_COUNT).join('\n');
 
   // 1. Interactive prompt detection (highest priority)
   // This includes yes/no prompts, multiple choice, and approval prompts
