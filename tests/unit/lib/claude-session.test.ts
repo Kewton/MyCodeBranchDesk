@@ -431,6 +431,135 @@ describe('claude-session - Issue #152 improvements', () => {
     });
   });
 
+  describe('startClaudeSession() - trust dialog (Issue #201)', () => {
+    beforeEach(() => {
+      vi.mocked(hasSession).mockResolvedValue(false);
+      vi.mocked(createSession).mockResolvedValue();
+      vi.mocked(sendKeys).mockResolvedValue();
+    });
+
+    it('should send Enter when trust dialog is detected', async () => {
+      let callCount = 0;
+      vi.mocked(capturePane).mockImplementation(async () => {
+        callCount++;
+        if (callCount === 1) {
+          // First poll: trust dialog displayed
+          return 'Quick safety check: Is this a project you created or one you trust?\n\n ❯ 1. Yes, I trust this folder\n   2. No, exit';
+        }
+        // Subsequent polls: prompt displayed after Enter
+        return '❯ ';
+      });
+
+      const options = {
+        worktreeId: 'test-worktree',
+        worktreePath: '/path/to/worktree',
+      };
+
+      const promise = startClaudeSession(options);
+
+      // Advance through polls and stability delay
+      await vi.advanceTimersByTimeAsync(CLAUDE_INIT_POLL_INTERVAL * 3 + CLAUDE_POST_PROMPT_DELAY);
+
+      await expect(promise).resolves.toBeUndefined();
+
+      // Verify Enter was sent (sendKeys called with empty string + Enter)
+      // First sendKeys call is for claudePath, subsequent for trust dialog Enter
+      const sendKeysCalls = vi.mocked(sendKeys).mock.calls;
+      const enterCalls = sendKeysCalls.filter(
+        (call) => call[1] === '' && call[2] === true
+      );
+      expect(enterCalls.length).toBe(1);
+    });
+
+    it('should send Enter only once even when dialog persists (duplicate prevention)', async () => {
+      let callCount = 0;
+      vi.mocked(capturePane).mockImplementation(async () => {
+        callCount++;
+        if (callCount <= 2) {
+          // First two polls: trust dialog still displayed (buffer not yet updated)
+          return 'Quick safety check: Is this a project you created or one you trust?\n\n ❯ 1. Yes, I trust this folder\n   2. No, exit';
+        }
+        // Third poll: prompt displayed
+        return '❯ ';
+      });
+
+      const options = {
+        worktreeId: 'test-worktree',
+        worktreePath: '/path/to/worktree',
+      };
+
+      const promise = startClaudeSession(options);
+
+      // Advance through polls and stability delay
+      await vi.advanceTimersByTimeAsync(CLAUDE_INIT_POLL_INTERVAL * 4 + CLAUDE_POST_PROMPT_DELAY);
+
+      await expect(promise).resolves.toBeUndefined();
+
+      // Verify Enter was sent only once (not on second dialog detection)
+      const sendKeysCalls = vi.mocked(sendKeys).mock.calls;
+      const enterCalls = sendKeysCalls.filter(
+        (call) => call[1] === '' && call[2] === true
+      );
+      expect(enterCalls.length).toBe(1);
+    });
+
+    it('should not affect existing dialog-less flow (regression test)', async () => {
+      // Standard flow: no trust dialog, just prompt
+      let callCount = 0;
+      vi.mocked(capturePane).mockImplementation(async () => {
+        callCount++;
+        if (callCount < 3) {
+          return 'Starting Claude...';
+        }
+        return '> ';
+      });
+
+      const options = {
+        worktreeId: 'test-worktree',
+        worktreePath: '/path/to/worktree',
+      };
+
+      const promise = startClaudeSession(options);
+
+      // Advance through polls and stability delay
+      await vi.advanceTimersByTimeAsync(CLAUDE_INIT_POLL_INTERVAL * 4 + CLAUDE_POST_PROMPT_DELAY);
+
+      await expect(promise).resolves.toBeUndefined();
+
+      // Verify no extra Enter was sent for trust dialog
+      // Only the initial claudePath sendKeys should use Enter (true)
+      const sendKeysCalls = vi.mocked(sendKeys).mock.calls;
+      const enterCalls = sendKeysCalls.filter(
+        (call) => call[1] === '' && call[2] === true
+      );
+      expect(enterCalls.length).toBe(0);
+    });
+
+    it('should complete initialization after trust dialog Enter send', async () => {
+      let callCount = 0;
+      vi.mocked(capturePane).mockImplementation(async () => {
+        callCount++;
+        if (callCount <= 2) {
+          return ' ❯ 1. Yes, I trust this folder\n   2. No, exit';
+        }
+        return '❯ ';
+      });
+
+      const options = {
+        worktreeId: 'test-worktree',
+        worktreePath: '/path/to/worktree',
+      };
+
+      const promise = startClaudeSession(options);
+
+      // Advance through polls and stability delay
+      await vi.advanceTimersByTimeAsync(CLAUDE_INIT_POLL_INTERVAL * 4 + CLAUDE_POST_PROMPT_DELAY);
+
+      // Should resolve successfully (not timeout)
+      await expect(promise).resolves.toBeUndefined();
+    });
+  });
+
   describe('getSessionName()', () => {
     it('should generate session name with mcbd-claude- prefix', () => {
       expect(getSessionName('test-worktree')).toBe('mcbd-claude-test-worktree');

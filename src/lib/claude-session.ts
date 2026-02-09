@@ -12,6 +12,7 @@ import {
 } from './tmux';
 import {
   CLAUDE_PROMPT_PATTERN,
+  CLAUDE_TRUST_DIALOG_PATTERN,
   stripAnsi,
 } from './cli-patterns';
 import { exec } from 'child_process';
@@ -43,6 +44,9 @@ function getErrorMessage(error: unknown): string {
  * - Load and initialize its internal state
  * - Authenticate with Anthropic servers (if needed)
  * - Display the interactive prompt
+ *
+ * This timeout also covers trust dialog auto-response time (typically <1s).
+ * When reducing this value, consider dialog response overhead.
  *
  * 15 seconds provides headroom for slower networks or cold starts.
  */
@@ -330,6 +334,7 @@ export async function startClaudeSession(
     const startTime = Date.now();
 
     let initialized = false;
+    let trustDialogHandled = false;
     while (Date.now() - startTime < maxWaitTime) {
       await new Promise((resolve) => setTimeout(resolve, pollInterval));
 
@@ -347,6 +352,16 @@ export async function startClaudeSession(
           console.log(`Claude initialized in ${Date.now() - startTime}ms`);
           initialized = true;
           break;
+        }
+
+        // Issue #201: Detect trust dialog and auto-respond with Enter
+        // Condition order: CLAUDE_PROMPT_PATTERN (above) is checked first for shortest path
+        if (!trustDialogHandled && CLAUDE_TRUST_DIALOG_PATTERN.test(cleanOutput)) {
+          await sendKeys(sessionName, '', true);
+          trustDialogHandled = true;
+          // TODO: Log output method unification (console.log vs createLogger) to be addressed in a separate Issue (SF-002)
+          console.log('Trust dialog detected, sending Enter to confirm');
+          // Continue polling to wait for prompt detection
         }
       } catch {
         // Ignore capture errors during initialization
