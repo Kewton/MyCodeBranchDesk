@@ -348,9 +348,12 @@ function extractResponse(
 
     const response = responseLines.join('\n').trim();
 
-    // Additional check: ensure response doesn't contain thinking indicators
-    // This prevents saving intermediate states as final responses
-    if (thinkingPattern.test(response)) {
+    // DR-004: Check only the tail of the response for thinking indicators
+    // Prevents false blocking when completed thinking summaries appear in the response body
+    // SF-003 (Stage 3): This tail line count (5) should track STATUS_THINKING_LINE_COUNT=5
+    // in status-detector.ts. If STATUS_THINKING_LINE_COUNT changes, update this value accordingly.
+    const responseTailLines = response.split('\n').slice(-5).join('\n');
+    if (thinkingPattern.test(responseTailLines)) {
       return {
         response: '',
         isComplete: false,
@@ -544,6 +547,10 @@ async function checkForResponse(worktreeId: string, cliToolId: CLIToolType): Pro
       // No new output or response not yet complete
       // But if Claude is processing (thinking), mark any pending prompts as answered
       // This handles cases where user responded to prompts directly via terminal
+      // KNOWN LIMITATION (Issue #188 MF-001 Stage 3): This full-text thinking check
+      // may falsely match completed thinking summaries in scrollback, causing pending
+      // prompts to be incorrectly marked as answered. A follow-up Issue should apply
+      // the same tail-line windowing as DR-004 (extractResponse thinking check).
       const { thinkingPattern } = getCliToolPatterns(cliToolId);
       const cleanOutput = stripAnsi(output);
       if (thinkingPattern.test(cleanOutput)) {

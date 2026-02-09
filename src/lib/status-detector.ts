@@ -44,10 +44,25 @@ export interface StatusDetectionResult {
 }
 
 /**
- * Number of lines from the end to check for status indicators
+ * Number of lines from the end to check for prompt and input indicators
  * @constant
  */
 const STATUS_CHECK_LINE_COUNT: number = 15;
+
+/**
+ * Number of lines from the end to check for thinking indicators.
+ * Thinking indicators (spinner + activity text) only appear in the most recent lines.
+ * A small window prevents completed thinking summaries (e.g., "Churned for 41s")
+ * in scrollback from being falsely detected as active thinking.
+ *
+ * SF-002: Named STATUS_THINKING_LINE_COUNT (not THINKING_CHECK_LINE_COUNT) to avoid
+ * naming collision with auto-yes-manager.ts's THINKING_CHECK_LINE_COUNT=50.
+ * The two constants serve different purposes:
+ *   - STATUS_THINKING_LINE_COUNT (5): UI status display (accuracy-focused)
+ *   - THINKING_CHECK_LINE_COUNT (50): Auto-Yes false-fire prevention (safety-focused)
+ * @constant
+ */
+const STATUS_THINKING_LINE_COUNT: number = 5;
 
 /**
  * Time threshold (in ms) for considering output as "stale"
@@ -81,6 +96,8 @@ export function detectSessionStatus(
   const cleanOutput = stripAnsi(output);
   const lines = cleanOutput.split('\n');
   const lastLines = lines.slice(-STATUS_CHECK_LINE_COUNT).join('\n');
+  // DR-003: Separate thinking detection window (5 lines) from prompt detection window (15 lines)
+  const thinkingLines = lines.slice(-STATUS_THINKING_LINE_COUNT).join('\n');
 
   // 1. Interactive prompt detection (highest priority)
   // This includes yes/no prompts, multiple choice, and approval prompts
@@ -95,9 +112,9 @@ export function detectSessionStatus(
     };
   }
 
-  // 2. Thinking indicator detection
+  // 2. Thinking indicator detection - STATUS_THINKING_LINE_COUNT window (narrower)
   // CLI tool is actively processing (shows spinner, "Planning...", etc.)
-  if (detectThinking(cliToolId, lastLines)) {
+  if (detectThinking(cliToolId, thinkingLines)) {
     return {
       status: 'running',
       confidence: 'high',
