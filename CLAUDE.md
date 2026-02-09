@@ -376,6 +376,19 @@ commandmate status --all                   # 全サーバー状態確認
 
 ## 最近の実装機能
 
+### Issue #201: 信頼性確認ダイアログ自動応答
+- **機能追加**: Claude CLI v2.xの初回ワークスペースアクセス時に表示される「Quick safety check」ダイアログに自動で応答
+- **根本原因**: tmux経由起動でダイアログの❯がCLAUDE_PROMPT_PATTERNにマッチせず15秒タイムアウト
+- **修正内容**: startClaudeSession()のポーリングループにCLAUDE_TRUST_DIALOG_PATTERN検出とEnter自動送信を追加
+- **主要な変更点**:
+  - CLAUDE_TRUST_DIALOG_PATTERN定数追加（/Yes, I trust this folder/m）
+  - trustDialogHandledフラグによる二重送信防止
+  - console.logでダイアログ検出ログ出力
+- **主要コンポーネント**:
+  - `src/lib/cli-patterns.ts` - パターン定数追加
+  - `src/lib/claude-session.ts` - ポーリングループ修正
+- 詳細: [設計書](./dev-reports/design/issue-201-trust-dialog-auto-response-design-policy.md)
+
 ### Issue #188: 応答完了後もスピナーが表示され続ける（thinkingインジケータの誤検出）
 - **バグ修正**: Claude CLIの応答が完了し `>` プロンプトが表示されているにもかかわらず、サイドバーのステータスがスピナー（`running`）のまま更新されない問題を修正
 - **根本原因**: `current-output/route.ts`がthinking検出を非空行15行ウィンドウで実行し、完了済みのthinkingサマリー行（例: `✻ Churned for 41s`）を誤検出。さらにthinking=trueでプロンプト検出を無条件スキップ

@@ -53,6 +53,20 @@ export const CLAUDE_PROMPT_PATTERN = /^[>❯](\s*$|\s+\S)/m;
 export const CLAUDE_SEPARATOR_PATTERN = /^─{10,}$/m;
 
 /**
+ * Claude trust dialog pattern (Issue #201)
+ *
+ * Matches the "Quick safety check" dialog displayed by Claude CLI v2.x
+ * when accessing a workspace for the first time.
+ *
+ * Intentionally uses partial matching (no line-start anchor ^):
+ * Other pattern constants (CLAUDE_PROMPT_PATTERN, CLAUDE_SEPARATOR_PATTERN, etc.)
+ * use line-start anchors (^), but this pattern needs to match at any position
+ * within the tmux output buffer because the dialog text may appear after
+ * tmux padding or other output. (SF-001)
+ */
+export const CLAUDE_TRUST_DIALOG_PATTERN = /Yes, I trust this folder/m;
+
+/**
  * Codex prompt pattern
  * T1.2: Improved to detect empty prompts as well
  */
