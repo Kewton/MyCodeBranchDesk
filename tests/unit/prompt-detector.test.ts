@@ -1136,6 +1136,50 @@ Are you sure you want to continue? (yes/no)
   });
 
   // ==========================================================================
+  // Bug fix: trailing empty lines (tmux terminal padding) in scan window
+  // ==========================================================================
+  describe('Bug fix: trailing empty lines in detectMultipleChoicePrompt scan window', () => {
+    it('should detect prompt when output has many trailing empty lines (tmux padding)', () => {
+      // Real-world scenario: tmux buffer ends with 40+ empty padding lines
+      // that would push the prompt options outside the 50-line scan window
+      const lines: string[] = [];
+      lines.push('Previous output');
+      lines.push(' Do you want to proceed?');
+      lines.push(' \u276F 1. Yes');
+      lines.push("   2. Yes, and don't ask again for gh commands in /some/long/path");
+      lines.push('   3. No');
+      lines.push('');
+      lines.push(' Esc to cancel \u00B7 Tab to amend \u00B7 ctrl+e to explain');
+      // Add 46 trailing empty lines (tmux padding)
+      for (let i = 0; i < 46; i++) {
+        lines.push('');
+      }
+      const output = lines.join('\n');
+      const result = detectPrompt(output, { requireDefaultIndicator: false });
+      expect(result.isPrompt).toBe(true);
+      expect(result.promptData?.type).toBe('multiple_choice');
+      if (isMultipleChoicePrompt(result.promptData)) {
+        expect(result.promptData.options.length).toBe(3);
+        expect(result.promptData.question).toContain('Do you want to proceed?');
+      }
+    });
+
+    it('should detect prompt with requireDefaultIndicator: true and trailing empty lines', () => {
+      const lines: string[] = [];
+      lines.push('Question?');
+      lines.push('\u276F 1. Option A');
+      lines.push('  2. Option B');
+      for (let i = 0; i < 50; i++) {
+        lines.push('');
+      }
+      const output = lines.join('\n');
+      const result = detectPrompt(output);
+      expect(result.isPrompt).toBe(true);
+      expect(result.promptData?.type).toBe('multiple_choice');
+    });
+  });
+
+  // ==========================================================================
   // Issue #193: getAnswerInput SEC-003 - Safe error messages
   // ==========================================================================
   describe('Issue #193: getAnswerInput SEC-003 - safe error messages', () => {

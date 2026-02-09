@@ -302,8 +302,16 @@ function detectMultipleChoicePrompt(output: string, options?: DetectPromptOption
 
   const lines = output.split('\n');
 
-  // Calculate scan window: last 50 lines
-  const scanStart = Math.max(0, lines.length - 50);
+  // Strip trailing empty lines (tmux terminal padding) before computing scan window.
+  // tmux buffers often end with many empty padding lines that would shift the
+  // scan window away from the actual prompt content.
+  let effectiveEnd = lines.length;
+  while (effectiveEnd > 0 && lines[effectiveEnd - 1].trim() === '') {
+    effectiveEnd--;
+  }
+
+  // Calculate scan window: last 50 non-trailing-empty lines
+  const scanStart = Math.max(0, effectiveEnd - 50);
 
   // ==========================================================================
   // Pass 1: Check for ❯ indicator existence in scan window
@@ -312,7 +320,7 @@ function detectMultipleChoicePrompt(output: string, options?: DetectPromptOption
   // ==========================================================================
   if (requireDefault) {
     let hasDefaultLine = false;
-    for (let i = scanStart; i < lines.length; i++) {
+    for (let i = scanStart; i < effectiveEnd; i++) {
       const line = lines[i].trim();
       if (DEFAULT_OPTION_PATTERN.test(line)) {
         hasDefaultLine = true;
@@ -335,7 +343,7 @@ function detectMultipleChoicePrompt(output: string, options?: DetectPromptOption
   const collectedOptions: Array<{ number: number; label: string; isDefault: boolean }> = [];
   let questionEndIndex = -1;
 
-  for (let i = lines.length - 1; i >= scanStart; i--) {
+  for (let i = effectiveEnd - 1; i >= scanStart; i--) {
     const line = lines[i].trim();
 
     // Try DEFAULT_OPTION_PATTERN first (❯ indicator)
