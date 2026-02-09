@@ -386,14 +386,22 @@ export function ensureEnvRepositoriesRegistered(
 }
 
 /**
- * Filter out excluded repository paths.
+ * Filter out excluded repository paths (enabled=0).
  * Exclusion logic is encapsulated here, so changes to exclusion criteria
  * (e.g., pattern-based exclusion, temporary exclusion) only affect this function.
+ *
+ * @requires ensureEnvRepositoriesRegistered() must be called before this function
+ *           to ensure all paths exist in the repositories table.
+ *           Without prior registration, unregistered paths will not be filtered correctly.
  *
  * NOTE (SEC-SF-002): Array.includes() performs case-sensitive string comparison.
  * On macOS (case-insensitive filesystem), paths with different casing would not match.
  * resolveRepositoryPath() normalization on both sides mitigates most cases.
  * On Linux (case-sensitive filesystem), the behavior is consistent.
+ *
+ * @param db - Database instance
+ * @param repositoryPaths - Array of repository paths to filter
+ * @returns Filtered array excluding disabled repositories
  *
  * SF-003: OCP - exclusion logic encapsulated
  */

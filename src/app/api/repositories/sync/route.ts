@@ -24,9 +24,11 @@ export async function POST() {
     const db = getDbInstance();
 
     // Issue #190: Register environment variable repositories to repositories table (idempotent)
+    // NOTE: Must be called BEFORE filterExcludedPaths() - order dependency
     ensureEnvRepositoriesRegistered(db, repositoryPaths);
 
     // Issue #190: Filter out excluded (enabled=0) repositories
+    // NOTE: Requires ensureEnvRepositoriesRegistered() to have been called first
     const filteredPaths = filterExcludedPaths(db, repositoryPaths);
 
     // Scan filtered repositories (excluded repos are skipped)

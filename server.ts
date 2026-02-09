@@ -40,6 +40,7 @@ import { stopAllPolling } from './src/lib/response-poller';
 import { stopAllAutoYesPolling } from './src/lib/auto-yes-manager';
 import { runMigrations } from './src/lib/db-migrations';
 import { getEnvByKey } from './src/lib/env';
+import { ensureEnvRepositoriesRegistered, filterExcludedPaths } from './src/lib/db-repository';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = getEnvByKey('CM_BIND') || '127.0.0.1';
@@ -87,8 +88,25 @@ app.prepare().then(() => {
         console.log(`  ${i + 1}. ${path}`);
       });
 
-      // Scan all repositories
-      const worktrees = await scanMultipleRepositories(repositoryPaths);
+      // Issue #202: Register environment variable repositories to repositories table (idempotent)
+      // NOTE: Must be called BEFORE filterExcludedPaths() - see Section 4 of design policy
+      ensureEnvRepositoriesRegistered(db, repositoryPaths);
+
+      // Issue #202: Filter out excluded (enabled=0) repositories
+      // NOTE: Requires ensureEnvRepositoriesRegistered() to have been called first
+      const filteredPaths = filterExcludedPaths(db, repositoryPaths);
+      const excludedCount = repositoryPaths.length - filteredPaths.length;
+      if (excludedCount > 0) {
+        console.log(`Excluded repositories: ${excludedCount}, Active repositories: ${filteredPaths.length}`);
+        // SF-SEC-003: Log excluded repository paths for audit/troubleshooting
+        const excludedPaths = repositoryPaths.filter(p => !filteredPaths.includes(p));
+        excludedPaths.forEach(p => {
+          console.log(`  [excluded] ${p}`);
+        });
+      }
+
+      // Scan filtered repositories (excluded repos are skipped)
+      const worktrees = await scanMultipleRepositories(filteredPaths);
 
       // Sync to database
       syncWorktreesToDB(db, worktrees);
