@@ -92,11 +92,11 @@ export function Modal({
       <div className="flex min-h-full items-center justify-center p-2 sm:p-4">
         <div
           ref={modalRef}
-          className={`relative w-full ${sizeClasses[size]} bg-white rounded-lg shadow-xl transform transition-all`}
+          className={`relative w-full ${sizeClasses[size]} max-h-[calc(100vh-1rem)] sm:max-h-[calc(100vh-2rem)] flex flex-col bg-white rounded-lg shadow-xl transform transition-all`}
         >
           {/* Header */}
           {(title || showCloseButton) && (
-            <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex-shrink-0">
               <h3 className="text-base sm:text-lg font-semibold text-gray-900 truncate pr-2">{title}</h3>
               {showCloseButton && (
                 <button
@@ -122,7 +122,7 @@ export function Modal({
           )}
 
           {/* Content */}
-          <div className="px-4 sm:px-6 py-3 sm:py-4">{children}</div>
+          <div className="px-4 sm:px-6 py-3 sm:py-4 overflow-y-auto flex-1 min-h-0">{children}</div>
         </div>
       </div>
     </div>
