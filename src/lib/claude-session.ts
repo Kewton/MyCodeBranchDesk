@@ -15,6 +15,7 @@ import {
   CLAUDE_TRUST_DIALOG_PATTERN,
   stripAnsi,
 } from './cli-patterns';
+import { detectAndResendIfPastedText } from './pasted-text-helper';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -423,6 +424,13 @@ export async function sendMessageToClaude(
   // Send message using sendKeys consistently (CONS-001)
   await sendKeys(sessionName, message, false);
   await sendKeys(sessionName, '', true);
+
+  // Issue #212: Detect [Pasted text] and resend Enter for multi-line messages
+  // MF-001: Single-line messages skip detection (+0ms overhead)
+  if (message.includes('\n')) {
+    await detectAndResendIfPastedText(sessionName);
+  }
+
   console.log(`Sent message to Claude session: ${sessionName}`);
 }
 

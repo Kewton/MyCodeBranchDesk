@@ -13,8 +13,17 @@ import {
 } from '../tmux';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { detectAndResendIfPastedText } from '../pasted-text-helper';
 
 const execAsync = promisify(exec);
+
+/**
+ * Extract error message from unknown error type (DRY)
+ * Same pattern as claude-session.ts getErrorMessage()
+ */
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 /**
  * Codex initialization timing constants
@@ -97,7 +106,7 @@ export class CodexTool extends BaseCLITool {
 
       console.log(`✓ Started Codex session: ${sessionName}`);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = getErrorMessage(error);
       throw new Error(`Failed to start Codex session: ${errorMessage}`);
     }
   }
@@ -132,9 +141,15 @@ export class CodexTool extends BaseCLITool {
       // Wait a moment for the message to be processed
       await new Promise((resolve) => setTimeout(resolve, 200));
 
+      // Issue #212: Detect [Pasted text] and resend Enter for multi-line messages
+      // MF-001: Single-line messages skip detection (+0ms overhead)
+      if (message.includes('\n')) {
+        await detectAndResendIfPastedText(sessionName);
+      }
+
       console.log(`✓ Sent message to Codex session: ${sessionName}`);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = getErrorMessage(error);
       throw new Error(`Failed to send message to Codex: ${errorMessage}`);
     }
   }
@@ -165,7 +180,7 @@ export class CodexTool extends BaseCLITool {
         console.log(`✓ Stopped Codex session: ${sessionName}`);
       }
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = getErrorMessage(error);
       console.error(`Error stopping Codex session: ${errorMessage}`);
       throw error;
     }

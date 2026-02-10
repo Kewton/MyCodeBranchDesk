@@ -17,6 +17,11 @@ vi.mock('@/lib/tmux', () => ({
   killSession: vi.fn(),
 }));
 
+// Mock pasted-text-helper (Issue #212)
+vi.mock('@/lib/pasted-text-helper', () => ({
+  detectAndResendIfPastedText: vi.fn().mockResolvedValue(undefined),
+}));
+
 // Mock child_process
 vi.mock('child_process', () => ({
   exec: vi.fn((cmd, opts, cb) => {
@@ -46,6 +51,7 @@ import {
 } from '@/lib/claude-session';
 import { hasSession, createSession, sendKeys, capturePane } from '@/lib/tmux';
 import { CLAUDE_PROMPT_PATTERN, CLAUDE_SEPARATOR_PATTERN } from '@/lib/cli-patterns';
+import { detectAndResendIfPastedText } from '@/lib/pasted-text-helper';
 
 // ----- Shared test constants (DRY) -----
 const TEST_WORKTREE_ID = 'test-worktree';
@@ -525,6 +531,49 @@ describe('claude-session - Issue #152 improvements', () => {
   describe('getSessionName()', () => {
     it('should generate session name with mcbd-claude- prefix', () => {
       expect(getSessionName(TEST_WORKTREE_ID)).toBe(TEST_SESSION_NAME);
+    });
+  });
+
+  // Issue #212: Pasted text detection in sendMessageToClaude
+  describe('sendMessageToClaude() - Pasted text detection (Issue #212)', () => {
+    beforeEach(() => {
+      vi.mocked(hasSession).mockResolvedValue(true);
+      vi.mocked(sendKeys).mockResolvedValue();
+      vi.mocked(capturePane).mockResolvedValue('> ');
+    });
+
+    // MF-001: Single-line messages should skip detection
+    it('should skip Pasted text detection for single-line messages', async () => {
+      const promise = sendMessageToClaude(TEST_WORKTREE_ID, 'hello');
+      await vi.advanceTimersByTimeAsync(CLAUDE_POST_PROMPT_DELAY);
+      await promise;
+
+      // detectAndResendIfPastedText should NOT be called for single-line
+      expect(detectAndResendIfPastedText).not.toHaveBeenCalled();
+      // Standard sendKeys should still be called (message + Enter)
+      expect(sendKeys).toHaveBeenCalledTimes(2);
+    });
+
+    // Multi-line messages should trigger detection
+    it('should run Pasted text detection for multi-line messages', async () => {
+      const promise = sendMessageToClaude(TEST_WORKTREE_ID, 'line1\nline2');
+      await vi.advanceTimersByTimeAsync(CLAUDE_POST_PROMPT_DELAY);
+      await promise;
+
+      // detectAndResendIfPastedText should be called with session name
+      expect(detectAndResendIfPastedText).toHaveBeenCalledWith(TEST_SESSION_NAME);
+      expect(detectAndResendIfPastedText).toHaveBeenCalledTimes(1);
+    });
+
+    // Existing flow should not be affected
+    it('should not affect existing message sending flow', async () => {
+      const promise = sendMessageToClaude(TEST_WORKTREE_ID, 'line1\nline2\nline3');
+      await vi.advanceTimersByTimeAsync(CLAUDE_POST_PROMPT_DELAY);
+      await promise;
+
+      // sendKeys order: message first, then Enter
+      expect(sendKeys).toHaveBeenNthCalledWith(1, TEST_SESSION_NAME, 'line1\nline2\nline3', false);
+      expect(sendKeys).toHaveBeenNthCalledWith(2, TEST_SESSION_NAME, '', true);
     });
   });
 });
