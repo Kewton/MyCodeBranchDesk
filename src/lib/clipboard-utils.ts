@@ -1,4 +1,18 @@
-import { stripAnsi } from '@/lib/cli-patterns';
+/**
+ * ANSI escape code pattern for stripping terminal color codes.
+ * Same pattern as cli-patterns.ts ANSI_PATTERN, duplicated here to avoid
+ * importing server-side modules (cli-patterns → logger → env → fs) into
+ * client-side code.
+ *
+ * Known limitations (SEC-002): 8-bit CSI, DEC private modes,
+ * character set switching, some RGB color formats are not supported.
+ * See src/lib/cli-patterns.ts ANSI_PATTERN for details.
+ */
+const ANSI_PATTERN = /\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\[[0-9;]*m/g;
+
+function stripAnsi(str: string): string {
+  return str.replace(ANSI_PATTERN, '');
+}
 
 /**
  * テキストをクリップボードにコピーする
@@ -10,9 +24,6 @@ import { stripAnsi } from '@/lib/cli-patterns';
  *
  * @remarks
  * - 空文字列または空白文字のみの入力は無視されます（早期リターン）
- * - stripAnsi() の既知の制限（SEC-002）: 8-bit CSI、DEC private modes、
- *   character set switching、一部のRGB color形式はサポートされていません。
- *   詳細は src/lib/cli-patterns.ts の ANSI_PATTERN を参照してください。
  */
 export async function copyToClipboard(text: string): Promise<void> {
   // SF-S4-1: 空文字/空白文字バリデーション
