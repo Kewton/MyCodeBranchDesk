@@ -13,6 +13,7 @@ import {
 } from '../tmux';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { detectAndResendIfPastedText } from '../pasted-text-helper';
 
 const execAsync = promisify(exec);
 
@@ -131,6 +132,12 @@ export class CodexTool extends BaseCLITool {
 
       // Wait a moment for the message to be processed
       await new Promise((resolve) => setTimeout(resolve, 200));
+
+      // Issue #212: Detect [Pasted text] and resend Enter for multi-line messages
+      // MF-001: Single-line messages skip detection (+0ms overhead)
+      if (message.includes('\n')) {
+        await detectAndResendIfPastedText(sessionName);
+      }
 
       console.log(`✓ Sent message to Codex session: ${sessionName}`);
     } catch (error: unknown) {

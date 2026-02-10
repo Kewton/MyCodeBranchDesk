@@ -7,6 +7,9 @@ import { describe, it, expect } from 'vitest';
 import {
   CODEX_THINKING_PATTERN,
   CODEX_PROMPT_PATTERN,
+  PASTED_TEXT_PATTERN,
+  PASTED_TEXT_DETECT_DELAY,
+  MAX_PASTED_TEXT_RETRIES,
   getCliToolPatterns,
   detectThinking,
   stripAnsi,
@@ -201,6 +204,53 @@ More text`;
     it('should handle text without ANSI codes', () => {
       const input = 'Plain text';
       expect(stripAnsi(input)).toBe('Plain text');
+    });
+  });
+
+  // Issue #212: Pasted text detection constants and patterns
+  describe('PASTED_TEXT_PATTERN (Issue #212)', () => {
+    it('should match standard Pasted text format', () => {
+      expect(PASTED_TEXT_PATTERN.test('[Pasted text #1 +46 lines]')).toBe(true);
+      expect(PASTED_TEXT_PATTERN.test('[Pasted text #2 +3 lines]')).toBe(true);
+      expect(PASTED_TEXT_PATTERN.test('[Pasted text #10 +100 lines]')).toBe(true);
+    });
+
+    it('should not match normal text', () => {
+      expect(PASTED_TEXT_PATTERN.test('Hello world')).toBe(false);
+      expect(PASTED_TEXT_PATTERN.test('[Some other text]')).toBe(false);
+      expect(PASTED_TEXT_PATTERN.test('Pasted text')).toBe(false);
+    });
+
+    it('should match partial line containing Pasted text', () => {
+      expect(PASTED_TEXT_PATTERN.test('some prefix [Pasted text #1 +5 lines]')).toBe(true);
+    });
+  });
+
+  describe('Pasted text constants (Issue #212)', () => {
+    it('should export PASTED_TEXT_DETECT_DELAY as 500', () => {
+      expect(PASTED_TEXT_DETECT_DELAY).toBe(500);
+    });
+
+    it('should export MAX_PASTED_TEXT_RETRIES as 3', () => {
+      expect(MAX_PASTED_TEXT_RETRIES).toBe(3);
+    });
+  });
+
+  describe('getCliToolPatterns skipPatterns - Pasted text (Issue #212)', () => {
+    it('should include PASTED_TEXT_PATTERN in claude skipPatterns', () => {
+      const patterns = getCliToolPatterns('claude');
+      const hasPastedTextPattern = patterns.skipPatterns.some(
+        p => p.test('[Pasted text #1 +46 lines]')
+      );
+      expect(hasPastedTextPattern).toBe(true);
+    });
+
+    it('should include PASTED_TEXT_PATTERN in codex skipPatterns', () => {
+      const patterns = getCliToolPatterns('codex');
+      const hasPastedTextPattern = patterns.skipPatterns.some(
+        p => p.test('[Pasted text #1 +46 lines]')
+      );
+      expect(hasPastedTextPattern).toBe(true);
     });
   });
 });
