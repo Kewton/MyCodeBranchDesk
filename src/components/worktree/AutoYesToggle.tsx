@@ -3,12 +3,15 @@
  *
  * Displays a toggle switch with countdown timer when enabled
  * and a notification when auto-response occurs.
+ *
+ * Issue #225: Added duration propagation and HH:MM:SS countdown format
  */
 
 'use client';
 
 import React, { memo, useEffect, useState, useCallback } from 'react';
 import { AutoYesConfirmDialog } from './AutoYesConfirmDialog';
+import type { AutoYesDuration } from '@/config/auto-yes-config';
 
 /** Props for AutoYesToggle component */
 export interface AutoYesToggleProps {
@@ -17,7 +20,7 @@ export interface AutoYesToggleProps {
   /** Expiration timestamp (ms since epoch) */
   expiresAt: number | null;
   /** Callback when toggle is clicked */
-  onToggle: (enabled: boolean) => Promise<void>;
+  onToggle: (enabled: boolean, duration?: AutoYesDuration) => Promise<void>;
   /** Last auto-response answer (for notification) */
   lastAutoResponse: string | null;
   /** Currently active CLI tool name (e.g. 'claude', 'codex') */
@@ -27,12 +30,18 @@ export interface AutoYesToggleProps {
 }
 
 /**
- * Format remaining time as MM:SS
+ * Format remaining time as MM:SS (under 1 hour) or H:MM:SS (1 hour or more)
+ * [SF-001] Kept in AutoYesToggle.tsx as module-scope function (single usage location)
  */
 function formatTimeRemaining(expiresAt: number): string {
   const remaining = Math.max(0, expiresAt - Date.now());
-  const minutes = Math.floor(remaining / 60000);
+  const hours = Math.floor(remaining / 3600000);
+  const minutes = Math.floor((remaining % 3600000) / 60000);
   const seconds = Math.floor((remaining % 60000) / 1000);
+
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }
   return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 }
 
@@ -91,10 +100,10 @@ export const AutoYesToggle = memo(function AutoYesToggle({
     }
   }, [enabled, onToggle]);
 
-  const handleConfirm = useCallback(() => {
+  const handleConfirm = useCallback((duration: AutoYesDuration) => {
     setShowConfirmDialog(false);
     setToggling(true);
-    onToggle(true).finally(() => setToggling(false));
+    onToggle(true, duration).finally(() => setToggling(false));
   }, [onToggle]);
 
   const handleCancel = useCallback(() => {
