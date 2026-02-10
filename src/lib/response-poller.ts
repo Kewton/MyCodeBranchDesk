@@ -30,7 +30,7 @@ import type { PromptDetectionResult } from './prompt-detector';
 import { recordClaudeConversation } from './conversation-logger';
 import type { CLIToolType } from './cli-tools/types';
 import { parseClaudeOutput } from './claude-output';
-import { getCliToolPatterns, stripAnsi, buildDetectPromptOptions } from './cli-patterns';
+import { getCliToolPatterns, stripAnsi, buildDetectPromptOptions, PASTED_TEXT_PATTERN } from './cli-patterns';
 
 /**
  * Polling interval in milliseconds (default: 2 seconds)
@@ -156,6 +156,7 @@ export function cleanClaudeResponse(response: string): string {
     /\?\s*for shortcuts\s*$/,  // Shortcuts hint at end of line
     /^─{10,}$/,  // Separator lines
     /^❯\s*$/,  // Empty prompt lines
+    PASTED_TEXT_PATTERN,  // [Pasted text #N +XX lines] (Issue #212)
   ];
 
   // Filter out UI elements and keep only the response content
