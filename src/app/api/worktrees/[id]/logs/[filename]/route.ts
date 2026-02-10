@@ -8,30 +8,32 @@ import { getDbInstance } from '@/lib/db-instance';
 import { getWorktreeById } from '@/lib/db';
 import { getLogDir } from '@/config/log-config';
 import { sanitizeForExport } from '@/lib/log-export-sanitizer';
+import { withLogging } from '@/lib/api-logger';
 import fs from 'fs/promises';
 import path from 'path';
 
-export async function GET(
+export const GET = withLogging<{ id: string; filename: string }>(async (
   request: NextRequest,
-  { params }: { params: { id: string; filename: string } }
-) {
+  { params }: { params: { id: string; filename: string } | Promise<{ id: string; filename: string }> }
+) => {
   try {
+    const resolvedParams = await Promise.resolve(params);
     const db = getDbInstance();
 
     // Check if worktree exists
-    const worktree = getWorktreeById(db, params.id);
+    const worktree = getWorktreeById(db, resolvedParams.id);
     if (!worktree) {
       return NextResponse.json(
-        { error: `Worktree '${params.id}' not found` },
+        { error: `Worktree '${resolvedParams.id}' not found` },
         { status: 404 }
       );
     }
 
     // Validate filename to prevent path traversal attacks
-    const filename = params.filename;
+    const filename = resolvedParams.filename;
 
     // Only allow .md files and ensure it starts with the worktree ID
-    if (!filename.endsWith('.md') || !filename.startsWith(`${params.id}-`)) {
+    if (!filename.endsWith('.md') || !filename.startsWith(`${resolvedParams.id}-`)) {
       return NextResponse.json(
         { error: 'Invalid filename' },
         { status: 400 }
@@ -104,4 +106,4 @@ export async function GET(
       { status: 500 }
     );
   }
-}
+}, { skipResponseBody: true });
