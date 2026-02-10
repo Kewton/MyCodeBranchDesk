@@ -6,12 +6,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbInstance } from '@/lib/db-instance';
 import { getWorktreeById } from '@/lib/db';
-import { getEnvByKey } from '@/lib/env';
+import { getLogDir } from '@/config/log-config';
 import fs from 'fs/promises';
 import path from 'path';
-
-// Issue #76: Environment variable fallback support
-const LOG_DIR = getEnvByKey('CM_LOG_DIR') || path.join(process.cwd(), 'data', 'logs');
 
 export async function GET(
   request: NextRequest,
@@ -56,7 +53,7 @@ export async function GET(
     let foundCliTool = '';
 
     for (const cliTool of cliTools) {
-      const filePath = path.join(LOG_DIR, cliTool, filename);
+      const filePath = path.join(getLogDir(), cliTool, filename);
 
       try {
         const stat = await fs.stat(filePath);
