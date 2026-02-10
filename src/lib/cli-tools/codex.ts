@@ -18,6 +18,14 @@ import { detectAndResendIfPastedText } from '../pasted-text-helper';
 const execAsync = promisify(exec);
 
 /**
+ * Extract error message from unknown error type (DRY)
+ * Same pattern as claude-session.ts getErrorMessage()
+ */
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
  * Codex initialization timing constants
  * T2.6: Extracted as constants for maintainability
  */
@@ -98,7 +106,7 @@ export class CodexTool extends BaseCLITool {
 
       console.log(`✓ Started Codex session: ${sessionName}`);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = getErrorMessage(error);
       throw new Error(`Failed to start Codex session: ${errorMessage}`);
     }
   }
@@ -141,7 +149,7 @@ export class CodexTool extends BaseCLITool {
 
       console.log(`✓ Sent message to Codex session: ${sessionName}`);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = getErrorMessage(error);
       throw new Error(`Failed to send message to Codex: ${errorMessage}`);
     }
   }
@@ -172,7 +180,7 @@ export class CodexTool extends BaseCLITool {
         console.log(`✓ Stopped Codex session: ${sessionName}`);
       }
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = getErrorMessage(error);
       console.error(`Error stopping Codex session: ${errorMessage}`);
       throw error;
     }

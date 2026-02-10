@@ -155,13 +155,21 @@ More text`;
     });
 
     it('should detect thinking for claude', () => {
-      // Note: Claude thinking pattern requires the ellipsis character (…) not three dots (...)
-      expect(detectThinking('claude', '✻ Analyzing something…')).toBe(true);
-      expect(detectThinking('claude', 'to interrupt)')).toBe(true);
+      // Note: Claude thinking pattern requires the ellipsis character (U+2026) not three dots (...)
+      expect(detectThinking('claude', '\u2733 Analyzing something\u2026')).toBe(true);
+      // Pattern was updated to 'esc to interrupt' (not 'to interrupt)') in Claude Code v2.x
+      expect(detectThinking('claude', 'esc to interrupt')).toBe(true);
     });
 
     it('should return false for gemini', () => {
       expect(detectThinking('gemini', 'any content')).toBe(false);
+    });
+
+    it('should use claude patterns as default for unknown tool', () => {
+      // @ts-expect-error - Testing invalid input for default branch
+      expect(detectThinking('unknown', '\u2733 Analyzing something\u2026')).toBe(true);
+      // @ts-expect-error - Testing invalid input for default branch
+      expect(detectThinking('unknown', 'Normal output')).toBe(false);
     });
   });
 

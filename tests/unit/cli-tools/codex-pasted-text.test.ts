@@ -19,13 +19,18 @@ vi.mock('@/lib/tmux', () => ({
   killSession: vi.fn(),
 }));
 
-// Mock child_process for execAsync
+/**
+ * Mock child_process for execAsync (used by codex.ts for tmux send-keys C-m).
+ * The exec callback can be either the 2nd or 3rd argument depending on
+ * whether options are passed.
+ */
 vi.mock('child_process', () => ({
-  exec: vi.fn((cmd: string, opts: unknown, cb?: unknown) => {
-    if (typeof opts === 'function') {
-      (opts as (err: null, result: { stdout: string; stderr: string }) => void)(null, { stdout: '', stderr: '' });
-    } else if (typeof cb === 'function') {
-      (cb as (err: null, result: { stdout: string; stderr: string }) => void)(null, { stdout: '', stderr: '' });
+  exec: vi.fn((_cmd: string, optsOrCb: unknown, cb?: unknown) => {
+    const callback = typeof optsOrCb === 'function' ? optsOrCb : cb;
+    if (typeof callback === 'function') {
+      (callback as (err: null, result: { stdout: string; stderr: string }) => void)(
+        null, { stdout: '', stderr: '' }
+      );
     }
     return {};
   }),
@@ -87,14 +92,13 @@ describe('CodexTool.sendMessage() - Pasted text detection (Issue #212)', () => {
       callOrder.push('sendKeys');
     });
 
-    // exec mock is already set up at the top - we track its call via the child_process mock
+    // Override exec mock to track call order
     const { exec } = await import('child_process');
-    vi.mocked(exec).mockImplementation(((cmd: string, opts: unknown, cb?: unknown) => {
+    vi.mocked(exec).mockImplementation(((_cmd: string, optsOrCb: unknown, cb?: unknown) => {
       callOrder.push('execAsync');
-      if (typeof opts === 'function') {
-        (opts as (err: null, stdout: string, stderr: string) => void)(null, '', '');
-      } else if (typeof cb === 'function') {
-        (cb as (err: null, stdout: string, stderr: string) => void)(null, '', '');
+      const callback = typeof optsOrCb === 'function' ? optsOrCb : cb;
+      if (typeof callback === 'function') {
+        (callback as (err: null, stdout: string, stderr: string) => void)(null, '', '');
       }
       return {} as ReturnType<typeof exec>;
     }) as typeof exec);
