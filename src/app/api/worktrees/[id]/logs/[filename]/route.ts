@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDbInstance } from '@/lib/db-instance';
 import { getWorktreeById } from '@/lib/db';
 import { getLogDir } from '@/config/log-config';
+import { sanitizeForExport } from '@/lib/log-export-sanitizer';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -81,6 +82,10 @@ export async function GET(
         { status: 404 }
       );
     }
+
+    // Apply sanitization if requested (Issue #11: log export feature)
+    const sanitize = request.nextUrl?.searchParams?.get('sanitize') === 'true';
+    if (sanitize) fileContent = sanitizeForExport(fileContent);
 
     return NextResponse.json(
       {
