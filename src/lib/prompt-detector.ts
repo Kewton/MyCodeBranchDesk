@@ -139,6 +139,7 @@ function yesNoPromptResult(
       options: ['yes', 'no'],
       status: 'pending',
       ...(defaultOption !== undefined && { defaultOption }),
+      instructionText: rawContent,
     },
     cleanContent,
     rawContent,
@@ -544,6 +545,18 @@ function detectMultipleChoicePrompt(output: string, options?: DetectPromptOption
     question = 'Please select an option:';
   }
 
+  // Extract instruction text: lines up to questionEndIndex (max 20 lines of context)
+  let instructionText: string | undefined;
+  if (questionEndIndex >= 0) {
+    const contextStart = Math.max(0, questionEndIndex - 19);
+    const contextLines = lines.slice(contextStart, questionEndIndex + 1)
+      .map(l => l.trim())
+      .filter(l => l.length > 0);
+    if (contextLines.length > 0) {
+      instructionText = contextLines.join('\n');
+    }
+  }
+
   return {
     isPrompt: true,
     promptData: {
@@ -563,6 +576,7 @@ function detectMultipleChoicePrompt(output: string, options?: DetectPromptOption
         };
       }),
       status: 'pending',
+      instructionText,
     },
     cleanContent: question.trim(),
     rawContent: truncateRawContent(output.trim()),  // Issue #235: complete prompt output (truncated) [MF-001]
