@@ -1655,6 +1655,82 @@ Are you sure you want to continue? (yes/no)
       });
     });
 
+    describe('instructionText in promptData', () => {
+      it('should set instructionText for multiple_choice prompts with context lines', () => {
+        const output = [
+          'Here is some instruction text for the user.',
+          'Please review the following changes:',
+          'Do you want to proceed?',
+          '\u276F 1. Yes',
+          '  2. No',
+          '  3. Cancel',
+        ].join('\n');
+
+        const result = detectPrompt(output);
+
+        expect(result.isPrompt).toBe(true);
+        expect(result.promptData?.type).toBe('multiple_choice');
+        expect(result.promptData?.instructionText).toBeDefined();
+        expect(result.promptData?.instructionText).toContain('Here is some instruction text');
+        expect(result.promptData?.instructionText).toContain('Do you want to proceed?');
+      });
+
+      it('should set instructionText for yes_no prompts using rawContent', () => {
+        const output = [
+          'I will execute the following command:',
+          '  rm -rf /tmp/cache',
+          'Do you want to continue? (y/n)',
+        ].join('\n');
+
+        const result = detectPrompt(output);
+
+        expect(result.isPrompt).toBe(true);
+        expect(result.promptData?.type).toBe('yes_no');
+        expect(result.promptData?.instructionText).toBeDefined();
+        expect(result.promptData?.instructionText).toContain('rm -rf /tmp/cache');
+        expect(result.promptData?.instructionText).toContain('Do you want to continue?');
+      });
+
+      it('should set instructionText for Approve? prompts', () => {
+        const output = [
+          'I will execute the following command:',
+          '  rm -rf /tmp/cache',
+          'Approve?',
+        ].join('\n');
+
+        const result = detectPrompt(output);
+
+        expect(result.isPrompt).toBe(true);
+        expect(result.promptData?.instructionText).toBeDefined();
+        expect(result.promptData?.instructionText).toContain('Approve?');
+      });
+
+      it('should not set instructionText when no prompt is detected', () => {
+        const output = 'This is just normal output without any prompt';
+        const result = detectPrompt(output);
+
+        expect(result.isPrompt).toBe(false);
+        expect(result.promptData).toBeUndefined();
+      });
+
+      it('should set instructionText for multiple_choice without cursor (requireDefaultIndicator: false)', () => {
+        const output = [
+          'Some context about the operation.',
+          'Which option would you like?',
+          '  1. Yes',
+          '  2. No',
+        ].join('\n');
+
+        const options: DetectPromptOptions = { requireDefaultIndicator: false };
+        const result = detectPrompt(output, options);
+
+        expect(result.isPrompt).toBe(true);
+        expect(result.promptData?.instructionText).toBeDefined();
+        expect(result.promptData?.instructionText).toContain('Some context about the operation.');
+        expect(result.promptData?.instructionText).toContain('Which option would you like?');
+      });
+    });
+
     describe('lastLines expansion regression [SF-S3-002]', () => {
       it('should not false-detect (y/n) pattern appearing in lines 11-20 from end', () => {
         // The (y/n) pattern should only match when it is at the END of a line

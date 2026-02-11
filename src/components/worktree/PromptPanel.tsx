@@ -142,6 +142,13 @@ function PromptPanelContent({
         )}
       </div>
 
+      {/* Instruction Text (context preceding the prompt) */}
+      {promptData.instructionText && (
+        <div className="max-h-40 overflow-y-auto whitespace-pre-wrap text-sm text-gray-600 bg-gray-50 rounded p-2 border border-gray-200">
+          {promptData.instructionText}
+        </div>
+      )}
+
       {/* Question */}
       <p className="text-gray-800 leading-relaxed">{promptData.question}</p>
 
