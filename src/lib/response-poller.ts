@@ -615,7 +615,8 @@ async function checkForResponse(worktreeId: string, cliToolId: CLIToolType): Pro
       const message = createMessage(db, {
         worktreeId,
         role: 'assistant',
-        content: promptDetection.cleanContent,
+        // Issue #235: rawContent優先でDB保存 (rawContent contains complete prompt output)
+        content: promptDetection.rawContent || promptDetection.cleanContent,
         messageType: 'prompt',
         promptData: promptDetection.promptData,
         timestamp: new Date(),

@@ -44,6 +44,51 @@ export interface PromptDetectionResult {
   promptData?: PromptData;
   /** Clean content without prompt suffix */
   cleanContent: string;
+  /**
+   * Complete prompt output (stripAnsi applied, truncated) - Issue #235
+   * Note: "raw" does not mean ANSI escape codes are present.
+   * This field holds the complete prompt output after stripAnsi() processing,
+   * truncated to RAW_CONTENT_MAX_LINES / RAW_CONTENT_MAX_CHARS limits.
+   * undefined when no prompt is detected.
+   */
+  rawContent?: string;
+}
+
+/**
+ * Maximum number of lines to retain in rawContent.
+ * Tail lines are preserved (instruction text typically appears just before the prompt).
+ * @see truncateRawContent
+ */
+const RAW_CONTENT_MAX_LINES = 200;
+
+/**
+ * Maximum number of characters to retain in rawContent.
+ * Tail characters are preserved.
+ * @see truncateRawContent
+ */
+const RAW_CONTENT_MAX_CHARS = 5000;
+
+/**
+ * Truncate raw content to fit within size limits.
+ * Preserves the tail (end) of the content since instruction text
+ * typically appears just before the prompt at the end of output.
+ *
+ * Security: No regular expressions used -- no ReDoS risk. [SF-S4-002]
+ * String.split('\n') and String.slice() are literal string operations only.
+ *
+ * @param content - The content to truncate
+ * @returns Truncated content (last RAW_CONTENT_MAX_LINES lines, max RAW_CONTENT_MAX_CHARS characters)
+ */
+function truncateRawContent(content: string): string {
+  const lines = content.split('\n');
+  const truncatedLines = lines.length > RAW_CONTENT_MAX_LINES
+    ? lines.slice(-RAW_CONTENT_MAX_LINES)
+    : lines;
+  let result = truncatedLines.join('\n');
+  if (result.length > RAW_CONTENT_MAX_CHARS) {
+    result = result.slice(-RAW_CONTENT_MAX_CHARS);
+  }
+  return result;
 }
 
 /**
@@ -94,7 +139,8 @@ export function detectPrompt(output: string, options?: DetectPromptOptions): Pro
   logger.debug('detectPrompt:start', { outputLength: output.length });
 
   const lines = output.split('\n');
-  const lastLines = lines.slice(-10).join('\n');
+  // [SF-003] [MF-S2-001] Expanded from 10 to 20 lines for rawContent coverage
+  const lastLines = lines.slice(-20).join('\n');
 
   // Pattern 0: Multiple choice (numbered options with ❯ indicator)
   // Example:
@@ -127,6 +173,7 @@ export function detectPrompt(output: string, options?: DetectPromptOptions): Pro
           ...(pattern.defaultOption !== undefined && { defaultOption: pattern.defaultOption }),
         },
         cleanContent: question,
+        rawContent: lastLines.trim(),  // Issue #235: complete prompt output (last 20 lines)
       };
     }
   }
@@ -149,6 +196,7 @@ export function detectPrompt(output: string, options?: DetectPromptOptions): Pro
         status: 'pending',
       },
       cleanContent: content || 'Approve?',
+      rawContent: lastLines.trim(),  // Issue #235: complete prompt output (last 20 lines)
     };
   }
 
@@ -506,6 +554,7 @@ function detectMultipleChoicePrompt(output: string, options?: DetectPromptOption
       status: 'pending',
     },
     cleanContent: question.trim(),
+    rawContent: truncateRawContent(output.trim()),  // Issue #235: complete prompt output (truncated) [MF-001]
   };
 }
 

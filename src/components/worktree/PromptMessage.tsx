@@ -16,11 +16,36 @@ export interface PromptMessageProps {
   onRespond: (answer: string) => Promise<void>;
 }
 
+/**
+ * Determine display content for instruction text.
+ * Returns null if content should not be displayed (empty, or identical to question).
+ *
+ * Note [SF-S4-003]: The trim() + strict equality comparison may not handle
+ * Unicode normalization differences (NFC/NFD) or residual control characters.
+ * In such cases, content would be displayed (information not lost). YAGNI applies.
+ *
+ * @param content - message.content (may contain rawContent or cleanContent)
+ * @param question - prompt.question text
+ * @returns Display content string or null
+ */
+function getDisplayContent(content: string | undefined | null, question: string): string | null {
+  // 1. Empty or undefined content -> do not display (fallback to question-only)
+  if (!content?.trim()) return null;
+
+  // 2. Content identical to question -> do not display to avoid duplication
+  if (content.trim() === question.trim()) return null;
+
+  // 3. Content contains question or is different -> display full content
+  return content;
+}
+
 export function PromptMessage({ message, onRespond }: PromptMessageProps) {
   const [responding, setResponding] = useState(false);
   const prompt = message.promptData!;
   const isPending = prompt.status === 'pending';
   const timestamp = format(new Date(message.timestamp), 'PPp', { locale: ja });
+  // [SF-S3-003] Cache getDisplayContent result for DRY principle
+  const displayContent = getDisplayContent(message.content, prompt.question);
 
   const handleRespond = async (answer: string) => {
     setResponding(true);
@@ -45,6 +70,13 @@ export function PromptMessage({ message, onRespond }: PromptMessageProps) {
           </div>
           <span className="text-xs text-yellow-600">{timestamp}</span>
         </div>
+
+        {/* Instruction text (Issue #235: rawContent display) [SF-S2-004] */}
+        {displayContent && (
+          <div className="text-sm text-gray-700 whitespace-pre-wrap mb-2">
+            {displayContent}
+          </div>
+        )}
 
         {/* Question */}
         <div className="mb-4">
