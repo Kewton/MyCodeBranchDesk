@@ -796,13 +796,27 @@ describe('WorktreeDetailRefactored', () => {
 
   describe('Visibility Change Recovery (Issue #246)', () => {
     /**
+     * Tests for the visibilitychange-based recovery mechanism.
+     *
+     * When a smartphone browser puts a page in the background, network requests
+     * are suspended and polling timers drift. Upon foreground restoration, the
+     * component must re-fetch data to clear stale errors and restore the UI.
+     *
+     * Design policy references:
+     * - MF-001: handleRetry() is called directly (DRY principle)
+     * - SF-001: RECOVERY_THROTTLE_MS prevents rapid re-fetches
+     * - IA-001: handleRetry() causes setInterval re-creation as a side-effect
+     * - IA-002: Concurrent fetches from visibility + polling + WebSocket are safe
+     */
+
+    /**
      * Helper to set document.visibilityState for testing.
-     * Uses Object.defineProperty to override the readonly property.
+     * Uses Object.defineProperty to override the readonly property because
+     * visibilityState is a read-only getter on the Document prototype.
      */
     let visibilityStateSpy: ReturnType<typeof vi.spyOn> | null = null;
 
     function setVisibilityState(state: DocumentVisibilityState) {
-      // Use Object.defineProperty to override the readonly property
       Object.defineProperty(document, 'visibilityState', {
         configurable: true,
         get: () => state,
@@ -822,7 +836,7 @@ describe('WorktreeDetailRefactored', () => {
       });
     });
 
-    it('triggers data re-fetch when visibilitychange fires with visible state', async () => {
+    it('TC-1: triggers data re-fetch when visibilitychange fires with visible state (MF-001)', async () => {
       render(<WorktreeDetailRefactored worktreeId="test-worktree-123" />);
 
       // Wait for initial load to complete
@@ -849,7 +863,7 @@ describe('WorktreeDetailRefactored', () => {
       });
     });
 
-    it('resets error state when visibilitychange fires during error', async () => {
+    it('TC-2: resets error state when visibilitychange fires during error (MF-001)', async () => {
       // First, make fetch fail to trigger error state
       mockFetch.mockImplementation(() =>
         Promise.resolve({
@@ -908,7 +922,7 @@ describe('WorktreeDetailRefactored', () => {
       });
     });
 
-    it('does not trigger data re-fetch when visibilityState is hidden', async () => {
+    it('TC-3: does not trigger data re-fetch when visibilityState is hidden', async () => {
       render(<WorktreeDetailRefactored worktreeId="test-worktree-123" />);
 
       // Wait for initial load to complete
@@ -932,8 +946,9 @@ describe('WorktreeDetailRefactored', () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
-    it('throttles rapid visibilitychange events within 5 seconds', async () => {
-      // Mock Date.now to control timestamps for throttle testing
+    it('TC-4: throttles rapid visibilitychange events within RECOVERY_THROTTLE_MS (SF-001)', async () => {
+      // Mock Date.now to control timestamps for throttle testing.
+      // RECOVERY_THROTTLE_MS = 5000ms, so events within 5 seconds should be skipped.
       const originalDateNow = Date.now;
       let currentTime = 1000000;
       Date.now = vi.fn(() => currentTime);
@@ -948,7 +963,7 @@ describe('WorktreeDetailRefactored', () => {
       // Clear fetch call history after initial load
       mockFetch.mockClear();
 
-      // First visibilitychange - should trigger fetch
+      // --- 1st visibilitychange: should trigger fetch ---
       setVisibilityState('visible');
       await act(async () => {
         document.dispatchEvent(new Event('visibilitychange'));
@@ -958,28 +973,22 @@ describe('WorktreeDetailRefactored', () => {
         expect(mockFetch).toHaveBeenCalled();
       });
 
-      const callCountAfterFirst = mockFetch.mock.calls.length;
-
-      // Clear and advance time by only 2 seconds (within throttle window)
+      // --- 2nd visibilitychange at +2s: should be throttled (within 5s window) ---
       mockFetch.mockClear();
       currentTime += 2000;
 
-      // Second visibilitychange - should be throttled (within 5 seconds)
       await act(async () => {
         document.dispatchEvent(new Event('visibilitychange'));
       });
 
-      // Wait a bit to ensure no fetch is triggered
+      // Wait a bit to confirm no fetch is triggered
       await new Promise((resolve) => setTimeout(resolve, 100));
-
-      // No new fetch calls should have been made (throttled)
       expect(mockFetch).not.toHaveBeenCalled();
 
-      // Advance time past throttle window (total 6 seconds from first)
+      // --- 3rd visibilitychange at +6s total: should trigger fetch (past 5s window) ---
       currentTime += 4000;
       mockFetch.mockClear();
 
-      // Third visibilitychange - should trigger fetch (past throttle window)
       await act(async () => {
         document.dispatchEvent(new Event('visibilitychange'));
       });

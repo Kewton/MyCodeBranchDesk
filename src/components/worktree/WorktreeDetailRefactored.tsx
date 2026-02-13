@@ -1468,11 +1468,26 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
    * When the page becomes visible again (e.g., smartphone foreground restoration),
    * calls handleRetry() to reset errors and re-fetch data.
    *
-   * Design notes (Issue #246):
-   * - handleRetry() calls setLoading(true) which triggers useEffect cleanup
-   *   for the polling interval (clearInterval), then setLoading(false) causes
-   *   a new setInterval to be created. This is intentional (IA-001).
-   * - handleRetry() is called directly to follow DRY principle (MF-001).
+   * Design rationale (Issue #246):
+   *
+   * [MF-001] DRY: handleRetry() is called directly rather than re-implementing
+   *   the same error-reset + data-fetch flow. This ensures any future changes
+   *   to the retry logic automatically apply to visibility recovery.
+   *
+   * [IA-001] Side-effect: handleRetry() calls setLoading(true), which causes
+   *   the polling useEffect (line ~1538) to run its cleanup (clearInterval).
+   *   When handleRetry() finishes and calls setLoading(false), the polling
+   *   useEffect re-runs and creates a new setInterval. This means there is
+   *   a brief gap where no polling occurs (up to IDLE_POLLING_INTERVAL_MS).
+   *   This is acceptable because visibilitychange itself fetches fresh data.
+   *
+   * [IA-002] Overlap: When the page becomes visible, up to 3 data-fetch
+   *   sources may fire concurrently:
+   *   1. This visibilitychange handler (handleRetry)
+   *   2. The setInterval polling timer (if it fires during the same tick)
+   *   3. WebSocket reconnection triggering a broadcast-based fetch
+   *   All fetches are idempotent GET requests, so concurrent execution is
+   *   safe -- it may cause redundant network calls but no data corruption.
    */
   const handleVisibilityChange = useCallback(() => {
     if (document.visibilityState !== 'visible') return;
@@ -1483,7 +1498,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
     }
     lastRecoveryTimestampRef.current = now;
 
-    // Call handleRetry() directly (DRY principle, MF-001)
+    // [MF-001] Call handleRetry() directly (DRY principle)
     handleRetry();
   }, [handleRetry]);
 
@@ -1526,6 +1541,11 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
    * When the page becomes visible, triggers handleRetry() to re-fetch all data.
    * This handles the case where the browser suspended network requests while
    * the page was in the background (common on mobile browsers).
+   *
+   * Unlike WorktreeList.tsx (SF-003), this component needs:
+   * - Error state reset (via handleRetry's setError(null))
+   * - Throttle guard (RECOVERY_THROTTLE_MS) because handleRetry triggers
+   *   a loading indicator and setInterval re-creation (IA-001)
    */
   useEffect(() => {
     document.addEventListener('visibilitychange', handleVisibilityChange);

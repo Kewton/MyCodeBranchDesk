@@ -133,13 +133,19 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
    * When the page becomes visible after being in the background,
    * immediately fetch fresh worktree data for data freshness.
    *
-   * Unlike WorktreeDetailRefactored.tsx, this does not need:
-   * - Error reset: error state does not stop polling (setInterval has no error guard) (IC-004)
-   * - Timestamp throttle: fetchWorktrees(true) is a lightweight GET request (IC-005)
-   * - Loading indicator: uses silent mode for seamless UX
+   * [SF-003] Design difference from WorktreeDetailRefactored.tsx:
+   * This component uses a simpler visibilitychange pattern because:
+   * - No error reset needed: error state does not stop polling here
+   *   (setInterval has no `if (error) return` guard) (IC-004)
+   * - No timestamp throttle needed: fetchWorktrees(true) is a lightweight
+   *   silent GET that does not trigger loading indicators or setInterval
+   *   re-creation
+   * - No loading indicator: uses silent mode for seamless UX
    *
-   * WebSocket reconnection may also trigger fetchWorktrees via broadcast,
-   * but this is safe due to GET idempotency (IA-002).
+   * [IA-002] WebSocket reconnection may also trigger fetchWorktrees via
+   * broadcast message, creating potential overlap with this handler.
+   * This is safe because all fetches are idempotent GET requests --
+   * concurrent execution causes at most redundant network calls.
    */
   useEffect(() => {
     const handleVisibilityChange = () => {
