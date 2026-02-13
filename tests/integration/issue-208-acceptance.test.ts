@@ -13,12 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import { detectPrompt } from '@/lib/prompt-detector';
 import type { DetectPromptOptions } from '@/lib/prompt-detector';
-import type { PromptData, MultipleChoicePromptData } from '@/types/models';
-
-// Type guard for MultipleChoicePromptData
-function isMultipleChoicePrompt(data: PromptData | undefined): data is MultipleChoicePromptData {
-  return data?.type === 'multiple_choice';
-}
+import { isMultipleChoicePrompt } from '../helpers/prompt-type-guards';
 
 describe('Issue #208 Acceptance Test', () => {
   // ========================================================================
