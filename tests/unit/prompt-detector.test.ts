@@ -6,17 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { detectPrompt, getAnswerInput } from '@/lib/prompt-detector';
 import type { DetectPromptOptions } from '@/lib/prompt-detector';
-import type { PromptData, YesNoPromptData, MultipleChoicePromptData } from '@/types/models';
-
-// Type guard for MultipleChoicePromptData
-function isMultipleChoicePrompt(data: PromptData | undefined): data is MultipleChoicePromptData {
-  return data?.type === 'multiple_choice';
-}
-
-// Type guard for YesNoPromptData
-function isYesNoPrompt(data: PromptData | undefined): data is YesNoPromptData {
-  return data?.type === 'yes_no';
-}
+import { isMultipleChoicePrompt, isYesNoPrompt } from '../helpers/prompt-type-guards';
 
 describe('Prompt Detector', () => {
   describe('detectPrompt', () => {

@@ -339,42 +339,34 @@ function isQuestionLikeLine(line: string): boolean {
   // Empty lines are not questions
   if (line.length === 0) return false;
 
-  // Pattern 1: Lines ending with question mark (English or full-width Japanese)
+  // Pattern 1: Lines containing question mark anywhere (English '?' or full-width U+FF1F).
+  // This covers both:
+  //   - Lines ending with '?' (standard question format)
+  //   - Lines with '?' mid-line (Issue #256: multi-line question wrapping where '?'
+  //     appears mid-line due to terminal width causing the question text to wrap)
+  //
   // Full-width question mark (U+FF1F) support is a defensive measure: Claude Code/CLI
   // displays questions in English, but this covers future multi-language support
   // and third-party tool integration.
-  if (line.endsWith('?') || line.endsWith('\uff1f')) return true;
-
-  // Pattern 2 (Issue #256): Lines containing question mark anywhere in the line.
-  // Handles multi-line question wrapping where '?' appears mid-line due to
-  // terminal width causing the question text to wrap.
   //
   // [SF-001] Scope constraints:
-  // - This pattern is effective without False Positive risk only within
+  // - The mid-line '?' detection is effective without False Positive risk only within
   //   SEC-001b guard context (questionEndIndex vicinity and upward scan range).
   // - isQuestionLikeLine() is currently module-private (no export).
   // - If this function is exported for external use in the future, consider:
-  //   (a) Providing a stricter variant (e.g., isStrictQuestionLikeLine()) without Pattern 2
-  //   (b) Separating Pattern 2 into a SEC-001b-specific helper function
+  //   (a) Providing a stricter variant (e.g., isStrictQuestionLikeLine()) without mid-line match
+  //   (b) Separating mid-line match into a SEC-001b-specific helper function
   //   (c) Adding URL exclusion logic (/[?&]\w+=/.test(line) to exclude)
   if (line.includes('?') || line.includes('\uff1f')) return true;
 
-  // Pattern 3: Lines ending with colon that contain a selection/input keyword
-  // Examples: "Select an option:", "Choose a mode:", "Pick one:"
-  // (Renumbered from Pattern 2 to Pattern 3 due to new Pattern 2 above)
-  if (line.endsWith(':')) {
-    if (QUESTION_KEYWORD_PATTERN.test(line)) return true;
-  }
-
-  // Pattern 4 (Issue #256): Lines containing a selection/input keyword without colon.
-  // Handles model selection prompts like "Select model" where the line does not end
-  // with ':' or '?'. This pattern works in conjunction with Pattern 3 (colon + keyword)
-  // to broaden detection for CLI prompts that use keyword-only headings.
+  // Pattern 2: Lines containing a selection/input keyword.
+  // Detects both colon-terminated (e.g., "Select an option:", "Choose a mode:") and
+  // non-colon forms (e.g., "Select model") used by CLI prompts (Issue #256).
   //
-  // [SF-001] Same scope constraints as Pattern 2 apply:
+  // [SF-001] Scope constraints apply:
   // - Effective without False Positive risk only within SEC-001b guard context.
   // - T11h-T11m False Positive lines do not contain QUESTION_KEYWORD_PATTERN keywords.
-  // - If this function is exported, consider restricting Pattern 4 to SEC-001b context.
+  // - If this function is exported, consider restricting this pattern to SEC-001b context.
   if (QUESTION_KEYWORD_PATTERN.test(line)) return true;
 
   return false;
@@ -473,19 +465,123 @@ function isConsecutiveFromOne(numbers: number[]): boolean {
  * @returns true if the line should be treated as a continuation of a previous option
  */
 function isContinuationLine(rawLine: string, line: string): boolean {
-  // Indented non-option line.
-  // Excludes lines ending with '?' or '？' (U+FF1F) because those are typically question lines
+  // Lines ending with '?' or full-width '？' (U+FF1F) are typically question lines
   // (e.g., "  Do you want to proceed?", "  コピーしたい対象はどれですか？") from CLI tool output
-  // where both the question and options are 2-space indented. Without this exclusion,
-  // the question line would be misclassified as a continuation line, causing
-  // questionEndIndex to remain -1 and Layer 5 SEC-001 to block detection.
+  // where both the question and options are 2-space indented. These must NOT be
+  // treated as continuation lines, otherwise questionEndIndex remains -1 and
+  // Layer 5 SEC-001 blocks detection.
   const endsWithQuestion = line.endsWith('?') || line.endsWith('\uff1f');
-  const hasLeadingSpaces = /^\s{2,}[^\d]/.test(rawLine) && !/^\s*\d+\./.test(rawLine) && !endsWithQuestion;
-  // Short fragment (< 5 chars, excluding question-ending lines)
-  const isShortFragment = line.length < 5 && !endsWithQuestion;
-  // Path string continuation: lines starting with / or ~, or alphanumeric-only fragments (2+ chars)
-  const isPathContinuation = /^[\/~]/.test(line) || (line.length >= 2 && /^[a-zA-Z0-9_-]+$/.test(line));
-  return !!hasLeadingSpaces || isShortFragment || isPathContinuation;
+
+  // Check 1: Indented non-option line (label text wrapping with indentation).
+  // Must have 2+ leading spaces, not start with a number (option line), and not end with '?'.
+  if (!endsWithQuestion && /^\s{2,}[^\d]/.test(rawLine) && !/^\s*\d+\./.test(rawLine)) {
+    return true;
+  }
+
+  // Check 2: Short fragment (< 5 chars, e.g., filename tail).
+  // Excludes question-ending lines to prevent misclassifying short questions.
+  if (line.length < 5 && !endsWithQuestion) {
+    return true;
+  }
+
+  // Check 3: Path string continuation (Issue #181).
+  // Lines starting with / or ~, or alphanumeric-only fragments (2+ chars).
+  if (/^[\/~]/.test(line) || (line.length >= 2 && /^[a-zA-Z0-9_-]+$/.test(line))) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Extract question text from the lines around questionEndIndex.
+ * Collects non-empty, non-separator lines from up to 5 lines before questionEndIndex
+ * through questionEndIndex itself, joining them with spaces.
+ *
+ * @param lines - Array of output lines
+ * @param questionEndIndex - Index of the last line before options, or -1 if not found
+ * @returns Extracted question text, or generic fallback if questionEndIndex is -1
+ */
+function extractQuestionText(lines: string[], questionEndIndex: number): string {
+  if (questionEndIndex < 0) {
+    return 'Please select an option:';
+  }
+
+  const questionLines: string[] = [];
+  for (let i = Math.max(0, questionEndIndex - 5); i <= questionEndIndex; i++) {
+    const line = lines[i].trim();
+    if (line && !SEPARATOR_LINE_PATTERN.test(line)) {
+      questionLines.push(line);
+    }
+  }
+  return questionLines.join(' ');
+}
+
+/**
+ * Extract instruction text for the prompt block.
+ * Captures the complete AskUserQuestion block including context before the question,
+ * option descriptions, and navigation hints.
+ *
+ * @param lines - Array of output lines
+ * @param questionEndIndex - Index of the last line before options, or -1 if not found
+ * @param effectiveEnd - End index of non-trailing-empty lines
+ * @returns Instruction text string, or undefined if no question line found
+ */
+function extractInstructionText(
+  lines: string[],
+  questionEndIndex: number,
+  effectiveEnd: number,
+): string | undefined {
+  if (questionEndIndex < 0) {
+    return undefined;
+  }
+
+  const contextStart = Math.max(0, questionEndIndex - 19);
+  const blockLines = lines.slice(contextStart, effectiveEnd)
+    .map(l => l.trimEnd());
+  const joined = blockLines.join('\n').trim();
+  return joined.length > 0 ? joined : undefined;
+}
+
+/**
+ * Build the final PromptDetectionResult for a multiple choice prompt.
+ * Maps collected options to the output format, checking each option for
+ * text input requirements using TEXT_INPUT_PATTERNS.
+ *
+ * @param question - Extracted question text
+ * @param collectedOptions - Options collected during Pass 2 scanning
+ * @param instructionText - Instruction text for the prompt block
+ * @param output - Original output text (used for rawContent truncation)
+ * @returns PromptDetectionResult with isPrompt: true and multiple_choice data
+ */
+function buildMultipleChoiceResult(
+  question: string,
+  collectedOptions: ReadonlyArray<{ number: number; label: string; isDefault: boolean }>,
+  instructionText: string | undefined,
+  output: string,
+): PromptDetectionResult {
+  return {
+    isPrompt: true,
+    promptData: {
+      type: 'multiple_choice',
+      question: question.trim(),
+      options: collectedOptions.map(opt => {
+        const requiresTextInput = TEXT_INPUT_PATTERNS.some(pattern =>
+          pattern.test(opt.label)
+        );
+        return {
+          number: opt.number,
+          label: opt.label,
+          isDefault: opt.isDefault,
+          requiresTextInput,
+        };
+      }),
+      status: 'pending',
+      instructionText,
+    },
+    cleanContent: question.trim(),
+    rawContent: truncateRawContent(output.trim()),  // Issue #235: complete prompt output (truncated) [MF-001]
+  };
 }
 
 /**
@@ -646,60 +742,10 @@ function detectMultipleChoicePrompt(output: string, options?: DetectPromptOption
     }
   }
 
-  // Extract question text
-  let question = '';
-  if (questionEndIndex >= 0) {
-    // Get all non-empty lines from questionEndIndex up to (but not including) first option
-    const questionLines: string[] = [];
-    for (let i = Math.max(0, questionEndIndex - 5); i <= questionEndIndex; i++) {
-      const line = lines[i].trim();
-      if (line && !SEPARATOR_LINE_PATTERN.test(line)) {
-        questionLines.push(line);
-      }
-    }
-    question = questionLines.join(' ');
-  } else {
-    // No clear question found - use a generic one
-    question = 'Please select an option:';
-  }
+  const question = extractQuestionText(lines, questionEndIndex);
+  const instructionText = extractInstructionText(lines, questionEndIndex, effectiveEnd);
 
-  // Extract instruction text: full prompt block (context before question through all options/descriptions)
-  // Captures the complete AskUserQuestion block including option descriptions and navigation hints.
-  let instructionText: string | undefined;
-  if (questionEndIndex >= 0) {
-    const contextStart = Math.max(0, questionEndIndex - 19);
-    const blockLines = lines.slice(contextStart, effectiveEnd)
-      .map(l => l.trimEnd());
-    const joined = blockLines.join('\n').trim();
-    if (joined.length > 0) {
-      instructionText = joined;
-    }
-  }
-
-  return {
-    isPrompt: true,
-    promptData: {
-      type: 'multiple_choice',
-      question: question.trim(),
-      options: collectedOptions.map(opt => {
-        // Check if this option requires text input using module-level patterns
-        const requiresTextInput = TEXT_INPUT_PATTERNS.some(pattern =>
-          pattern.test(opt.label)
-        );
-
-        return {
-          number: opt.number,
-          label: opt.label,
-          isDefault: opt.isDefault,
-          requiresTextInput,
-        };
-      }),
-      status: 'pending',
-      instructionText,
-    },
-    cleanContent: question.trim(),
-    rawContent: truncateRawContent(output.trim()),  // Issue #235: complete prompt output (truncated) [MF-001]
-  };
+  return buildMultipleChoiceResult(question, collectedOptions, instructionText, output);
 }
 
 /**
