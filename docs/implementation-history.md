@@ -6,6 +6,7 @@
 
 | Issue | 種別 | 概要 | 主要変更ファイル | 設計書 |
 |-------|------|------|-----------------|--------|
+| #256 | fix | 選択メッセージ検出精度向上（複数行質問対応、isQuestionLikeLine Pattern 2/4追加、SEC-001b上方走査、MF-001 SRP遵守、リファクタリング） | `prompt-detector.ts`, `prompt-type-guards.ts`, unit/integration tests | [link](../dev-reports/design/issue-256-multiple-choice-prompt-detection-design-policy.md) |
 | #124 | feat | i18n対応（next-intl、en/ja切替UI、ドキュメント英語化） | `i18n-config.ts`, `i18n.ts`, `locale-cookie.ts`, `useLocaleSwitch.ts`, `LocaleSwitcher.tsx`, `date-locale.ts`, `locales/`, `README.md`, `docs/en/` | - |
 | #212 | fix | 複数行メッセージのPasted text検知+Enter自動送信（共通ヘルパー、skipPatterns拡張） | `pasted-text-helper.ts`, `cli-patterns.ts`, `claude-session.ts`, `codex.ts`, `response-poller.ts` | [link](../dev-reports/design/issue-212-pasted-text-detection-design-policy.md) |
 | #211 | feat | 履歴メッセージコピーボタン（stripAnsi利用、Toast通知） | `clipboard-utils.ts`, `ConversationPairCard.tsx`, `HistoryPane.tsx`, `WorktreeDetailRefactored.tsx` | [link](../dev-reports/design/issue-211-history-copy-button-design-policy.md) |

@@ -118,6 +118,11 @@ src/
 ├── lib/           # ユーティリティ・ビジネスロジック
 │   └── cli-tools/ # CLIツール抽象化層
 └── types/         # 型定義
+
+tests/
+├── helpers/       # テスト共通ヘルパー（型ガード等）
+├── unit/          # 単体テスト
+└── integration/   # 結合テスト
 ```
 
 ### 主要機能モジュール
@@ -202,6 +207,12 @@ src/
 | `src/cli/utils/daemon-factory.ts` | DaemonManagerファクトリー（Issue #136） |
 | `src/cli/config/cli-dependencies.ts` | 依存関係定義 |
 | `src/cli/types/index.ts` | CLI共通型定義（ExitCode enum、StartOptions、StopOptions、StatusOptions） |
+
+### テストヘルパー（Issue #256）
+
+| モジュール | 説明 |
+|-----------|------|
+| `tests/helpers/prompt-type-guards.ts` | プロンプト型ガード関数（isMultipleChoicePrompt、isYesNoPrompt）共有化（DRY原則対応） |
 
 ---
 
