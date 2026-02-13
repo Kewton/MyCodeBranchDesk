@@ -46,8 +46,20 @@ const MAX_SEARCH_QUERY_LENGTH = 256;
  * compile output structure changes (instead of fragile __dirname relative paths).
  */
 function resolvePackageRoot(): string {
-  const packageJsonPath = path.resolve(__dirname, '..', '..', 'package.json');
-  return path.dirname(packageJsonPath);
+  // From src/cli/utils/ -> 3 levels up to project root
+  // From dist/cli/utils/ -> 3 levels up to project root
+  let dir = __dirname;
+  for (let i = 0; i < 5; i++) {
+    const candidate = path.join(dir, 'package.json');
+    try {
+      fs.accessSync(candidate);
+      return dir;
+    } catch {
+      dir = path.dirname(dir);
+    }
+  }
+  // Fallback: 3 levels up from __dirname
+  return path.resolve(__dirname, '..', '..', '..');
 }
 
 /**
