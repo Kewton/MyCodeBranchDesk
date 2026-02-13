@@ -237,5 +237,60 @@ describe('GET /api/app/update-check', () => {
       const data = await response.json();
       expect(data.status).toBe('degraded');
     });
+
+    it('should return HTTP 200 with unknown installType when both checkForUpdate and isGlobalInstall throw', async () => {
+      (checkForUpdate as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('Unexpected error')
+      );
+      (isGlobalInstall as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        throw new Error('__dirname not available');
+      });
+
+      const response = await GET();
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      expect(data.status).toBe('degraded');
+      expect(data.installType).toBe('unknown');
+      expect(data.hasUpdate).toBe(false);
+    });
+  });
+
+  describe('response header consistency (DRY)', () => {
+    it('should include same Cache-Control headers on error path', async () => {
+      (checkForUpdate as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('Unexpected error')
+      );
+
+      const response = await GET();
+
+      expect(response.headers.get('Cache-Control')).toBe(
+        'no-store, no-cache, must-revalidate'
+      );
+      expect(response.headers.get('Pragma')).toBe('no-cache');
+    });
+  });
+
+  describe('updateCommand for unknown installType', () => {
+    it('should return null updateCommand for unknown install type even with update', async () => {
+      const mockResult: UpdateCheckResult = {
+        hasUpdate: true,
+        currentVersion: '0.2.3',
+        latestVersion: '0.3.0',
+        releaseUrl: 'https://github.com/Kewton/CommandMate/releases/tag/v0.3.0',
+        releaseName: 'v0.3.0',
+        publishedAt: '2026-02-10T00:00:00Z',
+      };
+
+      (checkForUpdate as ReturnType<typeof vi.fn>).mockResolvedValue(mockResult);
+      (isGlobalInstall as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        throw new Error('detection failed');
+      });
+
+      const response = await GET();
+      const data = await response.json();
+
+      expect(data.installType).toBe('unknown');
+      expect(data.updateCommand).toBeNull();
+    });
   });
 });

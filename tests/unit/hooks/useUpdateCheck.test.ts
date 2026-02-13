@@ -108,4 +108,62 @@ describe('useUpdateCheck', () => {
       expect(appApi.checkForUpdate).toHaveBeenCalledTimes(1);
     });
   });
+
+  it('should not update state after unmount (cancelled flag)', async () => {
+    let resolvePromise: (value: UpdateCheckResponse) => void;
+    const delayedPromise = new Promise<UpdateCheckResponse>((resolve) => {
+      resolvePromise = resolve;
+    });
+
+    (appApi.checkForUpdate as ReturnType<typeof vi.fn>).mockReturnValue(delayedPromise);
+
+    const { result, unmount } = renderHook(() => useUpdateCheck());
+
+    // Unmount before the promise resolves
+    unmount();
+
+    // Resolve after unmount - should not cause state updates
+    resolvePromise!({
+      status: 'success',
+      hasUpdate: true,
+      currentVersion: '0.2.3',
+      latestVersion: '0.3.0',
+      releaseUrl: 'https://github.com/Kewton/CommandMate/releases/tag/v0.3.0',
+      releaseName: 'v0.3.0',
+      publishedAt: '2026-02-10T00:00:00Z',
+      installType: 'global',
+      updateCommand: 'npm install -g commandmate@latest',
+    });
+
+    // Wait a tick to ensure promise is processed
+    await new Promise((r) => setTimeout(r, 10));
+
+    // State should remain in initial loading state (no update after unmount)
+    expect(result.current.loading).toBe(true);
+    expect(result.current.data).toBeNull();
+  });
+
+  it('should not update error state after unmount on failure', async () => {
+    let rejectPromise: (reason: Error) => void;
+    const delayedPromise = new Promise<UpdateCheckResponse>((_resolve, reject) => {
+      rejectPromise = reject;
+    });
+
+    (appApi.checkForUpdate as ReturnType<typeof vi.fn>).mockReturnValue(delayedPromise);
+
+    const { result, unmount } = renderHook(() => useUpdateCheck());
+
+    // Unmount before the promise rejects
+    unmount();
+
+    // Reject after unmount - should not cause state updates
+    rejectPromise!(new Error('Network error'));
+
+    // Wait a tick to ensure promise is processed
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Error state should remain null (no update after unmount)
+    expect(result.current.error).toBeNull();
+    expect(result.current.loading).toBe(true);
+  });
 });

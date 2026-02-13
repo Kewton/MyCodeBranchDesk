@@ -31,6 +31,7 @@ export interface UpdateNotificationBannerProps {
  * - GitHub Releases link (target="_blank", rel="noopener noreferrer")
  * - Install-type-specific update command display
  * - Database preservation notice
+ * - Accessibility: role="status" for screen reader announcement (WCAG 4.1.3)
  */
 export function UpdateNotificationBanner({
   hasUpdate,
@@ -48,6 +49,8 @@ export function UpdateNotificationBanner({
   return (
     <div
       className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-2"
+      role="status"
+      aria-label={t('update.available')}
       data-testid="update-notification-banner"
     >
       <p className="text-sm font-medium text-blue-800 mb-1">

@@ -25,6 +25,9 @@ import type { UpdateCheckResult } from '@/lib/version-checker';
 // Types
 // =============================================================================
 
+/** Install type union used across the API response */
+type InstallType = 'global' | 'local' | 'unknown';
+
 /**
  * API Response type.
  * [SF-002] Explicit mapping from UpdateCheckResult with nullable fields.
@@ -38,9 +41,46 @@ export interface UpdateCheckResponse {
   releaseUrl: string | null;
   releaseName: string | null;
   publishedAt: string | null;
-  installType: 'global' | 'local' | 'unknown';
+  installType: InstallType;
   /** [SEC-SF-004] Fixed string "npm install -g commandmate@latest" only. Never include dynamic path info. */
   updateCommand: string | null;
+}
+
+// =============================================================================
+// Internal Helpers (DRY)
+// =============================================================================
+
+/**
+ * Detect install type with error handling.
+ * [CONS-001] Cross-layer call to CLI utility; errors fall back to 'unknown'.
+ *
+ * @returns Detected install type
+ */
+function detectInstallType(): InstallType {
+  try {
+    return isGlobalInstall() ? 'global' : 'local';
+  } catch {
+    return 'unknown';
+  }
+}
+
+/**
+ * [SEC-SF-003] OWASP A05:2021 - Security headers to prevent HTTP-level caching.
+ * Extracted as a constant to avoid duplication (DRY).
+ */
+const NO_CACHE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate',
+  'Pragma': 'no-cache',
+} as const;
+
+/**
+ * Build a NextResponse with the standard no-cache headers.
+ *
+ * @param data - Response payload
+ * @returns NextResponse with security headers
+ */
+function buildResponse(data: UpdateCheckResponse): NextResponse<UpdateCheckResponse> {
+  return NextResponse.json(data, { headers: NO_CACHE_HEADERS });
 }
 
 // =============================================================================
@@ -57,7 +97,7 @@ export interface UpdateCheckResponse {
  */
 function toUpdateCheckResponse(
   result: UpdateCheckResult | null,
-  installType: 'global' | 'local' | 'unknown'
+  installType: InstallType
 ): UpdateCheckResponse {
   if (!result) {
     return {
@@ -100,40 +140,11 @@ function toUpdateCheckResponse(
 export async function GET(): Promise<NextResponse<UpdateCheckResponse>> {
   try {
     const result = await checkForUpdate();
-
-    // Detect install type with error handling
-    let installType: 'global' | 'local' | 'unknown';
-    try {
-      installType = isGlobalInstall() ? 'global' : 'local';
-    } catch {
-      installType = 'unknown';
-    }
-
-    const responseData = toUpdateCheckResponse(result, installType);
-
-    // [SEC-SF-003] OWASP A05:2021 - Prevent HTTP-level caching
-    return NextResponse.json(responseData, {
-      headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate',
-        'Pragma': 'no-cache',
-      },
-    });
+    const installType = detectInstallType();
+    return buildResponse(toUpdateCheckResponse(result, installType));
   } catch {
     // Silent failure: return degraded response
-    let installType: 'global' | 'local' | 'unknown' = 'unknown';
-    try {
-      installType = isGlobalInstall() ? 'global' : 'local';
-    } catch {
-      // Keep unknown
-    }
-
-    const responseData = toUpdateCheckResponse(null, installType);
-
-    return NextResponse.json(responseData, {
-      headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate',
-        'Pragma': 'no-cache',
-      },
-    });
+    const installType = detectInstallType();
+    return buildResponse(toUpdateCheckResponse(null, installType));
   }
 }

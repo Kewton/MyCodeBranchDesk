@@ -492,5 +492,87 @@ describe('version-checker', () => {
       expect(mockFetch).not.toHaveBeenCalled();
       expect(result2).toBeNull();
     });
+
+    it('should clear expired rate limit and allow new fetch', async () => {
+      // Set rate limit to a timestamp in the past
+      const pastResetTimestamp = Math.floor((Date.now() - 1000) / 1000).toString();
+
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        headers: new Headers({
+          'X-RateLimit-Reset': pastResetTimestamp,
+        }),
+      }));
+
+      // First call triggers rate limit with past expiry
+      await checkForUpdate();
+
+      // Second call: rate limit should have expired, so fetch is called again
+      const mockResponse = {
+        tag_name: 'v0.3.0',
+        html_url: 'https://github.com/Kewton/CommandMate/releases/tag/v0.3.0',
+        name: 'v0.3.0',
+        published_at: '2026-02-10T00:00:00Z',
+      };
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(mockResponse),
+        headers: new Headers(),
+      });
+      vi.stubGlobal('fetch', mockFetch);
+
+      const result = await checkForUpdate();
+
+      // Fetch should have been called because rate limit expired
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(result).not.toBeNull();
+      expect(result!.hasUpdate).toBe(true);
+    });
+
+    it('should handle 403 without X-RateLimit-Reset header (fallback TTL)', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        headers: new Headers(), // No X-RateLimit-Reset header
+      }));
+
+      const result1 = await checkForUpdate();
+      expect(result1).toBeNull();
+
+      // Subsequent call should be rate-limited (fallback to CACHE_TTL_MS)
+      const mockFetch = vi.fn();
+      vi.stubGlobal('fetch', mockFetch);
+
+      const result2 = await checkForUpdate();
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(result2).toBeNull();
+    });
+
+    it('should handle fetch timeout (AbortSignal.timeout)', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(
+        new DOMException('The operation was aborted', 'AbortError')
+      ));
+
+      const result = await checkForUpdate();
+
+      // Should silently fail and return null (no cached result)
+      expect(result).toBeNull();
+    });
+
+    it('should handle JSON parse error gracefully', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.reject(new SyntaxError('Unexpected token')),
+        headers: new Headers(),
+      }));
+
+      const result = await checkForUpdate();
+
+      // Should silently fail and return null
+      expect(result).toBeNull();
+    });
   });
 });

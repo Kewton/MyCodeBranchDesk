@@ -99,4 +99,46 @@ describe('UpdateNotificationBanner', () => {
     // Should not find the version line since latestVersion is null
     expect(screen.queryByText(/worktree\.update\.latestVersion/)).toBeNull();
   });
+
+  // =========================================================================
+  // Accessibility tests (WCAG 4.1.3)
+  // =========================================================================
+  describe('accessibility', () => {
+    it('should have role="status" for screen reader announcement', () => {
+      render(<UpdateNotificationBanner {...defaultProps} />);
+
+      const banner = screen.getByTestId('update-notification-banner');
+      expect(banner.getAttribute('role')).toBe('status');
+    });
+
+    it('should have aria-label for screen readers', () => {
+      render(<UpdateNotificationBanner {...defaultProps} />);
+
+      const banner = screen.getByTestId('update-notification-banner');
+      expect(banner.getAttribute('aria-label')).toBeDefined();
+      expect(banner.getAttribute('aria-label')).not.toBe('');
+    });
+
+    it('should have aria-hidden on decorative arrow icon', () => {
+      render(<UpdateNotificationBanner {...defaultProps} />);
+
+      const arrow = screen.getByText('\u2192');
+      expect(arrow.getAttribute('aria-hidden')).toBe('true');
+    });
+  });
+
+  // =========================================================================
+  // Edge case: unknown install type
+  // =========================================================================
+  it('should not display update command for unknown install type', () => {
+    render(
+      <UpdateNotificationBanner
+        {...defaultProps}
+        installType="unknown"
+        updateCommand={null}
+      />
+    );
+
+    expect(screen.queryByText('npm install -g commandmate@latest')).toBeNull();
+  });
 });
