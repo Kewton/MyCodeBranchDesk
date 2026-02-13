@@ -90,6 +90,17 @@ const ACTIVE_POLLING_INTERVAL_MS = 2000;
 /** Polling interval when terminal is idle (ms) */
 const IDLE_POLLING_INTERVAL_MS = 5000;
 
+/**
+ * Throttle interval for visibilitychange recovery (ms).
+ * Prevents excessive API calls when the page rapidly transitions between
+ * visible and hidden states.
+ * Same value as IDLE_POLLING_INTERVAL_MS but semantically independent:
+ * - IDLE_POLLING_INTERVAL_MS: steady-state polling frequency
+ * - RECOVERY_THROTTLE_MS: visibilitychange burst prevention threshold
+ * (Issue #246, SF-001)
+ */
+const RECOVERY_THROTTLE_MS = 5000;
+
 /** Default worktree name when not loaded */
 const DEFAULT_WORKTREE_NAME = 'Unknown';
 
@@ -1442,6 +1453,41 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
   }, [fetchWorktree, fetchMessages, fetchCurrentOutput]);
 
   // ========================================================================
+  // Visibility Change Recovery (Issue #246)
+  // ========================================================================
+
+  /**
+   * Timestamp of the last visibilitychange recovery to prevent rapid re-fetches.
+   * Used as a throttle guard: if less than RECOVERY_THROTTLE_MS has elapsed
+   * since the last recovery, the handler skips execution.
+   */
+  const lastRecoveryTimestampRef = useRef<number>(0);
+
+  /**
+   * Handle page visibility change for background recovery.
+   * When the page becomes visible again (e.g., smartphone foreground restoration),
+   * calls handleRetry() to reset errors and re-fetch data.
+   *
+   * Design notes (Issue #246):
+   * - handleRetry() calls setLoading(true) which triggers useEffect cleanup
+   *   for the polling interval (clearInterval), then setLoading(false) causes
+   *   a new setInterval to be created. This is intentional (IA-001).
+   * - handleRetry() is called directly to follow DRY principle (MF-001).
+   */
+  const handleVisibilityChange = useCallback(() => {
+    if (document.visibilityState !== 'visible') return;
+
+    const now = Date.now();
+    if (now - lastRecoveryTimestampRef.current < RECOVERY_THROTTLE_MS) {
+      return;
+    }
+    lastRecoveryTimestampRef.current = now;
+
+    // Call handleRetry() directly (DRY principle, MF-001)
+    handleRetry();
+  }, [handleRetry]);
+
+  // ========================================================================
   // Effects
   // ========================================================================
 
@@ -1474,6 +1520,19 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
       isMounted = false;
     };
   }, [fetchWorktree, fetchMessages, fetchCurrentOutput]);
+
+  /**
+   * Register visibilitychange event listener for background recovery (Issue #246).
+   * When the page becomes visible, triggers handleRetry() to re-fetch all data.
+   * This handles the case where the browser suspended network requests while
+   * the page was in the background (common on mobile browsers).
+   */
+  useEffect(() => {
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [handleVisibilityChange]);
 
   /** Poll for current output and worktree status at adaptive intervals */
   useEffect(() => {

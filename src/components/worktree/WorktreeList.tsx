@@ -129,6 +129,32 @@ export function WorktreeList({ initialWorktrees = [] }: WorktreeListProps) {
   }, [fetchWorktrees]);
 
   /**
+   * Visibility change recovery (Issue #246).
+   * When the page becomes visible after being in the background,
+   * immediately fetch fresh worktree data for data freshness.
+   *
+   * Unlike WorktreeDetailRefactored.tsx, this does not need:
+   * - Error reset: error state does not stop polling (setInterval has no error guard) (IC-004)
+   * - Timestamp throttle: fetchWorktrees(true) is a lightweight GET request (IC-005)
+   * - Loading indicator: uses silent mode for seamless UX
+   *
+   * WebSocket reconnection may also trigger fetchWorktrees via broadcast,
+   * but this is safe due to GET idempotency (IA-002).
+   */
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchWorktrees(true); // Silent update
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [fetchWorktrees]);
+
+  /**
    * Filter and sort worktrees
    */
   const filteredAndSortedWorktrees = useMemo(() => {
