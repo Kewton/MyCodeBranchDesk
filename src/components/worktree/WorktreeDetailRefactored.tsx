@@ -1455,7 +1455,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
   }, [fetchWorktree, fetchMessages, fetchCurrentOutput]);
 
   // ========================================================================
-  // Visibility Change Recovery (Issue #246)
+  // Visibility Change Recovery (Issue #246, Issue #266)
   // ========================================================================
 
   /**
@@ -1468,30 +1468,25 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
   /**
    * Handle page visibility change for background recovery.
    * When the page becomes visible again (e.g., smartphone foreground restoration),
-   * calls handleRetry() to reset errors and re-fetch data.
+   * performs data re-fetch to synchronize stale state.
    *
-   * Design rationale (Issue #246):
+   * Design rationale (Issue #246, Issue #266):
    *
-   * [MF-001] DRY: handleRetry() is called directly rather than re-implementing
-   *   the same error-reset + data-fetch flow. This ensures any future changes
-   *   to the retry logic automatically apply to visibility recovery.
+   * [SF-001] SRP: handleVisibilityChange is responsible for "background recovery
+   *   data sync" only. Full recovery (handleRetry) is a separate concern.
    *
-   * [IA-001] Side-effect: handleRetry() calls setLoading(true), which causes
-   *   the polling useEffect (line ~1538) to run its cleanup (clearInterval).
-   *   When handleRetry() finishes and calls setLoading(false), the polling
-   *   useEffect re-runs and creates a new setInterval. This means there is
-   *   a brief gap where no polling occurs (up to IDLE_POLLING_INTERVAL_MS).
-   *   This is acceptable because visibilitychange itself fetches fresh data.
+   * [SF-002] KISS: Simple error guard - error state uses handleRetry (full recovery),
+   *   normal state uses lightweight recovery (no loading state change).
    *
    * [IA-002] Overlap: When the page becomes visible, up to 3 data-fetch
    *   sources may fire concurrently:
-   *   1. This visibilitychange handler (handleRetry)
+   *   1. This visibilitychange handler (lightweight recovery)
    *   2. The setInterval polling timer (if it fires during the same tick)
    *   3. WebSocket reconnection triggering a broadcast-based fetch
    *   All fetches are idempotent GET requests, so concurrent execution is
    *   safe -- it may cause redundant network calls but no data corruption.
    */
-  const handleVisibilityChange = useCallback(() => {
+  const handleVisibilityChange = useCallback(async () => {
     if (document.visibilityState !== 'visible') return;
 
     const now = Date.now();
@@ -1500,9 +1495,49 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
     }
     lastRecoveryTimestampRef.current = now;
 
-    // [MF-001] Call handleRetry() directly (DRY principle)
-    handleRetry();
-  }, [handleRetry]);
+    // [SF-001] Error state requires full recovery (handleRetry) to reset
+    // loading state and rebuild the UI from ErrorDisplay back to normal.
+    if (error) {
+      handleRetry();
+      return;
+    }
+
+    // [SF-002] Normal state uses lightweight recovery (loading state unchanged).
+    // This preserves the component tree, preventing MessageInput/PromptPanel
+    // content from being cleared by unmount/remount caused by setLoading(true/false).
+    //
+    // [SF-DRY-001] Note: These fetch calls duplicate the data retrieval done by
+    // handleRetry(). handleRetry uses setLoading(true/false) for full recovery,
+    // while this path intentionally omits loading state changes for lightweight
+    // recovery. When adding/changing fetch functions, update handleRetry() as well.
+    //
+    // [SF-CONS-001] handleRetry uses a sequential pattern (fetchWorktree first,
+    // then conditionally fetchMessages/fetchCurrentOutput). Lightweight recovery
+    // uses Promise.all for parallel execution because: failure is silently ignored
+    // (next polling cycle recovers), all requests are idempotent GETs (no data
+    // corruption risk), and parallel execution improves response time.
+    try {
+      await Promise.all([
+        fetchWorktree(),
+        fetchMessages(),
+        fetchCurrentOutput(),
+      ]);
+    } finally {
+      // [SF-IMP-001] fetchWorktree() internally catches errors and calls
+      // setError(message) without rethrowing. This means Promise.all resolves
+      // successfully even when fetchWorktree fails, but error state has already
+      // been set internally. Call setError(null) unconditionally to counter any
+      // internal setError() calls and maintain the component tree.
+      // On success, this is a no-op (error is already null).
+      // On failure, this prevents ErrorDisplay from replacing the normal UI,
+      // allowing the next polling cycle to recover naturally.
+      setError(null);
+    }
+    // [SF-IMP-002] Note: error in the dependency array causes useCallback to
+    // regenerate when error state changes, triggering useEffect listener
+    // re-registration (removeEventListener/addEventListener). Performance impact
+    // is negligible as these are synchronous lightweight operations.
+  }, [error, handleRetry, fetchWorktree, fetchMessages, fetchCurrentOutput]);
 
   // ========================================================================
   // Effects
@@ -1539,15 +1574,15 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
   }, [fetchWorktree, fetchMessages, fetchCurrentOutput]);
 
   /**
-   * Register visibilitychange event listener for background recovery (Issue #246).
-   * When the page becomes visible, triggers handleRetry() to re-fetch all data.
+   * Register visibilitychange event listener for background recovery (Issue #246, #266).
+   * When the page becomes visible, performs lightweight recovery (normal state)
+   * or full recovery via handleRetry() (error state) to re-fetch all data.
    * This handles the case where the browser suspended network requests while
    * the page was in the background (common on mobile browsers).
    *
    * Unlike WorktreeList.tsx (SF-003), this component needs:
-   * - Error state reset (via handleRetry's setError(null))
-   * - Throttle guard (RECOVERY_THROTTLE_MS) because handleRetry triggers
-   *   a loading indicator and setInterval re-creation (IA-001)
+   * - Error state branching: full recovery (handleRetry) vs lightweight recovery
+   * - Throttle guard (RECOVERY_THROTTLE_MS) to prevent rapid re-fetches
    */
   useEffect(() => {
     document.addEventListener('visibilitychange', handleVisibilityChange);
