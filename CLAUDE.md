@@ -157,13 +157,16 @@ tests/
 | `src/lib/db-repository.ts` | リポジトリDB操作関数群（Issue #190: 除外・復活・パス正規化・バリデーション関数追加、Issue #202: registerAndFilterRepositories統合関数追加） |
 | `src/types/sidebar.ts` | サイドバーステータス判定 |
 | `src/types/clone.ts` | クローン関連型定義（CloneJob, CloneError等） |
-| `src/lib/file-operations.ts` | ファイル操作（読取/更新/作成/削除/リネーム） |
+| `src/lib/file-operations.ts` | ファイル操作（読取/更新/作成/削除/リネーム/移動）、Issue #162: moveFileOrDirectory()追加、5層セキュリティ（SEC-005〜009: 保護ディレクトリ/シンボリック/自己移動/最終パス/TOCTOU検証）、validateFileOperation()共通検証、mapFsError()エラーマッピング |
+| `src/lib/date-utils.ts` | 相対時刻フォーマット（Issue #162: formatRelativeTime()、date-fnsベース、ロケール対応、無効日付ガード） |
+| `src/lib/file-tree.ts` | ディレクトリツリー構造生成（Issue #162: readDirectory()でbirthtime取得、TreeItem.birthtimeフィールド対応） |
 | `src/lib/git-utils.ts` | Git情報取得（getGitStatus関数、execFile使用、1秒タイムアウト） |
 | `src/lib/utils.ts` | 汎用ユーティリティ関数（debounce、truncateString、escapeHtml等） |
 | `src/config/editable-extensions.ts` | 編集可能ファイル拡張子設定 |
 | `src/config/file-operations.ts` | 再帰削除の安全設定 |
 | `src/types/markdown-editor.ts` | マークダウンエディタ関連型定義 |
 | `src/hooks/useContextMenu.ts` | コンテキストメニュー状態管理フック（MouseEvent/TouchEvent対応） |
+| `src/hooks/useFileOperations.ts` | ファイル操作フック（Issue #162: move操作の状態管理、MoveTarget型、UIロジック分離） |
 | `src/hooks/useLongPress.ts` | タッチ長押し検出フック（Issue #123、500ms閾値、10px移動キャンセル） |
 | `src/hooks/useFullscreen.ts` | Fullscreen API ラッパー（CSSフォールバック対応） |
 | `src/hooks/useLocalStorageState.ts` | localStorage永続化フック（バリデーション対応） |
@@ -175,6 +178,11 @@ tests/
 | `src/lib/file-search.ts` | ファイル内容検索ロジック（EXCLUDED_PATTERNSフィルタ、AbortControllerタイムアウト） |
 | `src/components/worktree/SearchBar.tsx` | 検索UIコンポーネント（検索入力、モード切替、ローディング表示） |
 | `src/hooks/useFileSearch.ts` | 検索状態管理フック（debounce処理、API呼び出し、結果管理） |
+| `src/components/worktree/MoveDialog.tsx` | ファイル移動先選択ダイアログ（Issue #162: ディレクトリツリーブラウザ、ルート選択、ネスト対応、updateTreeNode/findNodeByPath抽出） |
+| `src/components/worktree/ContextMenu.tsx` | ファイル/ディレクトリコンテキストメニュー（Issue #162: 「移動」メニュー項目追加、FolderInputアイコン、onMoveコールバック） |
+| `src/components/worktree/FileViewer.tsx` | ファイルビューア（Issue #162: コピーボタン追加、Copy/Checkアイコン切替、useMemo最適化、画像ファイル非表示） |
+| `src/components/worktree/FileTreeView.tsx` | ファイルツリー表示（Issue #162: birthtime表示、formatRelativeTime()ロケール対応、sm:inline条件表示） |
+| `src/components/worktree/WorktreeDetailRefactored.tsx` | Worktree詳細画面（Issue #162: handleMoveハンドラー追加、MoveDialog統合、useFileOperations呼び出し） |
 | `src/components/worktree/ImageViewer.tsx` | 画像表示コンポーネント |
 | `src/components/worktree/MermaidDiagram.tsx` | mermaidダイアグラム描画コンポーネント |
 | `src/components/worktree/MermaidCodeBlock.tsx` | mermaidコードブロックラッパー |

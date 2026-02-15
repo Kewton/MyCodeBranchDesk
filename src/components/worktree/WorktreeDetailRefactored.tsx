@@ -57,6 +57,8 @@ import type { CLIToolType } from '@/lib/cli-tools/types';
 import { deriveCliStatus } from '@/types/sidebar';
 import type { AutoYesDuration } from '@/config/auto-yes-config';
 import { useTranslations } from 'next-intl';
+import { useFileOperations } from '@/hooks/useFileOperations';
+import { MoveDialog } from '@/components/worktree/MoveDialog';
 
 // ============================================================================
 // Types
@@ -786,6 +788,8 @@ interface MobileContentProps {
   onRename: (path: string) => void;
   onDelete: (path: string) => void;
   onUpload: (targetDir: string) => void;
+  /** [Issue #162] Move callback */
+  onMove?: (path: string, type: 'file' | 'directory') => void;
   refreshTrigger: number;
   /** [Issue #21] File search hook return object */
   fileSearch: UseFileSearchReturn;
@@ -813,6 +817,7 @@ const MobileContent = memo(function MobileContent({
   onRename,
   onDelete,
   onUpload,
+  onMove,
   refreshTrigger,
   fileSearch,
   showToast,
@@ -863,6 +868,7 @@ const MobileContent = memo(function MobileContent({
               onRename={onRename}
               onDelete={onDelete}
               onUpload={onUpload}
+              onMove={onMove}
               refreshTrigger={refreshTrigger}
               searchQuery={fileSearch.query}
               searchMode={fileSearch.mode}
@@ -1339,6 +1345,20 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
   // Toast state for upload notifications
   const { toasts, showToast, removeToast } = useToast();
 
+  // [Issue #162] File operations hook (move dialog state management)
+  const {
+    moveTarget,
+    isMoveDialogOpen,
+    handleMove,
+    handleMoveConfirm,
+    handleMoveCancel,
+  } = useFileOperations(
+    worktreeId,
+    () => setFileTreeRefresh(prev => prev + 1),
+    (msg) => showToast(msg, 'success'),
+    (msg) => showToast(msg, 'error')
+  );
+
   // Hidden file input ref for upload
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadTargetPathRef = useRef<string>('');
@@ -1738,6 +1758,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
                             onRename={handleRename}
                             onDelete={handleDelete}
                             onUpload={handleUpload}
+                            onMove={handleMove}
                             refreshTrigger={fileTreeRefresh}
                             searchQuery={fileSearch.query}
                             searchMode={fileSearch.mode}
@@ -1875,6 +1896,17 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
               </div>
             </div>
           </Modal>
+          {/* [Issue #162] Move Dialog */}
+          {moveTarget && (
+            <MoveDialog
+              isOpen={isMoveDialogOpen}
+              onClose={handleMoveCancel}
+              onConfirm={handleMoveConfirm}
+              worktreeId={worktreeId}
+              sourcePath={moveTarget.path}
+              sourceType={moveTarget.type}
+            />
+          )}
           {/* Toast notifications */}
           <ToastContainer toasts={toasts} onClose={removeToast} />
         </div>
@@ -1986,6 +2018,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
             onRename={handleRename}
             onDelete={handleDelete}
             onUpload={handleUpload}
+            onMove={handleMove}
             refreshTrigger={fileTreeRefresh}
             fileSearch={fileSearch}
             showToast={showToast}
@@ -2089,6 +2122,17 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
             </div>
           </div>
         </Modal>
+        {/* [Issue #162] Move Dialog (Mobile) */}
+        {moveTarget && (
+          <MoveDialog
+            isOpen={isMoveDialogOpen}
+            onClose={handleMoveCancel}
+            onConfirm={handleMoveConfirm}
+            worktreeId={worktreeId}
+            sourcePath={moveTarget.path}
+            sourceType={moveTarget.type}
+          />
+        )}
         {/* Toast notifications (Mobile) */}
         <ToastContainer toasts={toasts} onClose={removeToast} />
       </div>

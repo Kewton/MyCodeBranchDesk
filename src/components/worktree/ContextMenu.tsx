@@ -16,7 +16,7 @@
 'use client';
 
 import React, { memo, useCallback, useEffect, useRef } from 'react';
-import { FilePlus, FolderPlus, Pencil, Trash2, Upload } from 'lucide-react';
+import { FilePlus, FolderPlus, Pencil, Trash2, Upload, FolderInput } from 'lucide-react';
 
 /**
  * Props for ContextMenu component
@@ -43,6 +43,8 @@ export interface ContextMenuProps {
   onDelete?: (path: string) => void;
   /** Upload file callback [CONS-004] */
   onUpload?: (targetPath: string) => void;
+  /** Move file/directory callback [Issue #162] */
+  onMove?: (path: string, type: 'file' | 'directory') => void;
 }
 
 /**
@@ -87,6 +89,7 @@ export const ContextMenu = memo(function ContextMenu({
   onRename,
   onDelete,
   onUpload,
+  onMove,
 }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -134,7 +137,18 @@ export const ContextMenu = memo(function ContextMenu({
       label: 'Rename',
       icon: <Pencil className="w-4 h-4" aria-hidden="true" role="img" />,
       onClick: () => handleItemClick(onRename),
-      showDividerAfter: targetType === 'file',
+    },
+    {
+      id: 'move',
+      label: 'Move',
+      icon: <FolderInput className="w-4 h-4" aria-hidden="true" role="img" />,
+      onClick: () => {
+        if (onMove && targetPath && targetType) {
+          onMove(targetPath, targetType);
+        }
+        onClose();
+      },
+      showDividerAfter: true,
     },
     {
       id: 'delete',
