@@ -26,6 +26,7 @@ import {
   createFileOrDirectory,
   deleteFileOrDirectory,
   renameFileOrDirectory,
+  moveFileOrDirectory,
   isEditableFile,
 } from '@/lib/file-operations';
 import { validateContent, isEditableExtension } from '@/config/editable-extensions';
@@ -64,6 +65,9 @@ const ERROR_CODE_TO_HTTP_STATUS: Record<string, number> = {
   FILE_TOO_LARGE: 413,
   INVALID_FILENAME: 400,
   INVALID_FILE_CONTENT: 400,
+  // Move-specific error codes
+  MOVE_SAME_PATH: 400,
+  MOVE_INTO_SELF: 400,
 };
 
 /**
@@ -369,29 +373,54 @@ export async function PATCH(
     const { worktree, relativePath } = result;
 
     const body = await request.json();
-    const { action, newName } = body;
+    const { action, newName, destination } = body;
 
-    if (action !== 'rename') {
-      return createErrorResponse('INVALID_REQUEST', 'Unknown action. Supported: "rename"');
+    switch (action) {
+      case 'rename': {
+        if (!newName || typeof newName !== 'string') {
+          return createErrorResponse('INVALID_REQUEST', 'newName is required');
+        }
+
+        const renameResult = await renameFileOrDirectory(worktree.path, relativePath, newName);
+
+        if (!renameResult.success) {
+          return createErrorResponse(
+            renameResult.error?.code || 'INTERNAL_ERROR',
+            renameResult.error?.message || 'Failed to rename file/directory'
+          );
+        }
+
+        return NextResponse.json({
+          success: true,
+          path: renameResult.path,
+        });
+      }
+
+      case 'move': {
+        // [MF-S3-002] Validate destination parameter
+        if (!destination || typeof destination !== 'string') {
+          return createErrorResponse('INVALID_REQUEST', 'destination is required and must be a string');
+        }
+
+        const moveResult = await moveFileOrDirectory(worktree.path, relativePath, destination);
+
+        if (!moveResult.success) {
+          return createErrorResponse(
+            moveResult.error?.code || 'INTERNAL_ERROR',
+            moveResult.error?.message || 'Failed to move file/directory'
+          );
+        }
+
+        return NextResponse.json({
+          success: true,
+          path: moveResult.path,
+        });
+      }
+
+      default:
+        // [SF-S2-002] Updated error message with supported actions
+        return createErrorResponse('INVALID_REQUEST', 'Unknown action. Supported: "rename", "move"');
     }
-
-    if (!newName || typeof newName !== 'string') {
-      return createErrorResponse('INVALID_REQUEST', 'newName is required');
-    }
-
-    const renameResult = await renameFileOrDirectory(worktree.path, relativePath, newName);
-
-    if (!renameResult.success) {
-      return createErrorResponse(
-        renameResult.error?.code || 'INTERNAL_ERROR',
-        renameResult.error?.message || 'Failed to rename file/directory'
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      path: renameResult.path,
-    });
   } catch (error: unknown) {
     console.error('Error renaming file/directory:', error);
     return createErrorResponse('INTERNAL_ERROR', 'Failed to rename file/directory');

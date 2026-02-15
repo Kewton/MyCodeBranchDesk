@@ -196,6 +196,7 @@ export async function readDirectory(
           name,
           type: 'file',
           size: entryStat.size,
+          birthtime: entryStat.birthtime.toISOString(),
         };
         if (ext && ext.length > 1) {
           item.extension = ext.slice(1); // Remove the leading dot

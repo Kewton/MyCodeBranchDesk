@@ -30,6 +30,14 @@
     "question": "Ask a question",
     "viewIssues": "View all issues"
   },
+  "fileTree": {
+    "moveTo": "Move to...",
+    "moveDialogTitle": "Select destination",
+    "moveConfirm": "Move here",
+    "moveSuccess": "Moved successfully",
+    "timeAgo": "{time} ago",
+    "rootDirectory": "Root"
+  },
   "update": {
     "available": "A new version is available",
     "latestVersion": "Latest: v{version}",

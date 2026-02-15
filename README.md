@@ -28,7 +28,8 @@ Developers with Claude Code experience who want to continue personal projects al
 - **Send instructions from browser** — Operate via message UI from both mobile and desktop
 - **Execution history & notes** — Retains conversation history per branch with note-taking support
 - **Markdown log viewer** — View Claude's detailed output in Markdown format
-- **File viewer** — Browse worktree files from the browser
+- **File viewer** — Browse worktree files from the browser with file operations (move, copy, delete)
+- **File timestamps** — Display file creation time in the file tree
 - **Auto Yes mode** — Control automatic approval with a confirmation dialog
 - **Repository removal** — Remove repositories from app management (actual files are not deleted)
 - **Clone URL registration** — Clone and register repositories by specifying HTTPS/SSH URLs
