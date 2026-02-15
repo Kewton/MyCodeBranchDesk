@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.9] - 2026-02-15
+
+### Added
+- File move/rename feature with `MoveDialog` component (Issue #162)
+  - Context menu "Move/Rename" option for files and directories
+  - Path validation and overwrite prevention
+- File creation date (birthtime) display in `FileViewer` header and mobile view (Issue #162)
+  - `date-utils.ts` with locale-aware formatting
+- Content copy button in `MarkdownEditor` toolbar (Issue #162)
+  - `useFileOperations` hook for file operation logic extraction
+
 ## [0.2.8] - 2026-02-14
 
 ### Fixed
@@ -432,7 +443,8 @@ _No changes recorded._
   - `MCBD_DB_PATH` -> `CM_DB_PATH`
 - `NEXT_PUBLIC_MCBD_AUTH_TOKEN` -> `NEXT_PUBLIC_CM_AUTH_TOKEN`
 
-[unreleased]: https://github.com/Kewton/CommandMate/compare/v0.2.8...HEAD
+[unreleased]: https://github.com/Kewton/CommandMate/compare/v0.2.9...HEAD
+[0.2.9]: https://github.com/Kewton/CommandMate/compare/v0.2.8...v0.2.9
 [0.2.8]: https://github.com/Kewton/CommandMate/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/Kewton/CommandMate/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/Kewton/CommandMate/compare/v0.2.5...v0.2.6
