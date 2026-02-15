@@ -254,6 +254,8 @@ export interface TreeItem {
   extension?: string;
   /** Number of items in directory (directories only) */
   itemCount?: number;
+  /** File creation time (ISO 8601 string) - files only [CO-001] */
+  birthtime?: string;
 }
 
 /**
