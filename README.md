@@ -223,14 +223,54 @@ See the [Security Guide](./docs/security-guide.md) and [Trust & Safety](./docs/e
 
 ## CLI Commands
 
+### Basic
+
 | Command | Description |
 |---------|-------------|
 | `commandmate init` | Initial setup (interactive) |
 | `commandmate init --defaults` | Initial setup (default values) |
+| `commandmate init --force` | Overwrite existing configuration |
+| `commandmate start` | Start the server (foreground) |
 | `commandmate start --daemon` | Start in background |
+| `commandmate start --dev` | Start in development mode |
 | `commandmate start -p 3001` | Start on a specific port |
 | `commandmate stop` | Stop the server |
+| `commandmate stop --force` | Force stop (SIGKILL) |
 | `commandmate status` | Check status |
+
+### Worktree Parallel Development
+
+Run separate servers per Issue/worktree with automatic port allocation.
+
+| Command | Description |
+|---------|-------------|
+| `commandmate start --issue 123` | Start server for Issue #123 worktree |
+| `commandmate start --issue 123 --auto-port` | Start with automatic port allocation |
+| `commandmate start --issue 123 -p 3123` | Start on a specific port |
+| `commandmate stop --issue 123` | Stop server for Issue #123 |
+| `commandmate status --issue 123` | Check status for Issue #123 |
+| `commandmate status --all` | Check status for all servers |
+
+### GitHub Issue Management
+
+Requires [gh CLI](https://cli.github.com/) to be installed.
+
+| Command | Description |
+|---------|-------------|
+| `commandmate issue create` | Create a new issue |
+| `commandmate issue create --bug` | Create with bug report template |
+| `commandmate issue create --feature` | Create with feature request template |
+| `commandmate issue search <query>` | Search issues |
+| `commandmate issue list` | List issues |
+
+### Documentation
+
+| Command | Description |
+|---------|-------------|
+| `commandmate docs` | Show documentation |
+| `commandmate docs -s <section>` | Show a specific section |
+| `commandmate docs -q <query>` | Search documentation |
+| `commandmate docs --all` | List all available sections |
 
 See `commandmate --help` for all options.
 

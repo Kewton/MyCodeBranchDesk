@@ -223,14 +223,54 @@ CommandMate は**完全にローカルで動作**します。アプリ本体・�
 
 ## CLI コマンド
 
+### 基本
+
 | コマンド | 説明 |
 |---------|------|
 | `commandmate init` | 初期設定（対話形式） |
 | `commandmate init --defaults` | 初期設定（デフォルト値） |
+| `commandmate init --force` | 既存設定を上書き |
+| `commandmate start` | サーバー起動（フォアグラウンド） |
 | `commandmate start --daemon` | バックグラウンド起動 |
+| `commandmate start --dev` | 開発モードで起動 |
 | `commandmate start -p 3001` | ポート指定で起動 |
 | `commandmate stop` | サーバー停止 |
+| `commandmate stop --force` | 強制停止（SIGKILL） |
 | `commandmate status` | 状態確認 |
+
+### Worktree 並列開発
+
+Issue/worktree ごとにサーバーを分離起動し、自動ポート割当で並列開発が可能です。
+
+| コマンド | 説明 |
+|---------|------|
+| `commandmate start --issue 123` | Issue #123 用サーバー起動 |
+| `commandmate start --issue 123 --auto-port` | 自動ポート割当で起動 |
+| `commandmate start --issue 123 -p 3123` | 特定ポートで起動 |
+| `commandmate stop --issue 123` | Issue #123 用サーバー停止 |
+| `commandmate status --issue 123` | Issue #123 用サーバー状態確認 |
+| `commandmate status --all` | 全サーバー状態確認 |
+
+### GitHub Issue 管理
+
+[gh CLI](https://cli.github.com/) のインストールが必要です。
+
+| コマンド | 説明 |
+|---------|------|
+| `commandmate issue create` | Issue を作成 |
+| `commandmate issue create --bug` | バグ報告テンプレートで作成 |
+| `commandmate issue create --feature` | 機能リクエストテンプレートで作成 |
+| `commandmate issue search <query>` | Issue を検索 |
+| `commandmate issue list` | Issue 一覧 |
+
+### ドキュメント参照
+
+| コマンド | 説明 |
+|---------|------|
+| `commandmate docs` | ドキュメント表示 |
+| `commandmate docs -s <section>` | 特定セクションを表示 |
+| `commandmate docs -q <query>` | ドキュメント検索 |
+| `commandmate docs --all` | 全セクション一覧 |
 
 全オプションは `commandmate --help` で確認できます。
 
