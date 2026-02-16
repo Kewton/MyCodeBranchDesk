@@ -260,6 +260,10 @@ Requires [gh CLI](https://cli.github.com/) to be installed.
 | `commandmate issue create` | Create a new issue |
 | `commandmate issue create --bug` | Create with bug report template |
 | `commandmate issue create --feature` | Create with feature request template |
+| `commandmate issue create --question` | Create with question template |
+| `commandmate issue create --title <title>` | Specify issue title |
+| `commandmate issue create --body <body>` | Specify issue body |
+| `commandmate issue create --labels <labels>` | Add labels (comma-separated) |
 | `commandmate issue search <query>` | Search issues |
 | `commandmate issue list` | List issues |
 

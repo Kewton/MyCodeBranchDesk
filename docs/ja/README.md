@@ -260,6 +260,10 @@ Issue/worktree ごとにサーバーを分離起動し、自動ポート割当�
 | `commandmate issue create` | Issue を作成 |
 | `commandmate issue create --bug` | バグ報告テンプレートで作成 |
 | `commandmate issue create --feature` | 機能リクエストテンプレートで作成 |
+| `commandmate issue create --question` | 質問テンプレートで作成 |
+| `commandmate issue create --title <title>` | タイトルを指定 |
+| `commandmate issue create --body <body>` | 本文を指定 |
+| `commandmate issue create --labels <labels>` | ラベルを追加（カンマ区切り） |
 | `commandmate issue search <query>` | Issue を検索 |
 | `commandmate issue list` | Issue 一覧 |
 
