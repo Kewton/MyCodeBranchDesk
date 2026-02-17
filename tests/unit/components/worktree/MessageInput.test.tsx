@@ -406,6 +406,44 @@ describe('MessageInput', () => {
 
         expect(queryDesktopSelector()).toBeInTheDocument();
       });
+
+      it('TC-8: should submit slash command without space via Enter in free input mode (Issue #288)', async () => {
+        const { worktreeApi } = await import('@/lib/api-client');
+
+        render(<MessageInput {...defaultProps} />);
+
+        enterFreeInputMode();
+
+        // Type a command without space (e.g., /compact)
+        typeMessage('/compact');
+
+        pressEnter();
+
+        await waitFor(() => {
+          expect(worktreeApi.sendMessage).toHaveBeenCalledWith(
+            'test-worktree',
+            '/compact',
+            'claude'
+          );
+        });
+      });
+
+      it('TC-9: should not submit when selector is open in normal mode (not free input)', async () => {
+        const { worktreeApi } = await import('@/lib/api-client');
+
+        render(<MessageInput {...defaultProps} />);
+
+        // Type '/' to open selector (normal mode, not free input)
+        openSelector();
+        expect(queryDesktopSelector()).toBeInTheDocument();
+
+        // Press Enter - should select command, not submit
+        pressEnter();
+
+        await delay();
+
+        expect(worktreeApi.sendMessage).not.toHaveBeenCalled();
+      });
     });
 
     describe('Mobile', () => {
