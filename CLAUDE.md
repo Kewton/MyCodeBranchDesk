@@ -148,7 +148,8 @@ tests/
 | `src/components/worktree/UpdateNotificationBanner.tsx` | アップデート通知バナーUI（Issue #257: MF-001 SRP準拠、i18n対応、GitHub Releasesリンク） |
 | `src/lib/auto-yes-manager.ts` | Auto-Yes状態管理とサーバー側ポーリング（Issue #138）、thinking状態のprompt検出スキップ（Issue #161） |
 | `src/lib/auto-yes-resolver.ts` | Auto-Yes自動応答判定ロジック |
-| `src/hooks/useAutoYes.ts` | Auto-Yesクライアント側フック（重複応答防止対応） |
+| `src/hooks/useAutoYes.ts` | Auto-Yesクライアント側フック（重複応答防止対応。**Issue #287: promptType/defaultOptionNumber送信** - prompt-response APIリクエストにpromptType/defaultOptionNumberを含め、promptCheck再検証失敗時のフォールバック対応） |
+| `src/lib/prompt-response-body-builder.ts` | プロンプト応答リクエストボディ構築ユーティリティ（Issue #287: buildPromptResponseBody()関数でpromptType/defaultOptionNumberを含むリクエストボディを生成、DRY原則対応、useAutoYes/WorktreeDetailRefactoredから共通化） |
 | `src/lib/cli-tools/` | CLIツール抽象化（Strategy パターン） |
 | `src/lib/cli-tools/codex.ts` | Codex CLI tmuxセッション管理（Issue #212: 複数行メッセージのPasted text検知+Enter再送、getErrorMessage()ヘルパー抽出） |
 | `src/lib/session-cleanup.ts` | セッション/ポーラー停止の一元管理（Facade パターン） |
@@ -198,6 +199,8 @@ tests/
 | `src/lib/date-locale.ts` | date-fnsロケールマッピング（getDateFnsLocale()、enUS/jaサポート） |
 | `src/config/github-links.ts` | GitHub URL定数の一元管理（Issue #264: GITHUB_REPO_BASE_URL派生、DRY原則対応、SSRF防止のためGITHUB_API_URLは除外） |
 | `src/components/worktree/FeedbackSection.tsx` | フィードバックリンクセクション（Issue #264: Bug Report/Feature Request/Question/View Issues、noopener noreferrer、i18n対応） |
+| `src/components/worktree/MessageInput.tsx` | メッセージ入力コンポーネント（Issue #288: isFreeInputModeフラグ追加、フリー入力モード中のセレクター再表示防止、モバイルボタンガード、経路分析コメント） |
+| `tests/helpers/message-input-test-utils.ts` | MessageInputテスト共通ヘルパー（Issue #288: モック定数、props factory、DOM queries、interaction helpers、DRY原則対応） |
 
 ### CLIモジュール（Issue #96, #136）
 

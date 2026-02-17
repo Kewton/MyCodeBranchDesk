@@ -35,6 +35,7 @@ export function MessageInput({ worktreeId, onMessageSent, cliToolId, isSessionRu
   const [error, setError] = useState<string | null>(null);
   const [isComposing, setIsComposing] = useState(false);
   const [showCommandSelector, setShowCommandSelector] = useState(false);
+  const [isFreeInputMode, setIsFreeInputMode] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const compositionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const justFinishedComposingRef = useRef(false);
@@ -74,6 +75,7 @@ export function MessageInput({ worktreeId, onMessageSent, cliToolId, isSessionRu
       const effectiveCliTool: CLIToolType = cliToolId || 'claude';
       await worktreeApi.sendMessage(worktreeId, message.trim(), effectiveCliTool);
       setMessage('');
+      setIsFreeInputMode(false);
       onMessageSent?.(effectiveCliTool);
     } catch (err) {
       setError(handleApiError(err));
@@ -131,16 +133,18 @@ export function MessageInput({ worktreeId, onMessageSent, cliToolId, isSessionRu
    */
   const handleCommandCancel = () => {
     setShowCommandSelector(false);
+    setIsFreeInputMode(false);
     textareaRef.current?.focus();
   };
 
   /**
-   * Handle free input mode (Issue #56)
-   * Closes selector and prefills '/' for custom command entry
+   * Handle free input mode (Issue #56, #288)
+   * Closes selector and carries over filter text as the custom command prefix
    */
-  const handleFreeInput = () => {
+  const handleFreeInput = (filterText: string) => {
     setShowCommandSelector(false);
-    setMessage('/');
+    setIsFreeInputMode(true);
+    setMessage(filterText ? `/${filterText}` : '/');
     // Focus textarea with a small delay to ensure selector is closed
     setTimeout(() => {
       textareaRef.current?.focus();
@@ -153,6 +157,25 @@ export function MessageInput({ worktreeId, onMessageSent, cliToolId, isSessionRu
   const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value;
     setMessage(newValue);
+
+    // Free input mode reset: when message is fully cleared
+    if (newValue === '') {
+      setIsFreeInputMode(false);
+      setShowCommandSelector(false);
+      return;
+    }
+
+    // Skip selector display logic during free input mode
+    // NOTE: setShowCommandSelector(false) is not needed here.
+    // handleFreeInput() already executed setShowCommandSelector(false),
+    // and there is no path through handleMessageChange that sets showCommandSelector to true
+    // when isFreeInputMode is true (this early return prevents it).
+    // Mobile command button bypass path is guarded separately (Stage 2 SF-001).
+    // (Stage 1 SF-002: Considered defensive setShowCommandSelector(false) here,
+    //  but path analysis shows no reachable case, so omitted per KISS principle)
+    if (isFreeInputMode) {
+      return;
+    }
 
     // Show command selector when '/' is typed at the start
     if (newValue === '/' || (newValue.startsWith('/') && !newValue.includes(' '))) {
@@ -188,8 +211,8 @@ export function MessageInput({ worktreeId, onMessageSent, cliToolId, isSessionRu
 
     // Submit on Enter (but not when Shift is pressed or composing with IME)
     // Shift+Enter allows line breaks
-    // Don't submit when command selector is open
-    if (e.key === 'Enter' && !isComposing && !showCommandSelector) {
+    // Don't submit when command selector is open (unless in free input mode - Issue #288)
+    if (e.key === 'Enter' && !isComposing && (!showCommandSelector || isFreeInputMode)) {
       if (isMobile) {
         // Mobile: Enter inserts newline (default behavior)
         return;
@@ -215,7 +238,12 @@ export function MessageInput({ worktreeId, onMessageSent, cliToolId, isSessionRu
         {isMobile && (
           <button
             type="button"
-            onClick={() => setShowCommandSelector(true)}
+            onClick={() => {
+              if (isFreeInputMode) {
+                setIsFreeInputMode(false);
+              }
+              setShowCommandSelector(true);
+            }}
             className="flex-shrink-0 p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
             aria-label="Show slash commands"
             data-testid="mobile-command-button"

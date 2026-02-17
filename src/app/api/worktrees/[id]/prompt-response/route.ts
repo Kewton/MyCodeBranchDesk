@@ -7,16 +7,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbInstance } from '@/lib/db-instance';
 import { getWorktreeById } from '@/lib/db';
-import { sendKeys, sendSpecialKeys } from '@/lib/tmux';
 import { CLIToolManager } from '@/lib/cli-tools/manager';
 import type { CLIToolType } from '@/lib/cli-tools/types';
 import { captureSessionOutput } from '@/lib/cli-session';
 import { detectPrompt, type PromptDetectionResult } from '@/lib/prompt-detector';
 import { stripAnsi, buildDetectPromptOptions } from '@/lib/cli-patterns';
+import { sendPromptAnswer } from '@/lib/prompt-answer-sender';
+import type { PromptType } from '@/types/models';
 
 interface PromptResponseRequest {
   answer: string;
   cliTool?: CLIToolType;
+  /** Issue #287: Prompt type from client-side detection (fallback when promptCheck fails) */
+  promptType?: PromptType;
+  /** Issue #287: Default option number from client-side detection (fallback when promptCheck fails) */
+  defaultOptionNumber?: number;
 }
 
 export async function POST(
@@ -25,7 +30,7 @@ export async function POST(
 ): Promise<NextResponse> {
   try {
     const body: PromptResponseRequest = await req.json();
-    const { answer, cliTool: cliToolParam } = body;
+    const { answer, cliTool: cliToolParam, promptType: bodyPromptType, defaultOptionNumber: bodyDefaultOptionNumber } = body;
 
     // Validation
     if (!answer) {
@@ -89,73 +94,17 @@ export async function POST(
     }
 
     // Send answer to tmux
+    // Issue #287 Bug2: Uses shared sendPromptAnswer() to unify logic
+    // with auto-yes-manager.ts, including fallback handling.
     try {
-      // Issue #193: Claude Code AskUserQuestion uses cursor-based navigation
-      // (Arrow/Space/Enter), not number input. Detect this format and send
-      // the appropriate key sequence instead of typing the number.
-      const isClaudeMultiChoice = cliToolId === 'claude'
-        && promptCheck?.promptData?.type === 'multiple_choice'
-        && /^\d+$/.test(answer);
-
-      if (isClaudeMultiChoice && promptCheck?.promptData?.type === 'multiple_choice') {
-        const targetNum = parseInt(answer, 10);
-        const mcOptions = promptCheck.promptData.options;
-        const defaultOption = mcOptions.find(o => o.isDefault);
-        const defaultNum = defaultOption?.number ?? 1;
-        const offset = targetNum - defaultNum;
-
-        // Detect multi-select (checkbox) prompts by checking for [ ] in option labels.
-        // Multi-select prompts require: Space to toggle checkbox → navigate to "Next" → Enter.
-        // Single-select prompts require: navigate to option → Enter.
-        const isMultiSelect = mcOptions.some(o => /^\[[ x]\] /.test(o.label));
-
-        if (isMultiSelect) {
-          // Multi-select: toggle checkbox, then navigate to "Next" and submit
-          const checkboxCount = mcOptions.filter(o => /^\[[ x]\] /.test(o.label)).length;
-
-          const keys: string[] = [];
-
-          // 1. Navigate to target option
-          if (offset > 0) {
-            for (let i = 0; i < offset; i++) keys.push('Down');
-          } else if (offset < 0) {
-            for (let i = 0; i < Math.abs(offset); i++) keys.push('Up');
-          }
-
-          // 2. Space to toggle checkbox
-          keys.push('Space');
-
-          // 3. Navigate to "Next" button (positioned right after all checkbox options)
-          const downToNext = checkboxCount - targetNum + 1;
-          for (let i = 0; i < downToNext; i++) keys.push('Down');
-
-          // 4. Enter to submit
-          keys.push('Enter');
-
-          await sendSpecialKeys(sessionName, keys);
-        } else {
-          // Single-select: navigate and Enter to select
-          const keys: string[] = [];
-
-          if (offset > 0) {
-            for (let i = 0; i < offset; i++) keys.push('Down');
-          } else if (offset < 0) {
-            for (let i = 0; i < Math.abs(offset); i++) keys.push('Up');
-          }
-
-          keys.push('Enter');
-          await sendSpecialKeys(sessionName, keys);
-        }
-      } else {
-        // Standard CLI prompt: send text + Enter (y/n, Approve?, etc.)
-        await sendKeys(sessionName, answer, false);
-
-        // Wait a moment for the input to be processed
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        // Send Enter
-        await sendKeys(sessionName, '', true);
-      }
+      await sendPromptAnswer({
+        sessionName,
+        answer,
+        cliToolId,
+        promptData: promptCheck?.promptData,
+        fallbackPromptType: bodyPromptType,
+        fallbackDefaultOptionNumber: bodyDefaultOptionNumber,
+      });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return NextResponse.json(
