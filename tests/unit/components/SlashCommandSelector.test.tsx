@@ -214,6 +214,38 @@ describe('SlashCommandSelector', () => {
 
       expect(mockOnClose).toHaveBeenCalledTimes(1);
     });
+
+    it('should not intercept Enter key when isOpen is false (Issue #288)', () => {
+      render(
+        <SlashCommandSelector
+          isOpen={false}
+          groups={mockGroups}
+          onSelect={mockOnSelect}
+          onClose={mockOnClose}
+        />
+      );
+
+      fireEvent.keyDown(document, { key: 'Enter' });
+
+      // onSelect should NOT be called because the listener is not registered when closed
+      expect(mockOnSelect).not.toHaveBeenCalled();
+    });
+
+    it('should select command on Enter key when isOpen is true', () => {
+      render(
+        <SlashCommandSelector
+          isOpen={true}
+          groups={mockGroups}
+          onSelect={mockOnSelect}
+          onClose={mockOnClose}
+        />
+      );
+
+      fireEvent.keyDown(document, { key: 'Enter' });
+
+      // First command should be selected (highlightedIndex defaults to 0)
+      expect(mockOnSelect).toHaveBeenCalledWith(mockGroups[0].commands[0]);
+    });
   });
 
   describe('Free input mode (Issue #56)', () => {

@@ -138,13 +138,13 @@ export function MessageInput({ worktreeId, onMessageSent, cliToolId, isSessionRu
   };
 
   /**
-   * Handle free input mode (Issue #56)
-   * Closes selector and prefills '/' for custom command entry
+   * Handle free input mode (Issue #56, #288)
+   * Closes selector and carries over filter text as the custom command prefix
    */
-  const handleFreeInput = () => {
+  const handleFreeInput = (filterText: string) => {
     setShowCommandSelector(false);
     setIsFreeInputMode(true);
-    setMessage('/');
+    setMessage(filterText ? `/${filterText}` : '/');
     // Focus textarea with a small delay to ensure selector is closed
     setTimeout(() => {
       textareaRef.current?.focus();
@@ -211,8 +211,8 @@ export function MessageInput({ worktreeId, onMessageSent, cliToolId, isSessionRu
 
     // Submit on Enter (but not when Shift is pressed or composing with IME)
     // Shift+Enter allows line breaks
-    // Don't submit when command selector is open
-    if (e.key === 'Enter' && !isComposing && !showCommandSelector) {
+    // Don't submit when command selector is open (unless in free input mode - Issue #288)
+    if (e.key === 'Enter' && !isComposing && (!showCommandSelector || isFreeInputMode)) {
       if (isMobile) {
         // Mobile: Enter inserts newline (default behavior)
         return;

@@ -25,8 +25,8 @@ export interface SlashCommandSelectorProps {
   isMobile?: boolean;
   /** Position for desktop dropdown */
   position?: { top: number; left: number };
-  /** Callback for free input mode (Issue #56) */
-  onFreeInput?: () => void;
+  /** Callback for free input mode (Issue #56, #288: passes current filter text) */
+  onFreeInput?: (filterText: string) => void;
 }
 
 /**
@@ -120,13 +120,15 @@ export function SlashCommandSelector({
     [isOpen, flatCommands, highlightedIndex, onClose, handleSelect]
   );
 
-  // Add keyboard listener
+  // Add keyboard listener only when selector is open (Issue #288)
+  // Prevents document-level Enter key interception when selector is closed
   useEffect(() => {
+    if (!isOpen) return;
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [handleKeyDown]);
+  }, [isOpen, handleKeyDown]);
 
   if (!isOpen) {
     return null;
@@ -185,12 +187,12 @@ export function SlashCommandSelector({
             />
           </div>
 
-          {/* Free input button (Issue #56) */}
+          {/* Free input button (Issue #56, #288) */}
           {onFreeInput && (
             <button
               type="button"
               data-testid="free-input-button"
-              onClick={onFreeInput}
+              onClick={() => onFreeInput(filter)}
               className="w-full px-4 py-3 text-left border-b border-gray-100 flex items-center gap-2 hover:bg-blue-50 transition-colors"
             >
               <span className="text-blue-600">
@@ -233,12 +235,12 @@ export function SlashCommandSelector({
         />
       </div>
 
-      {/* Free input button (Issue #56) */}
+      {/* Free input button (Issue #56, #288) */}
       {onFreeInput && (
         <button
           type="button"
           data-testid="free-input-button"
-          onClick={onFreeInput}
+          onClick={() => onFreeInput(filter)}
           className="w-full px-3 py-2 text-left border-b border-gray-100 flex items-center gap-2 hover:bg-blue-50 transition-colors text-sm"
         >
           <span className="text-blue-600">
