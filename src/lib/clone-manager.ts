@@ -211,11 +211,13 @@ export class CloneManager {
    * Resolve the default basePath when not explicitly provided via config.
    *
    * Priority:
-   * 1. WORKTREE_BASE_PATH (deprecated, emits console.warn)
+   * 1. WORKTREE_BASE_PATH (deprecated, emits console.warn once per process)
    * 2. process.cwd() (final fallback)
    *
    * [D1-007] WORKTREE_BASE_PATH is normalized with path.resolve() to ensure
    * it is an absolute path, preventing unexpected behavior with relative paths.
+   *
+   * @returns Absolute path to use as the base directory for clone operations
    */
   private resolveDefaultBasePath(): string {
     const worktreeBasePath = process.env.WORKTREE_BASE_PATH;

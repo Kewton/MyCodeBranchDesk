@@ -6,11 +6,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { runMigrations } from '@/lib/db-migrations';
-import { CloneManager, CloneManagerError, CloneResult, resetWorktreeBasePathWarning } from '@/lib/clone-manager';
-import { UrlNormalizer } from '@/lib/url-normalizer';
+import { CloneManager, CloneManagerError, resetWorktreeBasePathWarning } from '@/lib/clone-manager';
 import {
   createRepository,
-  getRepositoryByNormalizedUrl,
   getCloneJob,
   createCloneJob,
   updateCloneJob,
