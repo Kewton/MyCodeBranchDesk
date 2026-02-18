@@ -4,6 +4,9 @@
  *
  * Issue #302: mp4 file upload and playback support
  *
+ * [KISS] Uses simple HTML5 video tag
+ * Base64 data URI videos don't benefit from complex player libraries
+ *
  * Follows the same pattern as ImageViewer.tsx for consistency.
  *
  * Display constraints:
@@ -19,7 +22,7 @@ import React, { useState } from 'react';
 export interface VideoViewerProps {
   /** Video source (Base64 data URI) */
   src: string;
-  /** MIME type of the video */
+  /** MIME type of the video (for future use) */
   mimeType?: string;
   /** Callback when video fails to load */
   onError?: () => void;
@@ -37,7 +40,7 @@ export interface VideoViewerProps {
  * />
  * ```
  */
-export function VideoViewer({ src, mimeType, onError }: VideoViewerProps) {
+export function VideoViewer({ src, onError }: VideoViewerProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
@@ -80,6 +83,7 @@ export function VideoViewer({ src, mimeType, onError }: VideoViewerProps) {
           <p className="ml-3 text-gray-600">Loading video...</p>
         </div>
       )}
+      {/* [KISS] src on <video> is sufficient; <source> would be redundant for a single format */}
       <video
         controls
         src={src}
@@ -92,7 +96,6 @@ export function VideoViewer({ src, mimeType, onError }: VideoViewerProps) {
         }}
         className="rounded-lg shadow-sm"
       >
-        {mimeType && <source src={src} type={mimeType} />}
         Your browser does not support the video tag.
       </video>
     </div>

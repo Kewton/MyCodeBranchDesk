@@ -172,8 +172,9 @@ tests/
 | `src/hooks/useFullscreen.ts` | Fullscreen API ラッパー（CSSフォールバック対応） |
 | `src/hooks/useLocalStorageState.ts` | localStorage永続化フック（バリデーション対応） |
 | `src/config/z-index.ts` | z-index値の一元管理 |
-| `src/config/uploadable-extensions.ts` | アップロード可能拡張子・MIMEタイプ・マジックバイト検証 |
+| `src/config/uploadable-extensions.ts` | アップロード可能拡張子・MIMEタイプ・マジックバイト検証（Issue #302: mp4バリデータ追加、15MB上限、ftypシグネチャ検証） |
 | `src/config/image-extensions.ts` | 画像ファイル拡張子・マジックバイト・SVG XSS検証 |
+| `src/config/video-extensions.ts` | 動画ファイル拡張子・マジックバイト・MIME定義（Issue #302: VIDEO_EXTENSIONS、isVideoExtension()、getMimeTypeByVideoExtension()、validateVideoContent()） |
 | `src/config/mermaid-config.ts` | mermaid設定定数（securityLevel='strict'） |
 | `src/config/binary-extensions.ts` | バイナリファイル拡張子設定（検索除外用） |
 | `src/lib/file-search.ts` | ファイル内容検索ロジック（EXCLUDED_PATTERNSフィルタ、AbortControllerタイムアウト） |
@@ -181,10 +182,11 @@ tests/
 | `src/hooks/useFileSearch.ts` | 検索状態管理フック（debounce処理、API呼び出し、結果管理） |
 | `src/components/worktree/MoveDialog.tsx` | ファイル移動先選択ダイアログ（Issue #162: ディレクトリツリーブラウザ、ルート選択、ネスト対応、updateTreeNode/findNodeByPath抽出） |
 | `src/components/worktree/ContextMenu.tsx` | ファイル/ディレクトリコンテキストメニュー（Issue #162: 「移動」メニュー項目追加、FolderInputアイコン、onMoveコールバック） |
-| `src/components/worktree/FileViewer.tsx` | ファイルビューア（Issue #162: コピーボタン追加、Copy/Checkアイコン切替、useMemo最適化、画像ファイル非表示） |
+| `src/components/worktree/FileViewer.tsx` | ファイルビューア（Issue #162: コピーボタン追加、Copy/Checkアイコン切替、useMemo最適化、画像ファイル非表示。**Issue #302: 動画表示分岐追加、canCopyロジック修正（isVideo除外）**） |
 | `src/components/worktree/FileTreeView.tsx` | ファイルツリー表示（Issue #162: birthtime表示、formatRelativeTime()ロケール対応、sm:inline条件表示） |
 | `src/components/worktree/WorktreeDetailRefactored.tsx` | Worktree詳細画面（Issue #162: handleMoveハンドラー追加、MoveDialog統合、useFileOperations呼び出し） |
 | `src/components/worktree/ImageViewer.tsx` | 画像表示コンポーネント |
+| `src/components/worktree/VideoViewer.tsx` | 動画再生コンポーネント（Issue #302: HTML5 videoタグ、controls属性、ローディングインジケーター、エラーフォールバックUI） |
 | `src/components/worktree/MermaidDiagram.tsx` | mermaidダイアグラム描画コンポーネント |
 | `src/components/worktree/MermaidCodeBlock.tsx` | mermaidコードブロックラッパー |
 | `src/config/log-config.ts` | LOG_DIR定数の一元管理（getLogDir()関数、DRY原則対応） |

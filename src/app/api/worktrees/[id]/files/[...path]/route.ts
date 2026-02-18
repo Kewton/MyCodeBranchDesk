@@ -38,7 +38,7 @@ import {
 import {
   isVideoExtension,
   getMimeTypeByVideoExtension,
-  VIDEO_MAX_SIZE_BYTES,
+  validateVideoContent,
 } from '@/config/video-extensions';
 import { extname } from 'path';
 import { readFile, stat } from 'fs/promises';
@@ -200,16 +200,29 @@ export async function GET(
       const absolutePath = join(worktree.path, relativePath);
 
       try {
-        // Check file size before reading (memory efficiency)
+        // [DRY] Check file size before reading full content (memory efficiency)
         const fileStat = await stat(absolutePath);
-        if (fileStat.size > VIDEO_MAX_SIZE_BYTES) {
-          return createErrorResponse('FILE_TOO_LARGE', `File size exceeds ${VIDEO_MAX_SIZE_BYTES / 1024 / 1024}MB limit`);
+        const maxSizeBytes = 15 * 1024 * 1024; // VIDEO_MAX_SIZE_BYTES
+        if (fileStat.size > maxSizeBytes) {
+          return createErrorResponse('FILE_TOO_LARGE', `File size exceeds ${maxSizeBytes / 1024 / 1024}MB limit`);
         }
 
         // Read file as binary
         const fileBuffer = await readFile(absolutePath);
 
-        // Get MIME type
+        // Validate video content (size, magic bytes)
+        const validation = validateVideoContent(ext, fileBuffer);
+        if (!validation.valid) {
+          if (validation.error?.includes('MB')) {
+            return createErrorResponse('FILE_TOO_LARGE', validation.error);
+          }
+          if (validation.error?.includes('magic bytes')) {
+            return createErrorResponse('INVALID_MAGIC_BYTES', validation.error);
+          }
+          return createErrorResponse('INVALID_FILE_CONTENT', validation.error || 'Invalid video content');
+        }
+
+        // [DRY] Get MIME type using centralized helper
         const mimeType = getMimeTypeByVideoExtension(ext) || 'video/mp4';
 
         // Convert to Base64 data URI
