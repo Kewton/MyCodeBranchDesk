@@ -838,7 +838,7 @@ export const FileTreeView = memo(function FileTreeView({
               <button
                 data-testid="empty-new-file-button"
                 onClick={() => onNewFile('')}
-                className="flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                className="flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
                 <FilePlus className="w-4 h-4" aria-hidden="true" />
                 <span>New File</span>
@@ -848,7 +848,7 @@ export const FileTreeView = memo(function FileTreeView({
               <button
                 data-testid="empty-new-directory-button"
                 onClick={() => onNewDirectory('')}
-                className="flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                className="flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
                 <FolderPlus className="w-4 h-4" aria-hidden="true" />
                 <span>New Directory</span>
