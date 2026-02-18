@@ -35,8 +35,13 @@ import {
   validateImageContent,
   getMimeTypeByExtension,
 } from '@/config/image-extensions';
+import {
+  isVideoExtension,
+  getMimeTypeByVideoExtension,
+  VIDEO_MAX_SIZE_BYTES,
+} from '@/config/video-extensions';
 import { extname } from 'path';
-import { readFile } from 'fs/promises';
+import { readFile, stat } from 'fs/promises';
 
 /**
  * [DRY] Centralized mapping of error codes to HTTP status codes
@@ -183,6 +188,44 @@ export async function GET(
         });
       } catch (err: unknown) {
         // File not found or read error
+        if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+          return createErrorResponse('FILE_NOT_FOUND', 'File not found');
+        }
+        throw err;
+      }
+    }
+
+    // Check if this is a video file (Issue #302)
+    if (isVideoExtension(ext)) {
+      const absolutePath = join(worktree.path, relativePath);
+
+      try {
+        // Check file size before reading (memory efficiency)
+        const fileStat = await stat(absolutePath);
+        if (fileStat.size > VIDEO_MAX_SIZE_BYTES) {
+          return createErrorResponse('FILE_TOO_LARGE', `File size exceeds ${VIDEO_MAX_SIZE_BYTES / 1024 / 1024}MB limit`);
+        }
+
+        // Read file as binary
+        const fileBuffer = await readFile(absolutePath);
+
+        // Get MIME type
+        const mimeType = getMimeTypeByVideoExtension(ext) || 'video/mp4';
+
+        // Convert to Base64 data URI
+        const base64 = fileBuffer.toString('base64');
+        const dataUri = `data:${mimeType};base64,${base64}`;
+
+        return NextResponse.json({
+          success: true,
+          path: relativePath,
+          content: dataUri,
+          extension,
+          worktreePath: worktree.path,
+          isVideo: true,
+          mimeType,
+        });
+      } catch (err: unknown) {
         if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
           return createErrorResponse('FILE_NOT_FOUND', 'File not found');
         }
