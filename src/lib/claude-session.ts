@@ -137,6 +137,18 @@ export const CLAUDE_SEND_PROMPT_WAIT_TIMEOUT = 10000;
 export const CLAUDE_PROMPT_POLL_INTERVAL = 200;
 
 /**
+ * Maximum expected length of a shell prompt line (characters)
+ *
+ * Shell prompts are typically under 40 characters (e.g., "user@host:~/project$" ~30 chars).
+ * Lines at or above this threshold are not considered shell prompts, preventing
+ * false positives from Claude CLI output that happens to end with $, %, or #.
+ *
+ * Used by isSessionHealthy() to distinguish shell prompts from CLI output.
+ * 40 is an empirical threshold with safety margin.
+ */
+const MAX_SHELL_PROMPT_LENGTH = 40;
+
+/**
  * Cached Claude CLI path
  */
 let cachedClaudePath: string | null = null;
@@ -306,9 +318,6 @@ export async function isSessionHealthy(sessionName: string): Promise<HealthCheck
     const lastLine = lines[lines.length - 1]?.trim() ?? '';
 
     // F006: Line length check BEFORE SHELL_PROMPT_ENDINGS check (early return)
-    // Shell prompts are typically under 40 characters (e.g., "user@host:~/project$" ~30 chars).
-    // 40 is an empirical threshold with safety margin.
-    const MAX_SHELL_PROMPT_LENGTH = 40;
     if (lastLine.length >= MAX_SHELL_PROMPT_LENGTH) {
       // Long lines are not shell prompts -> treat as healthy (early return)
       return { healthy: true };

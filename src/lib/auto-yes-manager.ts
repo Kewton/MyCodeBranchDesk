@@ -85,6 +85,17 @@ export const THINKING_CHECK_LINE_COUNT = 50;
 /** Worktree ID validation pattern (security: prevent command injection) */
 const WORKTREE_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
+/**
+ * Extract error message from unknown error type.
+ * Provides consistent error message extraction across the module (DRY).
+ *
+ * @param error - Unknown error object
+ * @returns Error message string, or 'Unknown error' for non-Error values
+ */
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Unknown error';
+}
+
 // =============================================================================
 // In-memory State (globalThis for hot reload persistence - Issue #153)
 // =============================================================================
@@ -122,8 +133,11 @@ const autoYesPollerStates = globalThis.__autoYesPollerStates ??
 // =============================================================================
 
 /**
- * Validate worktree ID format (security measure)
+ * Validate worktree ID format (security measure).
  * Only allows alphanumeric characters, hyphens, and underscores.
+ *
+ * @param worktreeId - Worktree ID to validate
+ * @returns true if the ID matches the allowed pattern
  */
 export function isValidWorktreeId(worktreeId: string): boolean {
   if (!worktreeId || worktreeId.length === 0) return false;
@@ -131,7 +145,12 @@ export function isValidWorktreeId(worktreeId: string): boolean {
 }
 
 /**
- * Calculate backoff interval based on consecutive errors
+ * Calculate backoff interval based on consecutive errors.
+ * Returns the normal polling interval when errors are below the threshold,
+ * and applies exponential backoff (capped at MAX_BACKOFF_MS) above it.
+ *
+ * @param consecutiveErrors - Number of consecutive errors encountered
+ * @returns Polling interval in milliseconds
  */
 export function calculateBackoffInterval(consecutiveErrors: number): number {
   if (consecutiveErrors < MAX_CONSECUTIVE_ERRORS) {
@@ -152,15 +171,22 @@ export function calculateBackoffInterval(consecutiveErrors: number): number {
 // =============================================================================
 
 /**
- * Check if an auto-yes state has expired
+ * Check if an auto-yes state has expired.
+ * Compares current time against the expiresAt timestamp.
+ *
+ * @param state - Auto-yes state to check
+ * @returns true if the current time is past the expiration time
  */
 export function isAutoYesExpired(state: AutoYesState): boolean {
   return Date.now() > state.expiresAt;
 }
 
 /**
- * Get the auto-yes state for a worktree
- * Returns null if no state exists or if expired (auto-disables on expiry)
+ * Get the auto-yes state for a worktree.
+ * Returns null if no state exists. If expired, auto-disables and returns the disabled state.
+ *
+ * @param worktreeId - Worktree identifier
+ * @returns Current auto-yes state, or null if no state exists
  */
 export function getAutoYesState(worktreeId: string): AutoYesState | null {
   const state = autoYesStates.get(worktreeId);
@@ -208,7 +234,8 @@ export function setAutoYesEnabled(worktreeId: string, enabled: boolean, duration
 }
 
 /**
- * Clear all auto-yes states (for testing)
+ * Clear all auto-yes states.
+ * @internal Exported for testing purposes only.
  */
 export function clearAllAutoYesStates(): void {
   autoYesStates.clear();
@@ -219,14 +246,18 @@ export function clearAllAutoYesStates(): void {
 // =============================================================================
 
 /**
- * Get the number of active pollers
+ * Get the number of active pollers.
+ *
+ * @returns Count of currently active polling instances
  */
 export function getActivePollerCount(): number {
   return autoYesPollerStates.size;
 }
 
 /**
- * Clear all poller states (for testing)
+ * Clear all poller states.
+ * Stops all active pollers before clearing state.
+ * @internal Exported for testing purposes only.
  */
 export function clearAllPollerStates(): void {
   stopAllAutoYesPolling();
@@ -234,8 +265,11 @@ export function clearAllPollerStates(): void {
 }
 
 /**
- * Get the last server response timestamp for a worktree
- * Used by clients to prevent duplicate responses
+ * Get the last server response timestamp for a worktree.
+ * Used by clients to prevent duplicate responses.
+ *
+ * @param worktreeId - Worktree identifier
+ * @returns Timestamp (Date.now()) of the last server response, or null if none
  */
 export function getLastServerResponseTimestamp(worktreeId: string): number | null {
   const pollerState = autoYesPollerStates.get(worktreeId);
@@ -243,7 +277,10 @@ export function getLastServerResponseTimestamp(worktreeId: string): number | nul
 }
 
 /**
- * Update the last server response timestamp
+ * Update the last server response timestamp.
+ *
+ * @param worktreeId - Worktree identifier
+ * @param timestamp - Timestamp value (Date.now())
  */
 function updateLastServerResponseTimestamp(worktreeId: string, timestamp: number): void {
   const pollerState = autoYesPollerStates.get(worktreeId);
@@ -253,7 +290,9 @@ function updateLastServerResponseTimestamp(worktreeId: string, timestamp: number
 }
 
 /**
- * Reset error count for a poller
+ * Reset error count for a poller and restore the default polling interval.
+ *
+ * @param worktreeId - Worktree identifier
  */
 function resetErrorCount(worktreeId: string): void {
   const pollerState = autoYesPollerStates.get(worktreeId);
@@ -264,7 +303,9 @@ function resetErrorCount(worktreeId: string): void {
 }
 
 /**
- * Increment error count and apply backoff if needed
+ * Increment error count and apply backoff if the threshold is exceeded.
+ *
+ * @param worktreeId - Worktree identifier
  */
 function incrementErrorCount(worktreeId: string): void {
   const pollerState = autoYesPollerStates.get(worktreeId);
@@ -277,6 +318,10 @@ function incrementErrorCount(worktreeId: string): void {
 /**
  * Check if the given prompt has already been answered.
  * Extracted from pollAutoYes() to reduce responsibility concentration (F005/SRP).
+ *
+ * @param pollerState - Current poller state containing the last answered prompt key
+ * @param promptKey - Composite key of the current prompt (generated by generatePromptKey)
+ * @returns true if the prompt key matches the last answered prompt key
  */
 function isDuplicatePrompt(
   pollerState: AutoYesPollerState,
@@ -286,7 +331,15 @@ function isDuplicatePrompt(
 }
 
 /**
- * Internal polling function (setTimeout recursive)
+ * Internal polling function that recursively schedules itself via setTimeout.
+ * Captures tmux output, detects prompts, and sends auto-responses when appropriate.
+ *
+ * Includes duplicate prevention (Issue #306): skips prompts that have already
+ * been answered (tracked via lastAnsweredPromptKey) and applies a cooldown
+ * interval (COOLDOWN_INTERVAL_MS) after successful responses.
+ *
+ * @param worktreeId - Worktree identifier
+ * @param cliToolId - CLI tool type being polled
  */
 async function pollAutoYes(worktreeId: string, cliToolId: CLIToolType): Promise<void> {
   // Check if poller was stopped
@@ -392,8 +445,7 @@ async function pollAutoYes(worktreeId: string, cliToolId: CLIToolType): Promise<
     incrementErrorCount(worktreeId);
 
     // Log error (without sensitive details)
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.warn(`[Auto-Yes Poller] Error for worktree ${worktreeId}: ${errorMessage}`);
+    console.warn(`[Auto-Yes Poller] Error for worktree ${worktreeId}: ${getErrorMessage(error)}`);
   }
 
   // Schedule next poll (catch block fallthrough or other paths)
@@ -422,7 +474,13 @@ function scheduleNextPoll(
 }
 
 /**
- * Start server-side auto-yes polling for a worktree
+ * Start server-side auto-yes polling for a worktree.
+ * Validates the worktree ID, checks auto-yes state, enforces concurrent poller limits,
+ * and begins the polling loop.
+ *
+ * @param worktreeId - Worktree identifier (must match WORKTREE_ID_PATTERN)
+ * @param cliToolId - CLI tool type to poll for
+ * @returns Result indicating whether the poller was started, with reason if not
  */
 export function startAutoYesPolling(
   worktreeId: string,
@@ -472,7 +530,10 @@ export function startAutoYesPolling(
 }
 
 /**
- * Stop server-side auto-yes polling for a worktree
+ * Stop server-side auto-yes polling for a worktree.
+ * Clears the timer and removes the poller state.
+ *
+ * @param worktreeId - Worktree identifier
  */
 export function stopAutoYesPolling(worktreeId: string): void {
   const pollerState = autoYesPollerStates.get(worktreeId);
@@ -489,7 +550,8 @@ export function stopAutoYesPolling(worktreeId: string): void {
 }
 
 /**
- * Stop all server-side auto-yes polling (graceful shutdown)
+ * Stop all server-side auto-yes polling (graceful shutdown).
+ * Clears all timers and removes all poller states.
  */
 export function stopAllAutoYesPolling(): void {
   for (const [worktreeId, pollerState] of autoYesPollerStates.entries()) {

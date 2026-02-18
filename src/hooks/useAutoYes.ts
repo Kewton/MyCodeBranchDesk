@@ -43,7 +43,13 @@ export interface UseAutoYesReturn {
 }
 
 /**
- * Hook that automatically responds to prompts when auto-yes is enabled
+ * Hook that automatically responds to prompts when auto-yes is enabled.
+ *
+ * Uses a ref-based duplicate prevention mechanism combined with server-side
+ * timestamp checking to avoid sending the same response multiple times.
+ *
+ * @param params - Hook parameters including worktree context and prompt state
+ * @returns Object containing the last auto-response answer for UI display
  */
 export function useAutoYes({
   worktreeId,
