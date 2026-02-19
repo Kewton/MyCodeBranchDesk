@@ -15,7 +15,7 @@ describe('AutoYesToggle', () => {
   const defaultProps = {
     enabled: false,
     expiresAt: null,
-    onToggle: vi.fn<[AutoYesToggleParams], Promise<void>>().mockResolvedValue(undefined),
+    onToggle: vi.fn<(params: AutoYesToggleParams) => Promise<void>>().mockResolvedValue(undefined),
     lastAutoResponse: null,
   };
 

@@ -187,5 +187,3 @@ export function AutoYesConfirmDialog({
     </Modal>
   );
 }
-
-export default AutoYesConfirmDialog;

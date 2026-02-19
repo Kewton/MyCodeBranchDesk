@@ -15,11 +15,11 @@ import { resolveAutoAnswer } from './auto-yes-resolver';
 import { sendPromptAnswer } from './prompt-answer-sender';
 import { CLIToolManager } from './cli-tools/manager';
 import { stripAnsi, detectThinking, buildDetectPromptOptions } from './cli-patterns';
-import { DEFAULT_AUTO_YES_DURATION, validateStopPattern, type AutoYesDuration } from '@/config/auto-yes-config';
+import { DEFAULT_AUTO_YES_DURATION, validateStopPattern, type AutoYesDuration, type AutoYesStopReason } from '@/config/auto-yes-config';
 import { generatePromptKey } from './prompt-key';
 
-/** Stop reason for auto-yes disable (Issue #314) */
-export type AutoYesStopReason = 'expired' | 'stop_pattern_matched';
+// Re-export from shared config for backward compatibility (Issue #314)
+export type { AutoYesStopReason } from '@/config/auto-yes-config';
 
 /** Auto yes state for a worktree */
 export interface AutoYesState {

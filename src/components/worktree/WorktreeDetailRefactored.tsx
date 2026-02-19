@@ -51,6 +51,7 @@ import { useAutoYes } from '@/hooks/useAutoYes';
 import { buildPromptResponseBody } from '@/lib/prompt-response-body-builder';
 import { useUpdateCheck } from '@/hooks/useUpdateCheck';
 import { AutoYesToggle, type AutoYesToggleParams } from '@/components/worktree/AutoYesToggle';
+import type { AutoYesStopReason } from '@/config/auto-yes-config';
 import { NotificationDot } from '@/components/common/NotificationDot';
 import { BranchMismatchAlert } from '@/components/worktree/BranchMismatchAlert';
 import type { Worktree, ChatMessage, PromptData, GitStatus } from '@/types/models';
@@ -84,7 +85,7 @@ interface CurrentOutputResponse {
   autoYes?: {
     enabled: boolean;
     expiresAt: number | null;
-    stopReason?: 'expired' | 'stop_pattern_matched';
+    stopReason?: AutoYesStopReason;
   };
 }
 

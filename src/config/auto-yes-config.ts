@@ -36,6 +36,13 @@ export function isAllowedDuration(value: unknown): value is AutoYesDuration {
 }
 
 // =============================================================================
+// Stop Condition Types (Issue #314)
+// =============================================================================
+
+/** Reason why auto-yes was stopped (shared between server and client) */
+export type AutoYesStopReason = 'expired' | 'stop_pattern_matched';
+
+// =============================================================================
 // Stop Pattern Validation (Issue #314)
 // =============================================================================
 

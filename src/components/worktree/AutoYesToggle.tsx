@@ -155,5 +155,3 @@ export const AutoYesToggle = memo(function AutoYesToggle({
     </div>
   );
 });
-
-export default AutoYesToggle;
