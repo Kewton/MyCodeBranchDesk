@@ -22,5 +22,10 @@
   "stopPatternDescription": "ターミナル出力がこのパターンにマッチした場合、Auto-Yesを自動停止します",
   "invalidRegexPattern": "無効な正規表現パターンです",
   "patternTooLong": "パターンは500文字以内で入力してください",
-  "stopPatternMatched": "Stop条件にマッチしたためAuto-Yesを自動停止しました"
+  "stopPatternMatched": "Stop条件にマッチしたためAuto-Yesを自動停止しました",
+  "regexTipsLabel": "正規表現のヒント",
+  "regexTipsTitle": "正規表現Tips",
+  "regexTipWordBoundary": "… 単語単位でマッチ（部分一致を防止）",
+  "regexTipOr": "… OR条件（いずれかにマッチ）",
+  "regexTipCaseNote": "… 大文字小文字は区別されます"
 }

@@ -10,7 +10,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { Modal } from '@/components/ui/Modal';
 import {
@@ -44,18 +44,33 @@ export function AutoYesConfirmDialog({
   const [selectedDuration, setSelectedDuration] = useState<AutoYesDuration>(DEFAULT_AUTO_YES_DURATION);
   const [stopPattern, setStopPattern] = useState<string>('');
   const [regexError, setRegexError] = useState<string | null>(null);
+  const [showRegexTips, setShowRegexTips] = useState(false);
+  const tipsRef = useRef<HTMLDivElement>(null);
 
   /** Resolve a DURATION_LABELS value (e.g. 'autoYes.durations.1h') to a translated string */
   const durationLabel = (duration: AutoYesDuration): string =>
     t(DURATION_LABELS[duration].replace('autoYes.', ''));
 
-  // Reset stopPattern and regexError when dialog opens/closes (DS1-F008)
+  // Reset stopPattern, regexError, and tips when dialog opens/closes (DS1-F008)
   useEffect(() => {
     if (isOpen) {
       setStopPattern('');
       setRegexError(null);
+      setShowRegexTips(false);
     }
   }, [isOpen]);
+
+  // Close tooltip on click outside
+  useEffect(() => {
+    if (!showRegexTips) return;
+    const handleClick = (e: MouseEvent) => {
+      if (tipsRef.current && !tipsRef.current.contains(e.target as Node)) {
+        setShowRegexTips(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showRegexTips]);
 
   // Real-time validation of stop pattern
   useEffect(() => {
@@ -123,9 +138,35 @@ export function AutoYesConfirmDialog({
 
         {/* Stop Pattern input (Issue #314) */}
         <div className="text-sm text-gray-700">
-          <label htmlFor="stop-pattern-input" className="font-medium mb-1 block">
-            {t('stopPatternLabel')}
-          </label>
+          <div className="flex items-center gap-1.5 mb-1">
+            <label htmlFor="stop-pattern-input" className="font-medium">
+              {t('stopPatternLabel')}
+            </label>
+            <div className="relative" ref={tipsRef}>
+              <button
+                type="button"
+                onClick={() => setShowRegexTips(!showRegexTips)}
+                className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-300 text-gray-600 text-[10px] font-bold hover:bg-gray-400 focus:outline-none"
+                aria-label={t('regexTipsLabel')}
+                data-testid="regex-tips-button"
+              >
+                ?
+              </button>
+              {showRegexTips && (
+                <div
+                  className="absolute left-0 top-6 z-50 w-72 rounded-md border border-gray-200 bg-white p-3 shadow-lg text-xs text-gray-700"
+                  data-testid="regex-tips-tooltip"
+                >
+                  <p className="font-medium mb-1.5">{t('regexTipsTitle')}</p>
+                  <ul className="space-y-1">
+                    <li><code className="bg-gray-100 px-1 rounded">\bcat\b</code> {t('regexTipWordBoundary')}</li>
+                    <li><code className="bg-gray-100 px-1 rounded">error|fatal</code> {t('regexTipOr')}</li>
+                    <li><code className="bg-gray-100 px-1 rounded">(?i)error</code> {t('regexTipCaseNote')}</li>
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
           <p className="text-xs text-gray-500 mb-2">{t('stopPatternDescription')}</p>
           <input
             id="stop-pattern-input"
