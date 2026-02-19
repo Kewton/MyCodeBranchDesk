@@ -22,5 +22,10 @@
   "stopPatternDescription": "Auto-Yes will be automatically stopped when terminal output matches this pattern",
   "invalidRegexPattern": "Invalid regular expression pattern",
   "patternTooLong": "Pattern must be 500 characters or less",
-  "stopPatternMatched": "Auto-Yes was automatically stopped because the stop condition was matched"
+  "stopPatternMatched": "Auto-Yes was automatically stopped because the stop condition was matched",
+  "regexTipsLabel": "Regex tips",
+  "regexTipsTitle": "Regex Tips",
+  "regexTipWordBoundary": "… match whole word only (prevents partial match)",
+  "regexTipOr": "… OR condition (matches either)",
+  "regexTipCaseNote": "… matching is case-sensitive"
 }
