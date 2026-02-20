@@ -12,6 +12,9 @@ import {
   calculateBackoffInterval,
   getActivePollerCount,
   clearAllPollerStates,
+  disableAutoYes,
+  checkStopCondition,
+  executeRegexWithTimeout,
   MAX_CONCURRENT_POLLERS,
   POLLING_INTERVAL_MS,
   MAX_BACKOFF_MS,
@@ -1168,6 +1171,346 @@ describe('auto-yes-manager', () => {
   describe('Issue #306: COOLDOWN_INTERVAL_MS constant', () => {
     it('should export COOLDOWN_INTERVAL_MS as 5000ms', () => {
       expect(COOLDOWN_INTERVAL_MS).toBe(5000);
+    });
+  });
+
+  // ==========================================================================
+  // Issue #314: Stop Condition Tests
+  // ==========================================================================
+  describe('Issue #314: setAutoYesEnabled with stopPattern', () => {
+    it('should store stopPattern when enabling with stop pattern', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1700000000000);
+
+      const state = setAutoYesEnabled('wt-sp', true, 3600000, 'error|fatal');
+
+      expect(state.enabled).toBe(true);
+      expect(state.stopPattern).toBe('error|fatal');
+    });
+
+    it('should store undefined stopPattern when not provided', () => {
+      const state = setAutoYesEnabled('wt-no-sp', true, 3600000);
+
+      expect(state.enabled).toBe(true);
+      expect(state.stopPattern).toBeUndefined();
+    });
+
+    it('should clear stopPattern and stopReason on re-enable', () => {
+      // First enable with stopPattern
+      setAutoYesEnabled('wt-re', true, 3600000, 'error');
+      // Disable with reason
+      disableAutoYes('wt-re', 'stop_pattern_matched');
+      // Re-enable without stopPattern
+      const state = setAutoYesEnabled('wt-re', true, 3600000);
+
+      expect(state.enabled).toBe(true);
+      expect(state.stopPattern).toBeUndefined();
+      expect(state.stopReason).toBeUndefined();
+    });
+  });
+
+  describe('Issue #314: disableAutoYes', () => {
+    it('should disable auto-yes without reason', () => {
+      setAutoYesEnabled('wt-d1', true, 3600000, 'test-pattern');
+      const state = disableAutoYes('wt-d1');
+
+      expect(state.enabled).toBe(false);
+      expect(state.stopReason).toBeUndefined();
+      expect(state.stopPattern).toBe('test-pattern');
+    });
+
+    it('should disable with stop_pattern_matched reason', () => {
+      setAutoYesEnabled('wt-d2', true, 3600000, 'test-pattern');
+      const state = disableAutoYes('wt-d2', 'stop_pattern_matched');
+
+      expect(state.enabled).toBe(false);
+      expect(state.stopReason).toBe('stop_pattern_matched');
+      expect(state.stopPattern).toBe('test-pattern');
+    });
+
+    it('should disable with expired reason', () => {
+      setAutoYesEnabled('wt-d3', true, 3600000);
+      const state = disableAutoYes('wt-d3', 'expired');
+
+      expect(state.enabled).toBe(false);
+      expect(state.stopReason).toBe('expired');
+    });
+
+    it('should preserve enabledAt and expiresAt from existing state', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1700000000000);
+
+      setAutoYesEnabled('wt-d4', true, 3600000);
+      const state = disableAutoYes('wt-d4', 'expired');
+
+      expect(state.enabledAt).toBe(1700000000000);
+      expect(state.expiresAt).toBe(1700000000000 + 3600000);
+    });
+
+    it('should handle non-existent worktree gracefully', () => {
+      const state = disableAutoYes('wt-nonexistent');
+
+      expect(state.enabled).toBe(false);
+      expect(state.enabledAt).toBe(0);
+      expect(state.expiresAt).toBe(0);
+    });
+  });
+
+  describe('Issue #314: getAutoYesState with stopReason', () => {
+    it('should set stopReason to expired when auto-yes expires', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1700000000000);
+
+      setAutoYesEnabled('wt-exp', true, 3600000);
+
+      // Advance past expiration
+      vi.setSystemTime(1700000000000 + 3600001);
+
+      const state = getAutoYesState('wt-exp');
+      expect(state).not.toBeNull();
+      expect(state!.enabled).toBe(false);
+      expect(state!.stopReason).toBe('expired');
+    });
+  });
+
+  describe('Issue #314: executeRegexWithTimeout', () => {
+    it('should return true when regex matches', () => {
+      const regex = /error|fatal/;
+      const result = executeRegexWithTimeout(regex, 'an error occurred');
+      expect(result).toBe(true);
+    });
+
+    it('should return false when regex does not match', () => {
+      const regex = /error|fatal/;
+      const result = executeRegexWithTimeout(regex, 'all good here');
+      expect(result).toBe(false);
+    });
+
+    it('should return null when regex execution throws', () => {
+      // Create a regex that will throw during test()
+      const badRegex = /test/;
+      // Override test to throw
+      badRegex.test = () => { throw new Error('regex error'); };
+      const result = executeRegexWithTimeout(badRegex, 'test');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('Issue #314: checkStopCondition', () => {
+    it('should return false when no stopPattern is set', () => {
+      setAutoYesEnabled('wt-cs1', true, 3600000);
+      const result = checkStopCondition('wt-cs1', 'some output');
+      expect(result).toBe(false);
+    });
+
+    it('should return true when output matches stop pattern', () => {
+      setAutoYesEnabled('wt-cs2', true, 3600000, 'error|fatal');
+      const result = checkStopCondition('wt-cs2', 'a fatal error occurred');
+      expect(result).toBe(true);
+
+      // Verify auto-yes was disabled
+      const state = getAutoYesState('wt-cs2');
+      expect(state?.enabled).toBe(false);
+      expect(state?.stopReason).toBe('stop_pattern_matched');
+    });
+
+    it('should return false when output does not match stop pattern', () => {
+      setAutoYesEnabled('wt-cs3', true, 3600000, 'error|fatal');
+      const result = checkStopCondition('wt-cs3', 'all good here');
+      expect(result).toBe(false);
+
+      // Verify auto-yes is still enabled
+      const state = getAutoYesState('wt-cs3');
+      expect(state?.enabled).toBe(true);
+    });
+
+    it('should return false when worktree has no state', () => {
+      const result = checkStopCondition('wt-nonexistent', 'some output');
+      expect(result).toBe(false);
+    });
+
+    it('should disable and return false for invalid stop pattern', () => {
+      // Directly set a state with invalid pattern
+      setAutoYesEnabled('wt-cs4', true, 3600000, '[invalid');
+      const result = checkStopCondition('wt-cs4', 'test');
+      expect(result).toBe(false);
+
+      // Verify auto-yes was disabled (invalid pattern detected)
+      const state = getAutoYesState('wt-cs4');
+      expect(state?.enabled).toBe(false);
+    });
+  });
+
+  describe('Issue #314: pollAutoYes with checkStopCondition (delta-based)', () => {
+    it('should skip stop condition check on first poll (baseline establishment)', async () => {
+      const { captureSessionOutput } = await import('@/lib/cli-session');
+      const { sendKeys } = await import('@/lib/tmux');
+
+      vi.useFakeTimers();
+      vi.setSystemTime(Date.now());
+
+      vi.mocked(captureSessionOutput).mockReset();
+      vi.mocked(sendKeys).mockReset();
+
+      // Setup: enable auto-yes with stop pattern
+      setAutoYesEnabled('wt-baseline', true, 3600000, 'fatal error');
+      startAutoYesPolling('wt-baseline', 'claude');
+
+      // Mock: output that matches the stop pattern (pre-existing content)
+      vi.mocked(captureSessionOutput).mockResolvedValue('A fatal error has occurred');
+
+      // Advance timer to trigger first pollAutoYes
+      await vi.advanceTimersByTimeAsync(POLLING_INTERVAL_MS + 100);
+
+      // Verify: auto-yes is STILL enabled (first poll sets baseline, skips stop check)
+      const state = getAutoYesState('wt-baseline');
+      expect(state?.enabled).toBe(true);
+
+      // Verify: poller is still active
+      expect(getActivePollerCount()).toBe(1);
+
+      // Cleanup
+      stopAutoYesPolling('wt-baseline');
+      vi.mocked(captureSessionOutput).mockReset();
+      vi.mocked(sendKeys).mockReset();
+    });
+
+    it('should stop polling when NEW output matches stop pattern on second poll', async () => {
+      const { captureSessionOutput } = await import('@/lib/cli-session');
+      const { sendKeys } = await import('@/lib/tmux');
+
+      vi.useFakeTimers();
+      vi.setSystemTime(Date.now());
+
+      vi.mocked(captureSessionOutput).mockReset();
+      vi.mocked(sendKeys).mockReset();
+
+      // Setup: enable auto-yes with stop pattern
+      setAutoYesEnabled('wt-stop-poll', true, 3600000, 'fatal error');
+      startAutoYesPolling('wt-stop-poll', 'claude');
+
+      // First poll: initial output (no match - establishes baseline)
+      vi.mocked(captureSessionOutput).mockResolvedValue('Claude is working...');
+      await vi.advanceTimersByTimeAsync(POLLING_INTERVAL_MS + 100);
+
+      // Second poll: output grew with matching content
+      vi.mocked(captureSessionOutput).mockResolvedValue('Claude is working...\nA fatal error has occurred');
+      await vi.advanceTimersByTimeAsync(POLLING_INTERVAL_MS + 100);
+
+      // Verify: sendKeys was NOT called (stop condition matched on delta)
+      expect(sendKeys).not.toHaveBeenCalled();
+
+      // Verify: auto-yes was disabled with stop_pattern_matched reason
+      const state = getAutoYesState('wt-stop-poll');
+      expect(state?.enabled).toBe(false);
+      expect(state?.stopReason).toBe('stop_pattern_matched');
+
+      // Verify: poller was stopped
+      expect(getActivePollerCount()).toBe(0);
+
+      // Cleanup
+      vi.mocked(captureSessionOutput).mockReset();
+      vi.mocked(sendKeys).mockReset();
+    });
+
+    it('should not trigger stop on pre-existing content even after multiple polls', async () => {
+      const { captureSessionOutput } = await import('@/lib/cli-session');
+      const { sendKeys } = await import('@/lib/tmux');
+
+      vi.useFakeTimers();
+      vi.setSystemTime(Date.now());
+
+      vi.mocked(captureSessionOutput).mockReset();
+      vi.mocked(sendKeys).mockReset();
+
+      // Setup: enable auto-yes with stop pattern
+      setAutoYesEnabled('wt-no-false', true, 3600000, 'kewton');
+      startAutoYesPolling('wt-no-false', 'claude');
+
+      // First poll: output contains "kewton" (pre-existing, e.g. shell prompt)
+      vi.mocked(captureSessionOutput).mockResolvedValue('kewton@mac:~/project$ claude');
+      await vi.advanceTimersByTimeAsync(POLLING_INTERVAL_MS + 100);
+
+      // Second poll: same output (no new content)
+      vi.mocked(captureSessionOutput).mockResolvedValue('kewton@mac:~/project$ claude');
+      await vi.advanceTimersByTimeAsync(POLLING_INTERVAL_MS + 100);
+
+      // Verify: auto-yes is still enabled (no false trigger from pre-existing content)
+      const state = getAutoYesState('wt-no-false');
+      expect(state?.enabled).toBe(true);
+      expect(getActivePollerCount()).toBe(1);
+
+      // Cleanup
+      stopAutoYesPolling('wt-no-false');
+      vi.mocked(captureSessionOutput).mockReset();
+      vi.mocked(sendKeys).mockReset();
+    });
+
+    it('should continue polling when stop condition does not match', async () => {
+      const { captureSessionOutput } = await import('@/lib/cli-session');
+      const { sendKeys } = await import('@/lib/tmux');
+
+      vi.useFakeTimers();
+      vi.setSystemTime(Date.now());
+
+      vi.mocked(captureSessionOutput).mockReset();
+      vi.mocked(sendKeys).mockReset();
+
+      // Setup: enable auto-yes with stop pattern
+      setAutoYesEnabled('wt-no-stop', true, 3600000, 'fatal error');
+      startAutoYesPolling('wt-no-stop', 'claude');
+
+      // Mock: output that does NOT match the stop pattern, with a yes/no prompt
+      vi.mocked(captureSessionOutput).mockResolvedValue('Do you want to proceed? (y/n)');
+      vi.mocked(sendKeys).mockResolvedValue(undefined);
+
+      // Advance timer to trigger pollAutoYes
+      await vi.advanceTimersByTimeAsync(POLLING_INTERVAL_MS + 100);
+
+      // Verify: sendKeys WAS called (prompt was auto-answered)
+      expect(sendKeys).toHaveBeenCalled();
+
+      // Verify: auto-yes is still enabled
+      const state = getAutoYesState('wt-no-stop');
+      expect(state?.enabled).toBe(true);
+
+      // Cleanup
+      stopAutoYesPolling('wt-no-stop');
+      vi.mocked(captureSessionOutput).mockReset();
+      vi.mocked(sendKeys).mockReset();
+    });
+
+    it('should reset baseline when buffer shrinks', async () => {
+      const { captureSessionOutput } = await import('@/lib/cli-session');
+      const { sendKeys } = await import('@/lib/tmux');
+
+      vi.useFakeTimers();
+      vi.setSystemTime(Date.now());
+
+      vi.mocked(captureSessionOutput).mockReset();
+      vi.mocked(sendKeys).mockReset();
+
+      // Setup: enable auto-yes with stop pattern
+      setAutoYesEnabled('wt-shrink', true, 3600000, 'fatal error');
+      startAutoYesPolling('wt-shrink', 'claude');
+
+      // First poll: long output (baseline)
+      vi.mocked(captureSessionOutput).mockResolvedValue('A'.repeat(1000));
+      await vi.advanceTimersByTimeAsync(POLLING_INTERVAL_MS + 100);
+
+      // Second poll: shorter output (buffer shifted) - should not crash or false trigger
+      vi.mocked(captureSessionOutput).mockResolvedValue('Short output');
+      await vi.advanceTimersByTimeAsync(POLLING_INTERVAL_MS + 100);
+
+      // Verify: auto-yes is still enabled (buffer shrink handled gracefully)
+      const state = getAutoYesState('wt-shrink');
+      expect(state?.enabled).toBe(true);
+      expect(getActivePollerCount()).toBe(1);
+
+      // Cleanup
+      stopAutoYesPolling('wt-shrink');
+      vi.mocked(captureSessionOutput).mockReset();
+      vi.mocked(sendKeys).mockReset();
     });
   });
 });
