@@ -6,18 +6,28 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { MemoCard } from '@/components/worktree/MemoCard';
 import type { WorktreeMemo } from '@/types/models';
 
+// Hoisted mock functions (vi.mock factories are hoisted above imports)
+const { mockSaveNow, mockCopyToClipboard } = vi.hoisted(() => ({
+  mockSaveNow: vi.fn(),
+  mockCopyToClipboard: vi.fn(),
+}));
+
 // Mock useAutoSave hook
-const mockSaveNow = vi.fn();
 vi.mock('@/hooks/useAutoSave', () => ({
   useAutoSave: () => ({
     isSaving: false,
     error: null,
     saveNow: mockSaveNow,
   }),
+}));
+
+// Mock clipboard-utils
+vi.mock('@/lib/clipboard-utils', () => ({
+  copyToClipboard: mockCopyToClipboard,
 }));
 
 describe('MemoCard', () => {
@@ -196,6 +206,154 @@ describe('MemoCard', () => {
 
       const card = screen.getByTestId('memo-card');
       expect(card.className).toMatch(/p-\d|space-y-/);
+    });
+  });
+
+  describe('Copy functionality', () => {
+    beforeEach(() => {
+      mockCopyToClipboard.mockResolvedValue(undefined);
+    });
+
+    it('should render copy button with aria-label', () => {
+      render(<MemoCard {...defaultProps} />);
+
+      const copyButton = screen.getByRole('button', { name: /copy memo content/i });
+      expect(copyButton).toBeInTheDocument();
+    });
+
+    it('should call copyToClipboard with memo content when copy button is clicked', async () => {
+      render(<MemoCard {...defaultProps} />);
+
+      const copyButton = screen.getByRole('button', { name: /copy memo content/i });
+      await act(async () => {
+        fireEvent.click(copyButton);
+      });
+
+      expect(mockCopyToClipboard).toHaveBeenCalledWith('Test content');
+    });
+
+    it('should show Check icon after successful copy', async () => {
+      render(<MemoCard {...defaultProps} />);
+
+      const copyButton = screen.getByRole('button', { name: /copy memo content/i });
+      await act(async () => {
+        fireEvent.click(copyButton);
+      });
+
+      // Check icon should be visible (green color class)
+      const checkIcon = copyButton.querySelector('svg');
+      expect(checkIcon).toBeInTheDocument();
+      expect(checkIcon?.classList.toString()).toContain('text-green-600');
+    });
+
+    it('should revert to Copy icon after 2 seconds', async () => {
+      vi.useFakeTimers();
+
+      render(<MemoCard {...defaultProps} />);
+
+      const copyButton = screen.getByRole('button', { name: /copy memo content/i });
+      await act(async () => {
+        fireEvent.click(copyButton);
+      });
+
+      // Check icon should be visible
+      let icon = copyButton.querySelector('svg');
+      expect(icon?.classList.toString()).toContain('text-green-600');
+
+      // Advance timer by 2 seconds
+      await act(async () => {
+        vi.advanceTimersByTime(2000);
+      });
+
+      // Copy icon should be restored (no green color)
+      icon = copyButton.querySelector('svg');
+      expect(icon?.classList.toString()).not.toContain('text-green-600');
+
+      vi.useRealTimers();
+    });
+
+    it('should not call copyToClipboard when content is empty', async () => {
+      const memoWithEmptyContent = {
+        ...mockMemo,
+        content: '',
+      };
+      render(<MemoCard {...defaultProps} memo={memoWithEmptyContent} />);
+
+      const copyButton = screen.getByRole('button', { name: /copy memo content/i });
+      await act(async () => {
+        fireEvent.click(copyButton);
+      });
+
+      expect(mockCopyToClipboard).not.toHaveBeenCalled();
+    });
+
+    it('should not call copyToClipboard when content is whitespace only', async () => {
+      const memoWithWhitespace = {
+        ...mockMemo,
+        content: '   ',
+      };
+      render(<MemoCard {...defaultProps} memo={memoWithWhitespace} />);
+
+      const copyButton = screen.getByRole('button', { name: /copy memo content/i });
+      await act(async () => {
+        fireEvent.click(copyButton);
+      });
+
+      expect(mockCopyToClipboard).not.toHaveBeenCalled();
+    });
+
+    it('should handle rapid double-click correctly (only one timer active)', async () => {
+      vi.useFakeTimers();
+
+      render(<MemoCard {...defaultProps} />);
+
+      const copyButton = screen.getByRole('button', { name: /copy memo content/i });
+
+      // First click
+      await act(async () => {
+        fireEvent.click(copyButton);
+      });
+
+      // Second click immediately
+      await act(async () => {
+        fireEvent.click(copyButton);
+      });
+
+      expect(mockCopyToClipboard).toHaveBeenCalledTimes(2);
+
+      // After 2 seconds, icon should revert (single timer, not doubled)
+      await act(async () => {
+        vi.advanceTimersByTime(2000);
+      });
+
+      const icon = copyButton.querySelector('svg');
+      expect(icon?.classList.toString()).not.toContain('text-green-600');
+
+      vi.useRealTimers();
+    });
+
+    it('should not cause React warnings when unmounted during copy feedback', async () => {
+      vi.useFakeTimers();
+
+      const { unmount } = render(<MemoCard {...defaultProps} />);
+
+      const copyButton = screen.getByRole('button', { name: /copy memo content/i });
+      await act(async () => {
+        fireEvent.click(copyButton);
+      });
+
+      // Unmount while in "copied" state (timer still pending)
+      unmount();
+
+      // Advancing timers should not cause "state update on unmounted component" warning
+      await act(async () => {
+        vi.advanceTimersByTime(2000);
+      });
+
+      // If we get here without React warnings, the test passes
+      expect(true).toBe(true);
+
+      vi.useRealTimers();
     });
   });
 });

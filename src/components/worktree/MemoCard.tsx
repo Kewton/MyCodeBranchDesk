@@ -6,14 +6,17 @@
  * - Inline title and content editing
  * - Auto-save with debounce
  * - Save on blur
+ * - Copy memo content to clipboard
  * - Delete button
  * - Saving indicator
  */
 
 'use client';
 
-import React, { useState, useCallback, memo } from 'react';
+import React, { useState, useCallback, useRef, useEffect, memo } from 'react';
+import { Copy, Check } from 'lucide-react';
 import { useAutoSave } from '@/hooks/useAutoSave';
+import { copyToClipboard } from '@/lib/clipboard-utils';
 import type { WorktreeMemo } from '@/types/models';
 
 // ============================================================================
@@ -62,6 +65,19 @@ export const MemoCard = memo(function MemoCard({
   // Local state for title and content
   const [title, setTitle] = useState(memo.title);
   const [content, setContent] = useState(memo.content);
+
+  // Copy to clipboard state
+  const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Cleanup timer on unmount to prevent state updates on unmounted component
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
 
   // Auto-save for title
   const {
@@ -126,6 +142,24 @@ export const MemoCard = memo(function MemoCard({
     onDelete(memo.id);
   }, [memo.id, onDelete]);
 
+  /**
+   * [Issue #321] Copy memo content to clipboard.
+   * Icon changes from Copy to Check for 2 seconds on success.
+   * Empty or whitespace-only content is silently ignored.
+   * Failure is silently handled (icon remains unchanged).
+   */
+  const handleCopy = useCallback(async () => {
+    if (!content || content.trim().length === 0) return;
+    try {
+      await copyToClipboard(content);
+      setCopied(true);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Failure is indicated by icon not changing
+    }
+  }, [content]);
+
   return (
     <div
       data-testid="memo-card"
@@ -149,6 +183,19 @@ export const MemoCard = memo(function MemoCard({
             Saving...
           </span>
         )}
+        {/* [Issue #321] Copy memo content button */}
+        <button
+          type="button"
+          onClick={handleCopy}
+          aria-label="Copy memo content"
+          className="p-1 text-gray-400 hover:text-gray-600 transition-colors rounded"
+        >
+          {copied ? (
+            <Check className="w-4 h-4 text-green-600" />
+          ) : (
+            <Copy className="w-4 h-4" />
+          )}
+        </button>
         <button
           type="button"
           onClick={handleDelete}
