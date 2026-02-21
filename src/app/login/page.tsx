@@ -7,49 +7,28 @@
  * Features:
  * - Token input form (password type)
  * - Rate limit / lockout message display
- * - Authenticated redirect to /
+ * - Redirect to / when auth is disabled (via AuthContext, no fetch needed)
  * - i18n support (useTranslations('auth'))
  */
 
 import { useState, useEffect, FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
+import { useAuthEnabled } from '@/contexts/AuthContext';
 
 export default function LoginPage() {
   const t = useTranslations('auth');
+  const authEnabled = useAuthEnabled();
   const [token, setToken] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [retryAfter, setRetryAfter] = useState<number | null>(null);
-  const [checkingAuth, setCheckingAuth] = useState(true);
 
-  // Check if already authenticated
+  // Redirect to home if auth is not enabled
   useEffect(() => {
-    async function checkAuth() {
-      try {
-        const res = await fetch('/api/auth/status');
-        const data = await res.json();
-        if (!data.authEnabled) {
-          // Auth not enabled, redirect to home
-          window.location.href = '/';
-          return;
-        }
-        // Check if user is already authenticated by trying to access a protected route
-        const checkRes = await fetch('/', { method: 'HEAD', redirect: 'manual' });
-        if (checkRes.ok || checkRes.type === 'opaqueredirect') {
-          // User might be authenticated already - check by looking at status
-          if (checkRes.ok) {
-            window.location.href = '/';
-            return;
-          }
-        }
-      } catch {
-        // Ignore errors during auth check
-      } finally {
-        setCheckingAuth(false);
-      }
+    if (!authEnabled) {
+      window.location.href = '/';
     }
-    checkAuth();
-  }, []);
+  }, [authEnabled]);
 
   // Countdown timer for retry
   useEffect(() => {
@@ -104,13 +83,7 @@ export default function LoginPage() {
     }
   }
 
-  if (checkingAuth) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
-        <div className="text-gray-500">Loading...</div>
-      </div>
-    );
-  }
+  if (!authEnabled) return null;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
