@@ -3,26 +3,57 @@
  * Issue #331: Token authentication support
  *
  * SECURITY CONSTRAINTS:
- * - S002: AUTH_EXCLUDED_PATHS matching uses === (exact match, no startsWith)
+ * - S001: Uses XOR constant-time comparison (crypto.timingSafeEqual is Node.js only;
+ *   not available in Edge Runtime. XOR over fixed-length SHA-256 hex is equivalent.)
+ *   Full timingSafeEqual is used in auth.ts (Node.js runtime) for API routes.
+ * - S002: AUTH_EXCLUDED_PATHS matching uses Array.includes() exact match (no startsWith)
+ * - C001 (middleware variant): No Node.js-specific modules imported here.
+ *   auth.ts uses Node.js crypto, so constants/logic are duplicated inline for Edge Runtime.
  * - Backward compatibility: CM_AUTH_TOKEN_HASH unset -> immediate NextResponse.next()
  */
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import {
-  isAuthEnabled,
-  AUTH_EXCLUDED_PATHS,
-  AUTH_COOKIE_NAME,
-  verifyToken,
-} from '@/lib/auth';
+
+// Duplicated from auth.ts to avoid importing Node.js crypto module in Edge Runtime
+const AUTH_COOKIE_NAME = 'cm_auth_token';
+const AUTH_EXCLUDED_PATHS = ['/login', '/api/auth/login', '/api/auth/logout', '/api/auth/status'] as const;
+
+/**
+ * Verify authentication token using Web Crypto API (Edge Runtime compatible).
+ *
+ * S001: Uses XOR constant-time comparison instead of crypto.timingSafeEqual.
+ * For fixed-length SHA-256 hex strings, XOR over all bytes provides equivalent
+ * timing-attack resistance to timingSafeEqual.
+ */
+async function verifyTokenEdge(token: string): Promise<boolean> {
+  const storedHash = process.env.CM_AUTH_TOKEN_HASH;
+  if (!storedHash) return false;
+
+  // Hash the provided token using Web Crypto API (available in Edge Runtime)
+  const encoder = new TextEncoder();
+  const data = encoder.encode(token);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const tokenHash = Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+
+  // S001: Constant-time XOR comparison for fixed-length hex strings
+  if (tokenHash.length !== storedHash.length) return false;
+  let diff = 0;
+  for (let i = 0; i < tokenHash.length; i++) {
+    diff |= tokenHash.charCodeAt(i) ^ storedHash.charCodeAt(i);
+  }
+  return diff === 0;
+}
 
 /**
  * Authentication middleware
  * Checks for valid auth token in cookies before allowing access
  */
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   // Backward compatibility: skip auth if not enabled
-  if (!isAuthEnabled()) {
+  if (!process.env.CM_AUTH_TOKEN_HASH) {
     return NextResponse.next();
   }
 
@@ -35,7 +66,7 @@ export function middleware(request: NextRequest) {
 
   // Check for auth cookie
   const tokenCookie = request.cookies.get(AUTH_COOKIE_NAME);
-  if (tokenCookie && verifyToken(tokenCookie.value)) {
+  if (tokenCookie && (await verifyTokenEdge(tokenCookie.value))) {
     return NextResponse.next();
   }
 

@@ -85,7 +85,7 @@ describe('Auth Middleware', () => {
     delete process.env.CM_AUTH_TOKEN_HASH;
     const { middleware } = await import('@/middleware');
     const req = createMockRequest('/');
-    const res = middleware(req as never);
+    const res = await middleware(req as never);
     expect(res.status).toBe(200);
   });
 
@@ -98,7 +98,7 @@ describe('Auth Middleware', () => {
 
     const { middleware } = await import('@/middleware');
     const req = createMockRequest('/');
-    const res = middleware(req as never);
+    const res = await middleware(req as never);
     expect(res.status).toBe(302);
   });
 
@@ -112,7 +112,7 @@ describe('Auth Middleware', () => {
 
     const { middleware } = await import('@/middleware');
     const req = createMockRequest('/', { cm_auth_token: token });
-    const res = middleware(req as never);
+    const res = await middleware(req as never);
     expect(res.status).toBe(200);
   });
 
@@ -125,7 +125,7 @@ describe('Auth Middleware', () => {
 
     const { middleware } = await import('@/middleware');
     const req = createMockRequest('/login');
-    const res = middleware(req as never);
+    const res = await middleware(req as never);
     expect(res.status).toBe(200);
   });
 
@@ -138,7 +138,7 @@ describe('Auth Middleware', () => {
 
     const { middleware } = await import('@/middleware');
     const req = createMockRequest('/api/auth/login');
-    const res = middleware(req as never);
+    const res = await middleware(req as never);
     expect(res.status).toBe(200);
   });
 
@@ -151,7 +151,7 @@ describe('Auth Middleware', () => {
 
     const { middleware } = await import('@/middleware');
     const req = createMockRequest('/api/auth/status');
-    const res = middleware(req as never);
+    const res = await middleware(req as never);
     expect(res.status).toBe(200);
   });
 
@@ -164,7 +164,7 @@ describe('Auth Middleware', () => {
 
     const { middleware } = await import('@/middleware');
     const req = createMockRequest('/login-bypass');
-    const res = middleware(req as never);
+    const res = await middleware(req as never);
     expect(res.status).toBe(302);
   });
 
@@ -177,7 +177,7 @@ describe('Auth Middleware', () => {
 
     const { middleware } = await import('@/middleware');
     const req = createMockRequest('/', { cm_auth_token: 'wrong-token' });
-    const res = middleware(req as never);
+    const res = await middleware(req as never);
     expect(res.status).toBe(302);
   });
 });
