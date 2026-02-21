@@ -33,6 +33,8 @@ export default getRequestConfig(async ({ requestLocale }) => {
 
   return {
     locale,
+    // next-intl v4 requires timeZone to be set for SSR of client components
+    timeZone: 'UTC',
     messages: {
       common: common.default,
       worktree: worktree.default,

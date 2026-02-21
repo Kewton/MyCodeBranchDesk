@@ -19,6 +19,7 @@ interface AppProvidersProps {
   children: ReactNode;
   locale: string;
   messages: Record<string, unknown>;
+  timeZone?: string;
 }
 
 /**
@@ -31,9 +32,9 @@ interface AppProvidersProps {
  * </AppProviders>
  * ```
  */
-export function AppProviders({ children, locale, messages }: AppProvidersProps) {
+export function AppProviders({ children, locale, messages, timeZone }: AppProvidersProps) {
   return (
-    <NextIntlClientProvider locale={locale} messages={messages}>
+    <NextIntlClientProvider locale={locale} messages={messages} timeZone={timeZone}>
       <SidebarProvider>
         <WorktreeSelectionProvider>
           {children}
