@@ -1382,7 +1382,7 @@ describe('auto-yes-manager', () => {
     it('should return expired when auto-yes is disabled', () => {
       // Setup: enable then disable auto-yes to create a disabled state
       setAutoYesEnabled('test-wt-exp', true);
-      disableAutoYes('test-wt-exp', 'manual' as 'expired');
+      disableAutoYes('test-wt-exp', 'expired');
       const pollerState = createTestPollerState();
 
       // Need to register poller state in globalThis for stopAutoYesPolling to work
