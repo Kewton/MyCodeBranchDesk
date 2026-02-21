@@ -24,6 +24,19 @@ import { generateToken, hashToken, parseDuration } from '../../lib/auth';
 
 const logger = new CLILogger();
 
+/**
+ * Display the generated authentication token to the user.
+ * Called once after server start; the token is not persisted and cannot be retrieved later.
+ *
+ * @param token - The plaintext authentication token to display
+ */
+function displayAuthToken(token: string): void {
+  logger.info('');
+  logger.info('Authentication token (save this - it will not be shown again):');
+  logger.info(`  ${token}`);
+  logger.info('');
+}
+
 /** HTTPS certificate warning when --auth is used without --cert/--key */
 const HTTPS_WARNING = `
 \x1b[1m\x1b[33mWARNING: Authentication enabled without HTTPS\x1b[0m
@@ -195,12 +208,9 @@ export async function startCommand(options: StartOptions): Promise<void> {
         const url = `${protocol}://${bind === '0.0.0.0' ? '127.0.0.1' : bind}:${actualPort}`;
         logger.info(`URL: ${url}`);
 
-        // Issue #331: Show token to user
+        // Issue #331: Show token to user (shown once, not persisted)
         if (authToken) {
-          logger.info('');
-          logger.info('Authentication token (save this - it will not be shown again):');
-          logger.info(`  ${authToken}`);
-          logger.info('');
+          displayAuthToken(authToken);
         }
 
         logSecurityEvent({
@@ -272,12 +282,9 @@ export async function startCommand(options: StartOptions): Promise<void> {
       console.log(REVERSE_PROXY_WARNING);
     }
 
-    // Issue #331: Show token to user (foreground mode)
+    // Issue #331: Show token to user (foreground mode, shown once, not persisted)
     if (authToken) {
-      logger.info('');
-      logger.info('Authentication token (save this - it will not be shown again):');
-      logger.info(`  ${authToken}`);
-      logger.info('');
+      displayAuthToken(authToken);
     }
 
     // Use package installation directory, not current working directory

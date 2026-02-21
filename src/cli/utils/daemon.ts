@@ -75,12 +75,9 @@ export class DaemonManager {
       env.CM_DB_PATH = options.dbPath;
     }
 
-    // Issue #331: Pass auth and HTTPS environment variables to daemon
-    if (options.auth && env.CM_AUTH_TOKEN_HASH) {
-      // Token hash is already set by startCommand
-    }
-    // Forward these from the parent env if set by startCommand
-    const authEnvKeys = ['CM_AUTH_TOKEN_HASH', 'CM_AUTH_EXPIRE', 'CM_HTTPS_CERT', 'CM_HTTPS_KEY', 'CM_ALLOW_HTTP'];
+    // Issue #331: Forward auth and HTTPS environment variables from parent process to daemon.
+    // These are set by startCommand before calling daemon.start().
+    const authEnvKeys = ['CM_AUTH_TOKEN_HASH', 'CM_AUTH_EXPIRE', 'CM_HTTPS_CERT', 'CM_HTTPS_KEY', 'CM_ALLOW_HTTP'] as const;
     for (const key of authEnvKeys) {
       if (process.env[key]) {
         env[key] = process.env[key];

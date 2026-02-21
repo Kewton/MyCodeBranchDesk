@@ -11,19 +11,28 @@ import {
   AUTH_COOKIE_NAME,
   getTokenMaxAge,
   createRateLimiter,
+  buildAuthCookieOptions,
+  DEFAULT_COOKIE_MAX_AGE_SECONDS,
 } from '@/lib/auth';
 
 // Module-level rate limiter instance
 const rateLimiter = createRateLimiter();
 
+/** Fallback IP address when no forwarding headers are present */
+const LOOPBACK_IP = '127.0.0.1';
+
 /**
- * Extract client IP from request
+ * Extract client IP from request headers.
+ * Checks X-Forwarded-For (first entry) and X-Real-IP before falling back to loopback.
+ *
+ * @param request - Incoming Next.js request
+ * @returns Client IP address string
  */
 function getClientIp(request: NextRequest): string {
   return (
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
     request.headers.get('x-real-ip') ||
-    '127.0.0.1'
+    LOOPBACK_IP
   );
 }
 
@@ -69,19 +78,11 @@ export async function POST(request: NextRequest) {
 
     // Calculate cookie maxAge (remaining token lifetime in seconds)
     const maxAge = getTokenMaxAge();
-
-    // Determine if HTTPS (for Secure flag)
-    const isHttps = !!process.env.CM_HTTPS_CERT;
+    const effectiveMaxAge = maxAge > 0 ? maxAge : DEFAULT_COOKIE_MAX_AGE_SECONDS;
 
     // Set HttpOnly cookie with the token
     const response = NextResponse.json({ success: true });
-    response.cookies.set(AUTH_COOKIE_NAME, token, {
-      httpOnly: true,
-      sameSite: 'strict',
-      secure: isHttps,
-      maxAge: maxAge > 0 ? maxAge : 86400, // fallback 24h
-      path: '/',
-    });
+    response.cookies.set(AUTH_COOKIE_NAME, token, buildAuthCookieOptions(effectiveMaxAge));
 
     return response;
   } catch {

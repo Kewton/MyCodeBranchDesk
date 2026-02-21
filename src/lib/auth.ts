@@ -39,14 +39,26 @@ export const RATE_LIMIT_CONFIG = {
   cleanupInterval: 60 * 60 * 1000,
 } as const;
 
+/** Milliseconds in one minute */
+const MS_PER_MINUTE = 60 * 1000;
+
+/** Milliseconds in one hour */
+const MS_PER_HOUR = 60 * MS_PER_MINUTE;
+
+/** Milliseconds in one day */
+const MS_PER_DAY = 24 * MS_PER_HOUR;
+
 /** Default token expiration duration (24 hours) */
-const DEFAULT_EXPIRE_DURATION = 24 * 60 * 60 * 1000;
+const DEFAULT_EXPIRE_DURATION = 24 * MS_PER_HOUR;
 
 /** Minimum duration: 1 hour */
-const MIN_DURATION_MS = 60 * 60 * 1000;
+const MIN_DURATION_MS = MS_PER_HOUR;
 
 /** Maximum duration: 30 days */
-const MAX_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
+const MAX_DURATION_MS = 30 * MS_PER_DAY;
+
+/** Fallback cookie maxAge in seconds when no explicit expiry is set (24 hours) */
+export const DEFAULT_COOKIE_MAX_AGE_SECONDS = 24 * 60 * 60;
 
 // ============================================================
 // Module-level state (initialized from env at import time)
@@ -152,20 +164,19 @@ export function parseDuration(s: string): number {
   const value = parseInt(match[1], 10);
   const unit = match[2];
 
-  let ms: number;
-  switch (unit) {
-    case 'h':
-      ms = value * 60 * 60 * 1000;
-      break;
-    case 'd':
-      ms = value * 24 * 60 * 60 * 1000;
-      break;
-    case 'm':
-      ms = value * 60 * 1000;
-      break;
-    default:
-      throw new Error(`Invalid duration unit: "${unit}"`);
+  /** Map of duration unit characters to their millisecond multipliers */
+  const unitMultipliers: Record<string, number> = {
+    h: MS_PER_HOUR,
+    d: MS_PER_DAY,
+    m: MS_PER_MINUTE,
+  };
+
+  const multiplier = unitMultipliers[unit];
+  if (multiplier === undefined) {
+    throw new Error(`Invalid duration unit: "${unit}"`);
   }
+
+  const ms = value * multiplier;
 
   if (ms < MIN_DURATION_MS) {
     throw new Error(`Duration too short: minimum is 1h (60m). Got: "${s}"`);
@@ -240,6 +251,43 @@ export function getTokenMaxAge(): number {
   return Math.floor(remaining / 1000);
 }
 
+/**
+ * Check if HTTPS is enabled based on certificate environment variable
+ * @returns true if CM_HTTPS_CERT is set (indicating TLS certificates are configured)
+ */
+export function isHttpsEnabled(): boolean {
+  return !!process.env.CM_HTTPS_CERT;
+}
+
+/**
+ * Cookie options for authentication cookies.
+ * C001: Uses only standard types (no Next.js CookieOptions dependency).
+ */
+export interface AuthCookieOptions {
+  httpOnly: boolean;
+  sameSite: 'strict';
+  secure: boolean;
+  maxAge: number;
+  path: string;
+}
+
+/**
+ * Build authentication cookie options with consistent security settings.
+ * Centralizes cookie configuration to enforce HttpOnly, SameSite, and Secure flags.
+ *
+ * @param maxAge - Cookie max age in seconds. Use 0 to clear the cookie.
+ * @returns Cookie options object compatible with Next.js response.cookies.set()
+ */
+export function buildAuthCookieOptions(maxAge: number): AuthCookieOptions {
+  return {
+    httpOnly: true,
+    sameSite: 'strict',
+    secure: isHttpsEnabled(),
+    maxAge,
+    path: '/',
+  };
+}
+
 // ============================================================
 // Rate Limiter
 // ============================================================
@@ -275,14 +323,12 @@ export function createRateLimiter(): RateLimiter {
   const cleanupTimer = setInterval(() => {
     const now = Date.now();
     for (const [ip, entry] of entries) {
-      // Remove entries that are unlocked and older than lockout duration
-      if (
-        entry.lockedUntil === null ||
-        (entry.lockedUntil !== null && now > entry.lockedUntil)
-      ) {
-        if (now - entry.lastAttempt > RATE_LIMIT_CONFIG.lockoutDuration) {
-          entries.delete(ip);
-        }
+      // Remove entries whose lockout has expired (or was never set)
+      // and whose last attempt is older than the lockout duration
+      const isLockoutExpired = entry.lockedUntil === null || now > entry.lockedUntil;
+      const isStale = now - entry.lastAttempt > RATE_LIMIT_CONFIG.lockoutDuration;
+      if (isLockoutExpired && isStale) {
+        entries.delete(ip);
       }
     }
   }, RATE_LIMIT_CONFIG.cleanupInterval);

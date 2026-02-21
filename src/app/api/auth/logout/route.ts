@@ -6,18 +6,13 @@
  */
 
 import { NextResponse } from 'next/server';
-import { AUTH_COOKIE_NAME } from '@/lib/auth';
+import { AUTH_COOKIE_NAME, buildAuthCookieOptions } from '@/lib/auth';
 
 export async function POST() {
   const response = NextResponse.json({ success: true });
 
-  // Clear the auth cookie
-  response.cookies.set(AUTH_COOKIE_NAME, '', {
-    httpOnly: true,
-    sameSite: 'strict',
-    maxAge: 0,
-    path: '/',
-  });
+  // Clear the auth cookie (maxAge: 0 instructs the browser to delete it)
+  response.cookies.set(AUTH_COOKIE_NAME, '', buildAuthCookieOptions(0));
 
   return response;
 }
