@@ -210,6 +210,13 @@ export async function startCommand(options: StartOptions): Promise<void> {
       if (options.allowHttp) {
         process.env.CM_ALLOW_HTTP = '1';
       }
+      // Issue #332: Set IP restriction env vars for daemon mode
+      if (options.allowedIps) {
+        process.env.CM_ALLOWED_IPS = options.allowedIps;
+      }
+      if (options.trustProxy) {
+        process.env.CM_TRUST_PROXY = 'true';
+      }
 
       try {
         const pid = await daemonManager.start({
@@ -298,11 +305,19 @@ export async function startCommand(options: StartOptions): Promise<void> {
     if (options.allowHttp) {
       env.CM_ALLOW_HTTP = '1';
     }
+    // Issue #332: Set IP restriction env vars for foreground mode
+    if (options.allowedIps) {
+      env.CM_ALLOWED_IPS = options.allowedIps;
+    }
+    if (options.trustProxy) {
+      env.CM_TRUST_PROXY = 'true';
+    }
 
     // Issue #179: Security warning for external access - recommend reverse proxy
     const bindAddress = env.CM_BIND || '127.0.0.1';
 
-    if (bindAddress === '0.0.0.0' && !options.auth) {
+    // Issue #332: Suppress warning when --allowed-ips is set (IP restriction provides access control)
+    if (bindAddress === '0.0.0.0' && !options.auth && !options.allowedIps) {
       console.log(REVERSE_PROXY_WARNING);
     }
 

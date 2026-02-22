@@ -77,7 +77,8 @@ export class DaemonManager {
 
     // Issue #331: Forward auth and HTTPS environment variables from parent process to daemon.
     // These are set by startCommand before calling daemon.start().
-    const authEnvKeys = ['CM_AUTH_TOKEN_HASH', 'CM_AUTH_EXPIRE', 'CM_HTTPS_CERT', 'CM_HTTPS_KEY', 'CM_ALLOW_HTTP'] as const;
+    // Issue #332: Added CM_ALLOWED_IPS, CM_TRUST_PROXY for IP restriction in daemon mode
+    const authEnvKeys = ['CM_AUTH_TOKEN_HASH', 'CM_AUTH_EXPIRE', 'CM_HTTPS_CERT', 'CM_HTTPS_KEY', 'CM_ALLOW_HTTP', 'CM_ALLOWED_IPS', 'CM_TRUST_PROXY'] as const;
     for (const key of authEnvKeys) {
       if (process.env[key]) {
         env[key] = process.env[key];
@@ -89,7 +90,8 @@ export class DaemonManager {
     const port = env.CM_PORT || '3000';
     const protocol = env.CM_HTTPS_CERT ? 'https' : 'http';
 
-    if (bindAddress === '0.0.0.0' && !env.CM_AUTH_TOKEN_HASH) {
+    // Issue #332: Suppress warning when CM_ALLOWED_IPS is set (IP restriction provides access control)
+    if (bindAddress === '0.0.0.0' && !env.CM_AUTH_TOKEN_HASH && !env.CM_ALLOWED_IPS) {
       console.log(REVERSE_PROXY_WARNING);
     }
 
