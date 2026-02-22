@@ -11,23 +11,8 @@
 
 import crypto from 'crypto';
 
-// ============================================================
-// Constants
-// ============================================================
-
-/** Cookie name for authentication token */
-export const AUTH_COOKIE_NAME = 'cm_auth_token' as const;
-
-/**
- * Paths excluded from authentication check.
- * S002: Must use === for matching (no startsWith - bypass attack prevention)
- */
-export const AUTH_EXCLUDED_PATHS = [
-  '/login',
-  '/api/auth/login',
-  '/api/auth/logout',
-  '/api/auth/status',
-] as const;
+// Re-export shared constants from Edge Runtime-compatible config
+export { AUTH_COOKIE_NAME, AUTH_EXCLUDED_PATHS } from '../config/auth-config';
 
 /** Rate limiting configuration for brute-force protection */
 export const RATE_LIMIT_CONFIG = {

@@ -14,10 +14,7 @@
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-
-// Duplicated from auth.ts to avoid importing Node.js crypto module in Edge Runtime
-const AUTH_COOKIE_NAME = 'cm_auth_token';
-const AUTH_EXCLUDED_PATHS = ['/login', '/api/auth/login', '/api/auth/logout', '/api/auth/status'] as const;
+import { AUTH_COOKIE_NAME, AUTH_EXCLUDED_PATHS } from './config/auth-config';
 
 /**
  * Verify authentication token using Web Crypto API (Edge Runtime compatible).
