@@ -25,7 +25,12 @@ import type { SlashCommandGroup } from '@/types/slash-commands';
 
 /**
  * Slash commands API response
+ *
+ * NOTE: This interface is local to the worktree-specific API route.
+ * A separate SlashCommandsResponse exists in api-client.ts for /api/slash-commands (MCBD).
+ * The two types share the same name but have different structures (this one includes sources).
  */
+// TODO: api-client.ts の SlashCommandsResponse との型統合を検討する（sources フィールドの共有）
 interface SlashCommandsResponse {
   groups: ReturnType<typeof getStandardCommandGroups>;
   sources: {

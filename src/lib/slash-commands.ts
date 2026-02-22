@@ -120,6 +120,12 @@ function parseCommandFile(filePath: string): SlashCommand | null {
 /**
  * Parse a skill file (SKILL.md) and extract metadata (Issue #343)
  *
+ * [D009] Note on cliTools: SKILL.md may contain an `allowed-tools` frontmatter field,
+ * which specifies which Claude Code tools the skill is allowed to use (e.g., Bash, Read).
+ * This is distinct from the SlashCommand.cliTools field, which controls which CLI tools
+ * (claude, codex, gemini) a command is displayed for in the selector UI. Skills currently
+ * do not set cliTools, making them available for all CLI tools via filterCommandsByCliTool().
+ *
  * @param skillDirPath - Absolute path to the skill subdirectory
  * @param skillName - Directory name used as fallback for skill name
  * @returns Parsed SlashCommand or null if parsing fails
@@ -179,6 +185,10 @@ export async function loadSlashCommands(basePath?: string): Promise<SlashCommand
   commands.sort((a, b) => a.name.localeCompare(b.name));
 
   // Update cache
+  // Note: commandsCache is also assigned in getSlashCommandGroups() when basePath is not
+  // provided (via `commandsCache = await loadSlashCommands()`). This dual assignment is
+  // intentional: loadSlashCommands() always updates the cache for getCachedCommands() callers,
+  // while getSlashCommandGroups() uses the cache to avoid redundant loads.
   commandsCache = commands;
 
   return commands;
@@ -189,6 +199,11 @@ export async function loadSlashCommands(basePath?: string): Promise<SlashCommand
  *
  * Scans the skills directory for subdirectories containing SKILL.md files.
  * Each valid subdirectory is parsed as a skill command.
+ *
+ * NOTE: This function is declared async for consistency with loadSlashCommands(),
+ * even though the current implementation uses synchronous fs operations.
+ * This keeps the public API uniform and allows future migration to async I/O
+ * without breaking callers.
  *
  * Security measures:
  * - Path traversal prevention (rejects ".." in directory names)
@@ -315,6 +330,10 @@ export function clearCache(): void {
 
 /**
  * Filter commands by search query
+ *
+ * NOTE: This function only searches commandsCache and does NOT include skills.
+ * For UI filtering that includes both commands and skills, use
+ * `filterCommandGroups()` from command-merger.ts instead.
  *
  * @param query - Search query string
  * @returns Filtered commands matching the query
