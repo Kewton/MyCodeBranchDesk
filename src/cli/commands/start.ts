@@ -187,6 +187,24 @@ export async function startCommand(options: StartOptions): Promise<void> {
 
       logger.info(`Starting ${serverLabel} in background...`);
 
+      // Issue #331: Set auth environment variables in process.env so daemon.ts can forward them
+      // to the child process. daemon.ts reads process.env[key] to build the child env object.
+      if (authTokenHash) {
+        process.env.CM_AUTH_TOKEN_HASH = authTokenHash;
+      }
+      if (options.authExpire) {
+        process.env.CM_AUTH_EXPIRE = options.authExpire;
+      }
+      if (options.cert) {
+        process.env.CM_HTTPS_CERT = options.cert;
+      }
+      if (options.key) {
+        process.env.CM_HTTPS_KEY = options.key;
+      }
+      if (options.allowHttp) {
+        process.env.CM_ALLOW_HTTP = '1';
+      }
+
       try {
         const pid = await daemonManager.start({
           dev: options.dev,
