@@ -117,6 +117,20 @@ app.prepare().then(() => {
       return;
     }
 
+    // Issue #332: Inject X-Real-IP header for IP restriction
+    // [S3-005] This applies to HTTP requests only. WebSocket upgrade requests
+    // are skipped below and handled by ws-server.ts (which uses socket.remoteAddress directly).
+    const clientIp = req.socket.remoteAddress || '';
+    if (process.env.CM_TRUST_PROXY !== 'true') {
+      // CM_TRUST_PROXY=false: always overwrite to prevent forged headers
+      req.headers['x-real-ip'] = clientIp;
+    } else {
+      // CM_TRUST_PROXY=true: only set if X-Forwarded-For is absent
+      if (!req.headers['x-forwarded-for']) {
+        req.headers['x-real-ip'] = clientIp;
+      }
+    }
+
     // Skip WebSocket upgrade requests - they are handled by the server 'upgrade' event.
     if (req.headers['upgrade']) {
       return;

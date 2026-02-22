@@ -56,6 +56,9 @@ describe('Auth Middleware', () => {
     process.env = { ...originalEnv };
     delete process.env.CM_AUTH_TOKEN_HASH;
     delete process.env.CM_AUTH_EXPIRE;
+    // Issue #332: Clean up IP restriction env vars between tests
+    delete process.env.CM_ALLOWED_IPS;
+    delete process.env.CM_TRUST_PROXY;
   });
 
   afterEach(() => {
@@ -221,5 +224,66 @@ describe('Auth Middleware', () => {
     const req = createMockRequest('/', {}, { upgrade: 'websocket' });
     const res = await middleware(req as never);
     expect(res.status).toBe(200);
+  });
+
+  // ============================================================
+  // Issue #332: IP Restriction Tests
+  // ============================================================
+
+  describe('IP Restriction', () => {
+    it('should pass through when CM_ALLOWED_IPS is not set', async () => {
+      delete process.env.CM_ALLOWED_IPS;
+      const { middleware } = await import('@/middleware');
+      const req = createMockRequest('/');
+      const res = await middleware(req as never);
+      expect(res.status).toBe(200);
+    });
+
+    it('should pass through for allowed IP', async () => {
+      process.env.CM_ALLOWED_IPS = '192.168.1.0/24';
+      const { middleware } = await import('@/middleware');
+      const req = createMockRequest('/', {}, { 'x-real-ip': '192.168.1.100' });
+      const res = await middleware(req as never);
+      expect(res.status).toBe(200);
+    });
+
+    it('should return 403 for denied IP', async () => {
+      process.env.CM_ALLOWED_IPS = '192.168.1.0/24';
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { middleware } = await import('@/middleware');
+      const req = createMockRequest('/', {}, { 'x-real-ip': '10.0.0.1' });
+      const res = await middleware(req as never);
+      expect(res.status).toBe(403);
+      warnSpy.mockRestore();
+    });
+
+    it('should return 403 for excluded paths when IP is denied (S4-003)', async () => {
+      process.env.CM_ALLOWED_IPS = '192.168.1.0/24';
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { middleware } = await import('@/middleware');
+      const req = createMockRequest('/login', {}, { 'x-real-ip': '10.0.0.1' });
+      const res = await middleware(req as never);
+      expect(res.status).toBe(403);
+      warnSpy.mockRestore();
+    });
+
+    it('should return 403 when no client IP is available', async () => {
+      process.env.CM_ALLOWED_IPS = '192.168.1.0/24';
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { middleware } = await import('@/middleware');
+      const req = createMockRequest('/');
+      const res = await middleware(req as never);
+      expect(res.status).toBe(403);
+      warnSpy.mockRestore();
+    });
+
+    it('should use X-Forwarded-For when CM_TRUST_PROXY=true', async () => {
+      process.env.CM_ALLOWED_IPS = '192.168.1.0/24';
+      process.env.CM_TRUST_PROXY = 'true';
+      const { middleware } = await import('@/middleware');
+      const req = createMockRequest('/', {}, { 'x-forwarded-for': '192.168.1.50, 10.0.0.1' });
+      const res = await middleware(req as never);
+      expect(res.status).toBe(200);
+    });
   });
 });

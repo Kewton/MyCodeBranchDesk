@@ -15,6 +15,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { AUTH_COOKIE_NAME, AUTH_EXCLUDED_PATHS, computeExpireAt, isValidTokenHash } from './config/auth-config';
+import { getAllowedRanges, isIpAllowed, isIpRestrictionEnabled, getClientIp, normalizeIp } from './lib/ip-restriction';
 
 /** Token expiration timestamp, computed once at module load time */
 const expireAt: number | null = computeExpireAt();
@@ -63,6 +64,19 @@ async function verifyTokenEdge(token: string): Promise<boolean> {
  * Checks for valid auth token in cookies before allowing access
  */
 export async function middleware(request: NextRequest) {
+  // Step 1: IP restriction check (all requests)
+  // [S4-003] Executed before AUTH_EXCLUDED_PATHS evaluation. Excluded paths are also subject to IP restriction.
+  // [S2-005] Defense-in-depth: WebSocket upgrade requests are checked here AND in ws-server.ts.
+  if (isIpRestrictionEnabled()) {
+    const clientIp = getClientIp(request.headers);
+    if (!clientIp || !isIpAllowed(clientIp, getAllowedRanges())) {
+      // [S4-004] Log injection prevention: normalizeIp() + substring(0, 45)
+      const safeIp = clientIp ? normalizeIp(clientIp).substring(0, 45) : 'unknown';
+      console.warn(`[IP-RESTRICTION] Denied: ${safeIp}`);
+      return new NextResponse(null, { status: 403 });
+    }
+  }
+
   // WebSocket upgrade requests: verify auth before passing through.
   // On Node.js 19+, upgrade requests can trigger middleware even when an upgrade
   // listener is registered. ws-server.ts also checks auth on upgrade, so this is

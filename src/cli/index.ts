@@ -52,6 +52,8 @@ program
   .option('--cert <path>', 'Path to TLS certificate file')
   .option('--key <path>', 'Path to TLS private key file')
   .option('--allow-http', 'Suppress HTTPS warning when using --auth without certificates')
+  .option('--allowed-ips <cidrs>', 'Allowed IP addresses/CIDR ranges (comma-separated)')
+  .option('--trust-proxy', 'Trust X-Forwarded-For header from reverse proxy')
   .action(async (options) => {
     await startCommand({
       dev: options.dev,
@@ -65,6 +67,8 @@ program
       cert: options.cert,
       key: options.key,
       allowHttp: options.allowHttp,
+      allowedIps: options.allowedIps,
+      trustProxy: options.trustProxy,
     });
   });
 

@@ -26,6 +26,7 @@ or built-in token auth is a serious security risk.
 
 \x1b[1mRecommended authentication methods:\x1b[0m
   - commandmate start --auth (built-in token auth)
+  - commandmate start --allowed-ips 192.168.1.0/24 (IP restriction)
   - Nginx + Basic Auth
   - Cloudflare Access
   - Tailscale
