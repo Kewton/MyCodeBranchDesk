@@ -11,8 +11,9 @@
 
 import crypto from 'crypto';
 
-// Re-export shared constants from Edge Runtime-compatible config
-export { AUTH_COOKIE_NAME, AUTH_EXCLUDED_PATHS } from '../config/auth-config';
+// Import and re-export shared constants and functions from Edge Runtime-compatible config
+import { AUTH_COOKIE_NAME, AUTH_EXCLUDED_PATHS, parseDuration, computeExpireAt, DEFAULT_EXPIRE_DURATION_MS } from '../config/auth-config';
+export { AUTH_COOKIE_NAME, AUTH_EXCLUDED_PATHS, parseDuration, computeExpireAt, DEFAULT_EXPIRE_DURATION_MS };
 
 /** Rate limiting configuration for brute-force protection */
 export const RATE_LIMIT_CONFIG = {
@@ -24,24 +25,6 @@ export const RATE_LIMIT_CONFIG = {
   cleanupInterval: 60 * 60 * 1000,
 } as const;
 
-/** Milliseconds in one minute */
-const MS_PER_MINUTE = 60 * 1000;
-
-/** Milliseconds in one hour */
-const MS_PER_HOUR = 60 * MS_PER_MINUTE;
-
-/** Milliseconds in one day */
-const MS_PER_DAY = 24 * MS_PER_HOUR;
-
-/** Default token expiration duration (24 hours) */
-const DEFAULT_EXPIRE_DURATION = 24 * MS_PER_HOUR;
-
-/** Minimum duration: 1 hour */
-const MIN_DURATION_MS = MS_PER_HOUR;
-
-/** Maximum duration: 30 days */
-const MAX_DURATION_MS = 30 * MS_PER_DAY;
-
 /** Fallback cookie maxAge in seconds when no explicit expiry is set (24 hours) */
 export const DEFAULT_COOKIE_MAX_AGE_SECONDS = 24 * 60 * 60;
 
@@ -49,27 +32,21 @@ export const DEFAULT_COOKIE_MAX_AGE_SECONDS = 24 * 60 * 60;
 // Module-level state (initialized from env at import time)
 // ============================================================
 
+/** Valid SHA-256 hex string pattern: exactly 64 hex characters */
+const VALID_TOKEN_HASH_PATTERN = /^[0-9a-f]{64}$/;
+
 /** The stored hash of the authentication token */
-const storedTokenHash: string | undefined = process.env.CM_AUTH_TOKEN_HASH || undefined;
+const storedTokenHash: string | undefined = (() => {
+  const hash = process.env.CM_AUTH_TOKEN_HASH || undefined;
+  if (hash && !VALID_TOKEN_HASH_PATTERN.test(hash)) {
+    console.error(`[Security] CM_AUTH_TOKEN_HASH is not a valid 64-character hex string (got ${hash.length} chars). Authentication will be disabled.`);
+    return undefined;
+  }
+  return hash;
+})();
 
 /** Token expiration timestamp (ms since epoch) */
-const expireAt: number | null = (() => {
-  const expireStr = process.env.CM_AUTH_EXPIRE;
-  const now = Date.now();
-  if (expireStr) {
-    try {
-      return now + parseDuration(expireStr);
-    } catch {
-      // Invalid duration format - use default
-      return now + DEFAULT_EXPIRE_DURATION;
-    }
-  }
-  // Default 24h if auth is enabled
-  if (process.env.CM_AUTH_TOKEN_HASH) {
-    return now + DEFAULT_EXPIRE_DURATION;
-  }
-  return null;
-})();
+const expireAt: number | null = computeExpireAt();
 
 // ============================================================
 // Token Functions
@@ -125,53 +102,6 @@ export function verifyToken(token: string): boolean {
   }
 
   return crypto.timingSafeEqual(hashBuffer, storedBuffer);
-}
-
-// ============================================================
-// Duration Parsing
-// ============================================================
-
-/**
- * Parse a duration string into milliseconds
- * Supported formats: Nh (hours), Nd (days), Nm (minutes)
- * Minimum: 1h, Maximum: 30d
- *
- * @param s - Duration string (e.g., "24h", "7d", "90m")
- * @returns Duration in milliseconds
- * @throws Error if format is invalid or out of range
- */
-export function parseDuration(s: string): number {
-  const match = s.match(/^(\d+)([hdm])$/);
-  if (!match) {
-    throw new Error(`Invalid duration format: "${s}". Use Nh, Nd, or Nm (e.g., "24h", "7d", "90m")`);
-  }
-
-  const value = parseInt(match[1], 10);
-  const unit = match[2];
-
-  /** Map of duration unit characters to their millisecond multipliers */
-  const unitMultipliers: Record<string, number> = {
-    h: MS_PER_HOUR,
-    d: MS_PER_DAY,
-    m: MS_PER_MINUTE,
-  };
-
-  const multiplier = unitMultipliers[unit];
-  if (multiplier === undefined) {
-    throw new Error(`Invalid duration unit: "${unit}"`);
-  }
-
-  const ms = value * multiplier;
-
-  if (ms < MIN_DURATION_MS) {
-    throw new Error(`Duration too short: minimum is 1h (60m). Got: "${s}"`);
-  }
-
-  if (ms > MAX_DURATION_MS) {
-    throw new Error(`Duration too long: maximum is 30d (720h). Got: "${s}"`);
-  }
-
-  return ms;
 }
 
 // ============================================================

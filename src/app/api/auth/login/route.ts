@@ -18,27 +18,18 @@ import {
 // Module-level rate limiter instance
 const rateLimiter = createRateLimiter();
 
-/** Fallback IP address when no forwarding headers are present */
-const LOOPBACK_IP = '127.0.0.1';
-
 /**
- * Extract client IP from request headers.
- * Checks X-Forwarded-For (first entry) and X-Real-IP before falling back to loopback.
- *
- * @param request - Incoming Next.js request
- * @returns Client IP address string
+ * Rate limit key for login attempts.
+ * H2 fix: Do NOT trust X-Forwarded-For or X-Real-IP headers for rate limiting.
+ * These headers are attacker-controlled when there is no trusted reverse proxy.
+ * CommandMate typically serves direct connections, so we use a fixed key
+ * to enforce a global rate limit regardless of source IP.
  */
-function getClientIp(request: NextRequest): string {
-  return (
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    request.headers.get('x-real-ip') ||
-    LOOPBACK_IP
-  );
-}
+const RATE_LIMIT_KEY = 'global';
 
 export async function POST(request: NextRequest) {
   try {
-    const ip = getClientIp(request);
+    const ip = RATE_LIMIT_KEY;
 
     // Rate limit check
     const limitResult = rateLimiter.checkLimit(ip);
@@ -57,7 +48,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { token } = body;
 
-    if (!token || typeof token !== 'string') {
+    // M3 fix: Validate token type and length to prevent DoS via oversized input.
+    // Valid tokens are 64-char hex strings (32 bytes), so 256 chars is generous.
+    if (!token || typeof token !== 'string' || token.length > 256) {
       rateLimiter.recordFailure(ip);
       return NextResponse.json(
         { error: 'Token is required' },

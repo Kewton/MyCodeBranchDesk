@@ -14,7 +14,18 @@
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { AUTH_COOKIE_NAME, AUTH_EXCLUDED_PATHS } from './config/auth-config';
+import { AUTH_COOKIE_NAME, AUTH_EXCLUDED_PATHS, computeExpireAt } from './config/auth-config';
+
+/** Token expiration timestamp, computed once at module load time */
+const expireAt: number | null = computeExpireAt();
+
+/**
+ * Check if the token has expired.
+ * Uses the same expireAt logic as auth.ts (via shared computeExpireAt).
+ */
+function isTokenExpired(): boolean {
+  return expireAt !== null && Date.now() > expireAt;
+}
 
 /**
  * Verify authentication token using Web Crypto API (Edge Runtime compatible).
@@ -26,6 +37,9 @@ import { AUTH_COOKIE_NAME, AUTH_EXCLUDED_PATHS } from './config/auth-config';
 async function verifyTokenEdge(token: string): Promise<boolean> {
   const storedHash = process.env.CM_AUTH_TOKEN_HASH;
   if (!storedHash) return false;
+
+  // Check token expiry (C1 fix: middleware must also enforce expiry)
+  if (isTokenExpired()) return false;
 
   // Hash the provided token using Web Crypto API (available in Edge Runtime)
   const encoder = new TextEncoder();
@@ -49,11 +63,22 @@ async function verifyTokenEdge(token: string): Promise<boolean> {
  * Checks for valid auth token in cookies before allowing access
  */
 export async function middleware(request: NextRequest) {
-  // Skip WebSocket upgrade requests - they are handled by the server 'upgrade' event.
+  // WebSocket upgrade requests: verify auth before passing through.
   // On Node.js 19+, upgrade requests can trigger middleware even when an upgrade
-  // listener is registered, causing TypeError in handleRequestImpl (Issue #331).
+  // listener is registered. ws-server.ts also checks auth on upgrade, so this is
+  // defense-in-depth (H1 fix: prevent Upgrade header from bypassing middleware auth).
   if (request.headers.get('upgrade')?.toLowerCase() === 'websocket') {
-    return NextResponse.next();
+    // Skip auth check if auth is not enabled
+    if (!process.env.CM_AUTH_TOKEN_HASH) {
+      return NextResponse.next();
+    }
+    // Verify the auth cookie before allowing the upgrade to proceed
+    const tokenCookie = request.cookies.get(AUTH_COOKIE_NAME);
+    if (tokenCookie && !isTokenExpired() && (await verifyTokenEdge(tokenCookie.value))) {
+      return NextResponse.next();
+    }
+    // Return 401 for unauthenticated WebSocket upgrades
+    return new NextResponse(null, { status: 401 });
   }
 
   // Backward compatibility: skip auth if not enabled

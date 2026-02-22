@@ -19,3 +19,92 @@ export const AUTH_EXCLUDED_PATHS = [
   '/api/auth/logout',
   '/api/auth/status',
 ] as const;
+
+// ============================================================
+// Duration Parsing (Edge Runtime compatible)
+// ============================================================
+
+/** Milliseconds in one minute */
+const MS_PER_MINUTE = 60 * 1000;
+
+/** Milliseconds in one hour */
+const MS_PER_HOUR = 60 * MS_PER_MINUTE;
+
+/** Milliseconds in one day */
+const MS_PER_DAY = 24 * MS_PER_HOUR;
+
+/** Default token expiration duration (24 hours) */
+export const DEFAULT_EXPIRE_DURATION_MS = 24 * MS_PER_HOUR;
+
+/** Minimum duration: 1 hour */
+const MIN_DURATION_MS = MS_PER_HOUR;
+
+/** Maximum duration: 30 days */
+const MAX_DURATION_MS = 30 * MS_PER_DAY;
+
+/**
+ * Parse a duration string into milliseconds.
+ * Supported formats: Nh (hours), Nd (days), Nm (minutes)
+ * Minimum: 1h, Maximum: 30d
+ *
+ * @param s - Duration string (e.g., "24h", "7d", "90m")
+ * @returns Duration in milliseconds
+ * @throws Error if format is invalid or out of range
+ */
+export function parseDuration(s: string): number {
+  const match = s.match(/^(\d+)([hdm])$/);
+  if (!match) {
+    throw new Error(`Invalid duration format: "${s}". Use Nh, Nd, or Nm (e.g., "24h", "7d", "90m")`);
+  }
+
+  const value = parseInt(match[1], 10);
+  const unit = match[2];
+
+  /** Map of duration unit characters to their millisecond multipliers */
+  const unitMultipliers: Record<string, number> = {
+    h: MS_PER_HOUR,
+    d: MS_PER_DAY,
+    m: MS_PER_MINUTE,
+  };
+
+  const multiplier = unitMultipliers[unit];
+  if (multiplier === undefined) {
+    throw new Error(`Invalid duration unit: "${unit}"`);
+  }
+
+  const ms = value * multiplier;
+
+  if (ms < MIN_DURATION_MS) {
+    throw new Error(`Duration too short: minimum is 1h (60m). Got: "${s}"`);
+  }
+
+  if (ms > MAX_DURATION_MS) {
+    throw new Error(`Duration too long: maximum is 30d (720h). Got: "${s}"`);
+  }
+
+  return ms;
+}
+
+/**
+ * Compute token expiration timestamp from environment variables.
+ * Used by both auth.ts (Node.js) and middleware.ts (Edge Runtime).
+ *
+ * @returns Expiration timestamp (ms since epoch), or null if auth is not enabled
+ */
+export function computeExpireAt(): number | null {
+  const expireStr = process.env.CM_AUTH_EXPIRE;
+  const now = Date.now();
+  if (expireStr) {
+    try {
+      return now + parseDuration(expireStr);
+    } catch {
+      // Invalid duration format - use default
+      return now + DEFAULT_EXPIRE_DURATION_MS;
+    }
+  }
+  // Default 24h if auth is enabled
+  if (process.env.CM_AUTH_TOKEN_HASH) {
+    return now + DEFAULT_EXPIRE_DURATION_MS;
+  }
+  return null;
+}

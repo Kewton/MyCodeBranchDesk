@@ -219,8 +219,21 @@ app.prepare().then(() => {
     }
   }
 
-  server.listen(port, async (err?: Error) => {
-    if (err) throw err;
+  // H3 fix: Pass hostname to listen() so CM_BIND is respected.
+  // Note: http.Server.listen(port, hostname, callback) does not pass err to callback;
+  // listen errors emit an 'error' event instead.
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`Port ${port} is already in use`);
+    } else if (err.code === 'EADDRNOTAVAIL') {
+      console.error(`Address ${hostname}:${port} is not available`);
+    } else {
+      console.error('Server error:', err);
+    }
+    process.exit(1);
+  });
+
+  server.listen(port, hostname, async () => {
     console.log(`> Ready on ${protocol}://${hostname}:${port}`);
     console.log(`> WebSocket server ready`);
 

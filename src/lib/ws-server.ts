@@ -83,7 +83,7 @@ export function setupWebSocket(server: HTTPServer | HTTPSServer): void {
       const token = cookies[AUTH_COOKIE_NAME];
 
       if (!token || !verifyToken(token)) {
-        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+        socket.write('HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n');
         socket.destroy();
         return;
       }
