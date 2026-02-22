@@ -32,6 +32,7 @@ interface SlashCommandsResponse {
     standard: number;
     worktree: number;
     mcbd: number;
+    skill: number;  // Issue #343: Skills source count
   };
   cliTool: CLIToolType;
 }
@@ -98,13 +99,11 @@ export async function GET(
     // Issue #4: Filter by CLI tool
     const filteredGroups = filterCommandsByCliTool(mergedGroups, cliTool);
 
-    // Calculate source counts (after filtering)
-    const filteredStandardCount = filteredGroups
-      .flatMap(g => g.commands)
-      .filter(cmd => cmd.source === 'standard').length;
-    const filteredWorktreeCount = filteredGroups
-      .flatMap(g => g.commands)
-      .filter(cmd => cmd.source === 'worktree').length;
+    // Calculate source counts (after filtering) - DRY: flatMap once
+    const allFilteredCommands = filteredGroups.flatMap(g => g.commands);
+    const filteredStandardCount = allFilteredCommands.filter(cmd => cmd.source === 'standard').length;
+    const filteredWorktreeCount = allFilteredCommands.filter(cmd => cmd.source === 'worktree').length;
+    const filteredSkillCount = allFilteredCommands.filter(cmd => cmd.source === 'skill').length;
 
     return NextResponse.json({
       groups: filteredGroups,
@@ -112,6 +111,7 @@ export async function GET(
         standard: filteredStandardCount,
         worktree: filteredWorktreeCount,
         mcbd: 0, // MCBD commands are loaded separately via /api/slash-commands
+        skill: filteredSkillCount, // Issue #343: Skills source count
       },
       cliTool,
     });
