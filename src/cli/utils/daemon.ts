@@ -90,7 +90,8 @@ export class DaemonManager {
     const port = env.CM_PORT || '3000';
     const protocol = env.CM_HTTPS_CERT ? 'https' : 'http';
 
-    if (bindAddress === '0.0.0.0' && !env.CM_AUTH_TOKEN_HASH) {
+    // Issue #332: Suppress warning when CM_ALLOWED_IPS is set (IP restriction provides access control)
+    if (bindAddress === '0.0.0.0' && !env.CM_AUTH_TOKEN_HASH && !env.CM_ALLOWED_IPS) {
       console.log(REVERSE_PROXY_WARNING);
     }
 

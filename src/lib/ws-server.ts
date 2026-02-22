@@ -178,7 +178,7 @@ export function setupWebSocket(server: HTTPServer | HTTPSServer): void {
     });
   });
 
-  console.log('WebSocket server initialized');
+  // WebSocket server initialization complete (no log in production per CLAUDE.md)
 }
 
 /**
@@ -209,7 +209,6 @@ function handleMessage(ws: WebSocket, message: WebSocketMessage): void {
 function handleSubscribe(ws: WebSocket, worktreeId: string): void {
   const clientInfo = clients.get(ws);
   if (!clientInfo) {
-    console.log(`[WS] handleSubscribe: clientInfo not found for worktreeId: ${worktreeId}`);
     return;
   }
 
@@ -223,7 +222,7 @@ function handleSubscribe(ws: WebSocket, worktreeId: string): void {
   const room = rooms.get(worktreeId)!;
   room.add(ws);
 
-  console.log(`Client subscribed to worktree: ${worktreeId}, room size: ${room.size}, ws readyState: ${ws.readyState}`);
+  // Client subscribed (no log in production per CLAUDE.md)
 }
 
 /**
@@ -246,7 +245,7 @@ function handleUnsubscribe(ws: WebSocket, worktreeId: string): void {
     }
   }
 
-  console.log(`Client unsubscribed from worktree: ${worktreeId}`);
+  // Client unsubscribed (no log in production per CLAUDE.md)
 }
 
 /**
@@ -254,13 +253,7 @@ function handleUnsubscribe(ws: WebSocket, worktreeId: string): void {
  */
 function handleBroadcast(worktreeId: string, data: unknown): void {
   const room = rooms.get(worktreeId);
-  console.log(`[WS] handleBroadcast called for ${worktreeId}, room size: ${room?.size || 0}`);
-  if (!room) {
-    console.log(`[WS] No room found for ${worktreeId}`);
-    return;
-  }
-  if (room.size === 0) {
-    console.log(`[WS] Room for ${worktreeId} is empty`);
+  if (!room || room.size === 0) {
     return;
   }
 
@@ -271,22 +264,15 @@ function handleBroadcast(worktreeId: string, data: unknown): void {
       data,
     });
 
-    let successCount = 0;
-    let errorCount = 0;
-
     room.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
         try {
           client.send(message);
-          successCount++;
         } catch (sendError) {
-          errorCount++;
           console.error(`Error sending WebSocket message to client:`, sendError);
         }
       }
     });
-
-    console.log(`Broadcast to worktree ${worktreeId}: ${successCount}/${room.size} clients (${errorCount} errors)`);
   } catch (broadcastError) {
     console.error(`Error broadcasting to worktree ${worktreeId}:`, broadcastError);
     // Try to broadcast with sanitized data
@@ -392,7 +378,7 @@ export function cleanupRooms(worktreeIds: string[]): void {
       });
       // Delete the room
       rooms.delete(worktreeId);
-      console.log(`[WS] Cleaned up room for worktree: ${worktreeId}`);
+      // Room cleaned up (no log in production per CLAUDE.md)
     }
   }
 }
@@ -416,6 +402,6 @@ export function closeWebSocket(): void {
     wss.close();
     wss = null;
 
-    console.log('WebSocket server closed');
+    // WebSocket server closed (no log in production per CLAUDE.md)
   }
 }

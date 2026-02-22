@@ -40,6 +40,27 @@ export interface CidrRange {
   mask: number;
 }
 
+// --- Module-scope initialization [S1-003] ---
+// Following auth.ts storedTokenHash pattern: read env once at module load.
+// Placed before functions that depend on these values for clarity.
+
+const allowedIpsEnv = process.env.CM_ALLOWED_IPS?.trim() || '';
+
+// [S4-006] CM_TRUST_PROXY value validation:
+// 'true' is the only value that enables proxy trust. Other non-empty values
+// (e.g., 'TRUE', '1', 'yes') fall back to safe default (no proxy trust),
+// and a warning is emitted to help operators detect configuration mistakes.
+const trustProxyEnv = process.env.CM_TRUST_PROXY?.trim() || '';
+if (trustProxyEnv !== '' && trustProxyEnv !== 'true' && trustProxyEnv !== 'false') {
+  console.warn(
+    `[IP-RESTRICTION] CM_TRUST_PROXY has unexpected value: "${trustProxyEnv}". ` +
+    'Only "true" (lowercase) enables proxy trust.'
+  );
+}
+
+/** Whether CM_TRUST_PROXY is strictly 'true' */
+const trustProxy = trustProxyEnv === 'true';
+
 // --- Pure functions ---
 
 /**
@@ -83,7 +104,12 @@ export function normalizeIp(ip: string): string {
  * Throws Error on invalid CIDR format (fail-fast).
  *
  * [S4-002] Throws when entry count exceeds MAX_ALLOWED_IP_ENTRIES (256).
+ * Large CIDR entry counts cause parse delay and per-request OR-loop
+ * performance degradation.
+ *
  * [S4-005] Throws when any entry exceeds MAX_CIDR_ENTRY_LENGTH (18 chars).
+ * IPv4 CIDR maximum is '255.255.255.255/32' (18 chars); longer input is
+ * rejected before regex matching.
  *
  * @throws {Error} Invalid IP address or CIDR format
  * @throws {Error} Entry count exceeds MAX_ALLOWED_IP_ENTRIES (256)
@@ -197,14 +223,20 @@ export function isIpAllowed(ip: string, ranges: CidrRange[]): boolean {
 /**
  * Get client IP from request headers.
  *
- * [S1-004] Request parsing responsibility. Separate from CIDR matching.
- * If proxy-related settings grow, consider splitting to a separate module.
+ * [S1-004] Request parsing responsibility - separate from CIDR matching
+ * (isIpAllowed). These are different responsibilities: request parsing vs
+ * IP range evaluation. If proxy-related settings grow (e.g., trusted proxies
+ * list via CM_TRUSTED_PROXIES), consider splitting to a separate module
+ * (e.g., request-ip.ts).
  *
  * [S4-001] WARNING: When CM_TRUST_PROXY=true, the leftmost IP from
  * X-Forwarded-For is used. An attacker can inject arbitrary IPs at the
  * front of the header. The reverse proxy MUST overwrite X-Forwarded-For
- * with the client IP it received. If the proxy does not do this correctly,
+ * with the client IP it received (trusted proxy sets the client IP it
+ * received as the first entry). If the proxy does not do this correctly,
  * IP restriction bypass is possible.
+ * Future extension: introduce CM_TRUSTED_PROXIES for a trusted proxy IP
+ * list and switch to rightmost-non-trusted-IP extraction.
  *
  * @param headers - Request headers with get() method
  * @returns Client IP string or null
@@ -224,23 +256,6 @@ export function getClientIp(headers: {
   // Default: use X-Real-IP (set by server.ts from socket.remoteAddress)
   return headers.get('x-real-ip') || null;
 }
-
-// --- Module-scope initialization [S1-003] ---
-// Following auth.ts storedTokenHash pattern: read env once at module load.
-
-const allowedIpsEnv = process.env.CM_ALLOWED_IPS?.trim() || '';
-
-// [S4-006] CM_TRUST_PROXY value validation
-const trustProxyEnv = process.env.CM_TRUST_PROXY?.trim() || '';
-if (trustProxyEnv !== '' && trustProxyEnv !== 'true' && trustProxyEnv !== 'false') {
-  console.warn(
-    `[IP-RESTRICTION] CM_TRUST_PROXY has unexpected value: "${trustProxyEnv}". ` +
-    'Only "true" (lowercase) enables proxy trust.'
-  );
-}
-
-/** Whether CM_TRUST_PROXY is strictly 'true' */
-const trustProxy = trustProxyEnv === 'true';
 
 // [S1-001] Module-level cache of parsed ranges
 // Shared by middleware.ts and ws-server.ts via getAllowedRanges()
