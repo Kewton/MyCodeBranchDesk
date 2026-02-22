@@ -193,6 +193,12 @@ export interface Env {
 
   /** Issue #331: Path to TLS private key file (optional) */
   CM_HTTPS_KEY?: string;
+
+  /** Issue #332: Allowed IP addresses/CIDR ranges (comma-separated, optional) */
+  CM_ALLOWED_IPS?: string;
+
+  /** Issue #332: Trust reverse proxy X-Forwarded-For header ('true'/'false', optional) */
+  CM_TRUST_PROXY?: string;
 }
 
 /**

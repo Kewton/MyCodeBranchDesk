@@ -9,6 +9,7 @@ import { Server as HTTPSServer } from 'https';
 import { WebSocketServer, WebSocket } from 'ws';
 import { IncomingMessage } from 'http';
 import { isAuthEnabled, parseCookies, AUTH_COOKIE_NAME, verifyToken } from './auth';
+import { getAllowedRanges, isIpAllowed, isIpRestrictionEnabled, normalizeIp } from './ip-restriction';
 
 interface WebSocketMessage {
   type: 'subscribe' | 'unsubscribe' | 'broadcast';
@@ -74,6 +75,22 @@ export function setupWebSocket(server: HTTPServer | HTTPSServer): void {
         socket.destroy();
       }
       return;
+    }
+
+    // Issue #332: WebSocket IP restriction
+    // [S2-008] Uses request.socket.remoteAddress directly (not getClientIp()).
+    // getClientIp() is for HTTP headers (X-Real-IP/X-Forwarded-For);
+    // WebSocket upgrade gets IP from the socket connection directly.
+    if (isIpRestrictionEnabled()) {
+      const wsClientIp = normalizeIp(request.socket.remoteAddress || '');
+      if (!isIpAllowed(wsClientIp, getAllowedRanges())) {
+        // [S4-004] Log injection prevention: normalizeIp() + substring(0, 45)
+        const safeIp = wsClientIp.substring(0, 45);
+        console.warn(`[IP-RESTRICTION] WebSocket denied: ${safeIp}`);
+        socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+        socket.destroy();
+        return;
+      }
     }
 
     // Issue #331: WebSocket authentication via Cookie header

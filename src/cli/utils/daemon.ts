@@ -77,7 +77,8 @@ export class DaemonManager {
 
     // Issue #331: Forward auth and HTTPS environment variables from parent process to daemon.
     // These are set by startCommand before calling daemon.start().
-    const authEnvKeys = ['CM_AUTH_TOKEN_HASH', 'CM_AUTH_EXPIRE', 'CM_HTTPS_CERT', 'CM_HTTPS_KEY', 'CM_ALLOW_HTTP'] as const;
+    // Issue #332: Added CM_ALLOWED_IPS, CM_TRUST_PROXY for IP restriction in daemon mode
+    const authEnvKeys = ['CM_AUTH_TOKEN_HASH', 'CM_AUTH_EXPIRE', 'CM_HTTPS_CERT', 'CM_HTTPS_KEY', 'CM_ALLOW_HTTP', 'CM_ALLOWED_IPS', 'CM_TRUST_PROXY'] as const;
     for (const key of authEnvKeys) {
       if (process.env[key]) {
         env[key] = process.env[key];

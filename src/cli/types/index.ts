@@ -56,6 +56,10 @@ export interface StartOptions {
   key?: string;
   /** Suppress HTTPS warning when using --auth without certificates (Issue #331) */
   allowHttp?: boolean;
+  /** Issue #332: Allowed IP addresses/CIDR ranges (comma-separated) */
+  allowedIps?: string;
+  /** Issue #332: Trust X-Forwarded-For header from reverse proxy */
+  trustProxy?: boolean;
 }
 
 /**
