@@ -129,6 +129,7 @@ tests/
 
 | モジュール | 説明 |
 |-----------|------|
+| `src/config/auth-config.ts` | 認証設定定数（Issue #331: AUTH_COOKIE_NAME、AUTH_EXCLUDED_PATHS、Edge Runtime互換、auth.ts/middleware.ts共通） |
 | `src/lib/auth.ts` | トークン認証コアモジュール（Issue #331: generateToken/hashToken/verifyToken/parseDuration/parseCookies/isAuthEnabled/buildAuthCookieOptions/createRateLimiter、CLIビルド互換性制約: Next.js固有モジュール依存禁止） |
 | `src/middleware.ts` | 認証ミドルウェア（Issue #331: HTTPリクエスト認証、CM_AUTH_TOKEN_HASH未設定時は即NextResponse.next()、AUTH_EXCLUDED_PATHSの完全一致マッチング） |
 | `src/lib/env.ts` | 環境変数取得・フォールバック処理、getDatabasePathWithDeprecationWarning() |

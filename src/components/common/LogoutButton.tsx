@@ -8,8 +8,9 @@
  * Used in both desktop sidebar and mobile header.
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { useAuthEnabled } from '@/contexts/AuthContext';
 
 /**
  * LogoutButton - displays a logout button when auth is enabled
@@ -17,22 +18,8 @@ import { useTranslations } from 'next-intl';
  */
 export function LogoutButton() {
   const t = useTranslations('auth');
-  const [authEnabled, setAuthEnabled] = useState(false);
+  const authEnabled = useAuthEnabled();
   const [loading, setLoading] = useState(false);
-
-  // Check if auth is enabled on mount
-  useEffect(() => {
-    async function checkAuth() {
-      try {
-        const res = await fetch('/api/auth/status');
-        const data = await res.json();
-        setAuthEnabled(data.authEnabled);
-      } catch {
-        // Ignore errors - assume auth is not enabled
-      }
-    }
-    checkAuth();
-  }, []);
 
   if (!authEnabled) {
     return null;

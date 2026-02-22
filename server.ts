@@ -91,16 +91,48 @@ function validateCertPath(filePath: string, label: string): string {
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
+// Issue #331: Prevent Next.js (NextCustomServer) from registering its own upgrade
+// event listener on the HTTP server.
+//
+// When next() is called without customServer:false, it creates a NextCustomServer
+// instance. NextCustomServer.getRequestHandler() lazily calls setupWebSocketHandler()
+// on the first HTTP request, which registers an upgrade listener that calls
+// router-server's upgradeHandler → resolveRoutes({ res: socket }) → middleware match
+// → serverResult.requestHandler(req, socket, parsedUrl). This passes the raw TCP
+// socket as the HTTP response object, causing:
+//   TypeError: Cannot read properties of undefined (reading 'bind')
+// in handleRequestImpl when it tries to call _res.setHeader.bind(_res).
+//
+// Making setupWebSocketHandler a no-op prevents this listener from being added.
+// All WebSocket upgrades are handled by ws-server.ts (our own upgrade listener).
+(app as unknown as { setupWebSocketHandler?: () => void }).setupWebSocketHandler = () => {};
+
 app.prepare().then(() => {
   // Request handler for both HTTP and HTTPS
   const requestHandler = async (req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
+    // Guard: res must be a proper HTTP ServerResponse (not a raw net.Socket).
+    // Defense-in-depth: normally not needed after the setupWebSocketHandler fix above,
+    // but kept for safety in case any other path passes a non-ServerResponse object.
+    if (typeof (res as unknown as { setHeader?: unknown })?.setHeader !== 'function') {
+      return;
+    }
+
+    // Skip WebSocket upgrade requests - they are handled by the server 'upgrade' event.
+    if (req.headers['upgrade']) {
+      return;
+    }
+
+    const method = req.method ?? 'UNKNOWN';
+    const url = req.url ?? '/';
     try {
-      const parsedUrl = parse(req.url!, true);
+      const parsedUrl = parse(url, true);
       await handle(req, res, parsedUrl);
     } catch (err) {
-      console.error('Error handling request', err);
-      res.statusCode = 500;
-      res.end('Internal Server Error');
+      console.error(`handleRequestImpl failed: ${method} ${url}`, err);
+      if (!res.headersSent) {
+        res.statusCode = 500;
+        res.end('Internal Server Error');
+      }
     }
   };
 
@@ -187,8 +219,21 @@ app.prepare().then(() => {
     }
   }
 
-  server.listen(port, async (err?: Error) => {
-    if (err) throw err;
+  // H3 fix: Pass hostname to listen() so CM_BIND is respected.
+  // Note: http.Server.listen(port, hostname, callback) does not pass err to callback;
+  // listen errors emit an 'error' event instead.
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`Port ${port} is already in use`);
+    } else if (err.code === 'EADDRNOTAVAIL') {
+      console.error(`Address ${hostname}:${port} is not available`);
+    } else {
+      console.error('Server error:', err);
+    }
+    process.exit(1);
+  });
+
+  server.listen(port, hostname, async () => {
     console.log(`> Ready on ${protocol}://${hostname}:${port}`);
     console.log(`> WebSocket server ready`);
 
