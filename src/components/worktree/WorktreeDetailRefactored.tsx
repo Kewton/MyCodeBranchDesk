@@ -1411,14 +1411,18 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
   /** [Issue #294] Handle CMATE.md setup/validate button */
   const handleCmateSetup = useCallback(async () => {
     try {
-      // Check if CMATE.md already exists
-      const checkResponse = await fetch(
-        `/api/worktrees/${worktreeId}/files/CMATE.md`
-      );
+      // Check if CMATE.md exists via tree listing (avoids 404 console noise)
+      const treeResponse = await fetch(`/api/worktrees/${worktreeId}/tree`);
+      if (!treeResponse.ok) {
+        throw new Error(`Failed to list worktree files: ${treeResponse.status}`);
+      }
+      const treeData = await treeResponse.json();
+      const treeItems: { name: string }[] = treeData.items ?? [];
+      const cmateExists = treeItems.some(item => item.name === 'CMATE.md');
 
       let content: string;
 
-      if (checkResponse.status === 404) {
+      if (!cmateExists) {
         // File does not exist - create with template
         const createResponse = await fetch(
           `/api/worktrees/${worktreeId}/files/CMATE.md`,
@@ -1435,16 +1439,20 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
         setFileTreeRefresh(prev => prev + 1);
         // Use template content directly for validation
         content = CMATE_TEMPLATE_CONTENT;
-      } else if (checkResponse.ok) {
+      } else {
         // File exists - read content for validation
-        const data = await checkResponse.json();
+        const fileResponse = await fetch(
+          `/api/worktrees/${worktreeId}/files/CMATE.md`
+        );
+        if (!fileResponse.ok) {
+          throw new Error(`Failed to read CMATE.md: ${fileResponse.status}`);
+        }
+        const data = await fileResponse.json();
         if (typeof data.content !== 'string') {
           showToast(tSchedule('cmateValidation.failed'), 'error');
           return;
         }
         content = data.content;
-      } else {
-        throw new Error(`Failed to check CMATE.md: ${checkResponse.status}`);
       }
 
       // Validate content
