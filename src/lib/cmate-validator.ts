@@ -39,13 +39,16 @@ const MAX_CRON_EXPRESSION_LENGTH = 100;
 
 /** Validation error for a single row in the Schedules table */
 export interface CmateValidationError {
-  /** 0-based row index in the Schedules table */
+  /** 0-based row index in the Schedules table (-1 for header errors) */
   row: number;
   /** Human-readable error message */
   message: string;
   /** Field that caused the error */
-  field: 'columns' | 'name' | 'cron' | 'message';
+  field: 'columns' | 'name' | 'cron' | 'message' | 'header';
 }
+
+/** Expected header columns for the Schedules table (minimum required) */
+const EXPECTED_SCHEDULE_HEADERS = ['Name', 'Cron', 'Message'] as const;
 
 // =============================================================================
 // Template
@@ -135,6 +138,57 @@ function isValidCronExpression(expression: string): boolean {
   }
   const parts = expression.trim().split(/\s+/);
   return parts.length >= 5 && parts.length <= 6;
+}
+
+/**
+ * Validate that the Schedules section header row contains the expected columns.
+ *
+ * @param content - Raw CMATE.md file content
+ * @returns Array of validation errors (empty = headers valid)
+ */
+export function validateScheduleHeaders(
+  content: string
+): CmateValidationError[] {
+  const errors: CmateValidationError[] = [];
+  const lines = content.split('\n');
+
+  let inSchedules = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    const sectionMatch = trimmed.match(/^##\s+(.+)$/);
+    if (sectionMatch) {
+      inSchedules = sectionMatch[1].trim() === 'Schedules';
+      continue;
+    }
+
+    if (!inSchedules || !trimmed.startsWith('|')) {
+      continue;
+    }
+
+    // First table row in Schedules section = header row
+    const cells = trimmed
+      .split('|')
+      .slice(1, -1)
+      .map((cell) => cell.trim());
+
+    for (let i = 0; i < EXPECTED_SCHEDULE_HEADERS.length; i++) {
+      const expected = EXPECTED_SCHEDULE_HEADERS[i];
+      const actual = cells[i];
+      if (!actual || actual !== expected) {
+        errors.push({
+          row: -1,
+          message: `Header column ${i + 1}: expected "${expected}", got "${actual || '(missing)'}"`,
+          field: 'header',
+        });
+      }
+    }
+
+    break; // Only check the first table row (header)
+  }
+
+  return errors;
 }
 
 /**

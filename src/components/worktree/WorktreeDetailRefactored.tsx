@@ -61,7 +61,7 @@ import { useTranslations } from 'next-intl';
 import { useFileOperations } from '@/hooks/useFileOperations';
 import { MoveDialog } from '@/components/worktree/MoveDialog';
 import { encodePathForUrl } from '@/lib/url-path-encoder';
-import { parseCmateContent, validateSchedulesSection, CMATE_TEMPLATE_CONTENT } from '@/lib/cmate-validator';
+import { parseCmateContent, validateScheduleHeaders, validateSchedulesSection, CMATE_TEMPLATE_CONTENT } from '@/lib/cmate-validator';
 
 // ============================================================================
 // Types
@@ -1448,6 +1448,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
       }
 
       // Validate content
+      const headerErrors = validateScheduleHeaders(content);
       const sections = parseCmateContent(content);
       const scheduleRows = sections.get('Schedules');
 
@@ -1456,7 +1457,8 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
         return;
       }
 
-      const errors = validateSchedulesSection(scheduleRows);
+      const rowErrors = validateSchedulesSection(scheduleRows);
+      const errors = [...headerErrors, ...rowErrors];
 
       if (errors.length === 0) {
         showToast(

@@ -7,6 +7,7 @@ import { describe, it, expect } from 'vitest';
 import {
   CMATE_TEMPLATE_CONTENT,
   parseCmateContent,
+  validateScheduleHeaders,
   validateSchedulesSection,
 } from '@/lib/cmate-validator';
 
@@ -17,13 +18,16 @@ describe('cmate-validator', () => {
 
   describe('CMATE_TEMPLATE_CONTENT', () => {
     it('should parse and validate with zero errors (round-trip)', () => {
+      const headerErrors = validateScheduleHeaders(CMATE_TEMPLATE_CONTENT);
+      expect(headerErrors).toEqual([]);
+
       const sections = parseCmateContent(CMATE_TEMPLATE_CONTENT);
       const rows = sections.get('Schedules');
       expect(rows).toBeDefined();
       expect(rows!.length).toBeGreaterThan(0);
 
-      const errors = validateSchedulesSection(rows!);
-      expect(errors).toEqual([]);
+      const rowErrors = validateSchedulesSection(rows!);
+      expect(rowErrors).toEqual([]);
     });
   });
 
@@ -81,6 +85,72 @@ describe('cmate-validator', () => {
 `;
       const sections = parseCmateContent(content);
       expect(sections.get('Schedules')!).toHaveLength(0);
+    });
+  });
+
+  // ==========================================================================
+  // validateScheduleHeaders
+  // ==========================================================================
+
+  describe('validateScheduleHeaders', () => {
+    it('should return no errors for valid headers', () => {
+      const content = `## Schedules
+
+| Name | Cron | Message | CLI Tool | Enabled |
+|------|------|---------|----------|---------|
+| task1 | 0 * * * * | msg | claude | true |
+`;
+      expect(validateScheduleHeaders(content)).toEqual([]);
+    });
+
+    it('should detect wrong header name', () => {
+      const content = `## Schedules
+
+| Name | Cron | Message2 | CLI Tool | Enabled |
+|------|------|----------|----------|---------|
+| task1 | 0 * * * * | msg | claude | true |
+`;
+      const errors = validateScheduleHeaders(content);
+      expect(errors).toHaveLength(1);
+      expect(errors[0].field).toBe('header');
+      expect(errors[0].row).toBe(-1);
+      expect(errors[0].message).toContain('Message');
+      expect(errors[0].message).toContain('Message2');
+    });
+
+    it('should detect multiple wrong headers', () => {
+      const content = `## Schedules
+
+| Foo | Bar | Baz |
+|-----|-----|-----|
+| x | y | z |
+`;
+      const errors = validateScheduleHeaders(content);
+      expect(errors).toHaveLength(3);
+      expect(errors.every((e) => e.field === 'header')).toBe(true);
+    });
+
+    it('should detect missing required headers (too few columns)', () => {
+      const content = `## Schedules
+
+| Name | Cron |
+|------|------|
+| x | y |
+`;
+      const errors = validateScheduleHeaders(content);
+      expect(errors).toHaveLength(1);
+      expect(errors[0].message).toContain('Message');
+      expect(errors[0].message).toContain('(missing)');
+    });
+
+    it('should return empty for content with no Schedules section', () => {
+      const content = `## Other
+
+| Key | Value |
+|-----|-------|
+| foo | bar |
+`;
+      expect(validateScheduleHeaders(content)).toEqual([]);
     });
   });
 
