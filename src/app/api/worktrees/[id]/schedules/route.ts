@@ -14,8 +14,9 @@ import { isValidWorktreeId } from '@/lib/auto-yes-manager';
 import {
   MAX_SCHEDULE_NAME_LENGTH,
   MAX_SCHEDULE_MESSAGE_LENGTH,
-  MAX_SCHEDULE_CRON_LENGTH,
 } from '@/config/schedule-config';
+import { ALLOWED_CLI_TOOLS } from '@/lib/claude-executor';
+import { isValidCronExpression } from '@/config/cmate-constants';
 
 /**
  * GET /api/worktrees/:id/schedules
@@ -76,16 +77,19 @@ export async function POST(
     }
 
     const body = await request.json().catch(() => ({}));
-    const { name, message, cronExpression, cliToolId, enabled } = body;
+    const { cronExpression, cliToolId, enabled } = body;
 
-    // Validate required fields
-    if (!name || typeof name !== 'string') {
+    // Trim and validate required string fields
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    const message = typeof body.message === 'string' ? body.message.trim() : '';
+
+    if (!name) {
       return NextResponse.json({ error: 'name is required' }, { status: 400 });
     }
     if (name.length > MAX_SCHEDULE_NAME_LENGTH) {
       return NextResponse.json({ error: `name must be ${MAX_SCHEDULE_NAME_LENGTH} characters or less` }, { status: 400 });
     }
-    if (!message || typeof message !== 'string') {
+    if (!message) {
       return NextResponse.json({ error: 'message is required' }, { status: 400 });
     }
     if (message.length > MAX_SCHEDULE_MESSAGE_LENGTH) {
@@ -94,14 +98,19 @@ export async function POST(
     if (!cronExpression || typeof cronExpression !== 'string') {
       return NextResponse.json({ error: 'cronExpression is required' }, { status: 400 });
     }
-    if (cronExpression.length > MAX_SCHEDULE_CRON_LENGTH) {
-      return NextResponse.json({ error: `cronExpression must be ${MAX_SCHEDULE_CRON_LENGTH} characters or less` }, { status: 400 });
+    if (!isValidCronExpression(cronExpression)) {
+      return NextResponse.json({ error: 'Invalid cron expression format' }, { status: 400 });
+    }
+
+    // Validate cliToolId against whitelist
+    const toolId = cliToolId || 'claude';
+    if (!ALLOWED_CLI_TOOLS.has(toolId)) {
+      return NextResponse.json({ error: 'Invalid CLI tool' }, { status: 400 });
     }
 
     const now = Date.now();
     const id = randomUUID();
     const enabledValue = enabled !== false ? 1 : 0;
-    const toolId = cliToolId || 'claude';
 
     db.prepare(`
       INSERT INTO scheduled_executions (id, worktree_id, name, message, cron_expression, cli_tool_id, enabled, created_at, updated_at)

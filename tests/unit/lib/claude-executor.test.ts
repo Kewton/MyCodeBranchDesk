@@ -120,9 +120,9 @@ describe('claude-executor', () => {
       expect(args).toEqual(['exec', 'hello', '--sandbox', 'workspace-write']);
     });
 
-    it('should build fallback args with -p for unknown tools', () => {
-      const args = buildCliArgs('hello', 'gemini');
-      expect(args).toEqual(['-p', 'hello']);
+    it('should default to claude args for unknown tools', () => {
+      const args = buildCliArgs('hello', 'unknown');
+      expect(args).toEqual(['-p', 'hello', '--output-format', 'text', '--permission-mode', 'acceptEdits']);
     });
   });
 

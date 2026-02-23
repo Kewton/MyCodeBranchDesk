@@ -87,9 +87,8 @@ export function buildCliArgs(message: string, cliToolId: string, permission?: st
     case 'codex':
       return ['exec', message, '--sandbox', permission ?? 'workspace-write'];
     case 'claude':
-      return ['-p', message, '--output-format', 'text', '--permission-mode', permission ?? 'acceptEdits'];
     default:
-      return ['-p', message];
+      return ['-p', message, '--output-format', 'text', '--permission-mode', permission ?? 'acceptEdits'];
   }
 }
 

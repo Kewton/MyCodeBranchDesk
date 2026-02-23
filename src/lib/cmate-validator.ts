@@ -242,27 +242,20 @@ export function validateSchedulesSection(
     }
 
     // Validate permission (6th column)
+    // Empty/missing permission is allowed — parser applies default per CLI tool
     const permissionStr = row[5];
-    if (permissionStr !== undefined) {
+    if (permissionStr !== undefined && permissionStr.trim() !== '') {
       const trimmedPermission = permissionStr.trim();
-      if (trimmedPermission === '') {
+      // Validate permission value against allowed values for the CLI tool
+      const cliToolId = row[3]?.trim() || 'claude';
+      const allowedValues: readonly string[] =
+        cliToolId === 'codex' ? CODEX_SANDBOXES : CLAUDE_PERMISSIONS;
+      if (!allowedValues.includes(trimmedPermission)) {
         errors.push({
           row: i,
-          message: `Row ${i + 1}: empty permission`,
+          message: `Row ${i + 1}: invalid permission "${trimmedPermission}" for ${cliToolId}`,
           field: 'permission',
         });
-      } else {
-        // Validate permission value against allowed values for the CLI tool
-        const cliToolId = row[3]?.trim() || 'claude';
-        const allowedValues: readonly string[] =
-          cliToolId === 'codex' ? CODEX_SANDBOXES : CLAUDE_PERMISSIONS;
-        if (!allowedValues.includes(trimmedPermission)) {
-          errors.push({
-            row: i,
-            message: `Row ${i + 1}: invalid permission "${trimmedPermission}" for ${cliToolId}`,
-            field: 'permission',
-          });
-        }
       }
     }
   }

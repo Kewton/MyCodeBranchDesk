@@ -15,8 +15,9 @@ import {
   isValidUuidV4,
   MAX_SCHEDULE_NAME_LENGTH,
   MAX_SCHEDULE_MESSAGE_LENGTH,
-  MAX_SCHEDULE_CRON_LENGTH,
 } from '@/config/schedule-config';
+import { ALLOWED_CLI_TOOLS } from '@/lib/claude-executor';
+import { isValidCronExpression } from '@/config/cmate-constants';
 
 /**
  * GET /api/worktrees/:id/schedules/:scheduleId
@@ -85,17 +86,26 @@ export async function PUT(
     }
 
     const body = await request.json().catch(() => ({}));
-    const { name, message, cronExpression, cliToolId, enabled } = body;
+    const { cronExpression, cliToolId, enabled } = body;
+
+    // Trim string fields if provided
+    const name = body.name !== undefined ? (typeof body.name === 'string' ? body.name.trim() : '') : undefined;
+    const message = body.message !== undefined ? (typeof body.message === 'string' ? body.message.trim() : '') : undefined;
 
     // Validate optional fields
-    if (name !== undefined && (typeof name !== 'string' || name.length > MAX_SCHEDULE_NAME_LENGTH)) {
-      return NextResponse.json({ error: `name must be a string of ${MAX_SCHEDULE_NAME_LENGTH} characters or less` }, { status: 400 });
+    if (name !== undefined && (!name || name.length > MAX_SCHEDULE_NAME_LENGTH)) {
+      return NextResponse.json({ error: `name must be a non-empty string of ${MAX_SCHEDULE_NAME_LENGTH} characters or less` }, { status: 400 });
     }
-    if (message !== undefined && (typeof message !== 'string' || message.length > MAX_SCHEDULE_MESSAGE_LENGTH)) {
-      return NextResponse.json({ error: `message must be a string of ${MAX_SCHEDULE_MESSAGE_LENGTH} characters or less` }, { status: 400 });
+    if (message !== undefined && (!message || message.length > MAX_SCHEDULE_MESSAGE_LENGTH)) {
+      return NextResponse.json({ error: `message must be a non-empty string of ${MAX_SCHEDULE_MESSAGE_LENGTH} characters or less` }, { status: 400 });
     }
-    if (cronExpression !== undefined && (typeof cronExpression !== 'string' || cronExpression.length > MAX_SCHEDULE_CRON_LENGTH)) {
-      return NextResponse.json({ error: `cronExpression must be a string of ${MAX_SCHEDULE_CRON_LENGTH} characters or less` }, { status: 400 });
+    if (cronExpression !== undefined) {
+      if (typeof cronExpression !== 'string' || !isValidCronExpression(cronExpression)) {
+        return NextResponse.json({ error: 'Invalid cron expression format' }, { status: 400 });
+      }
+    }
+    if (cliToolId !== undefined && !ALLOWED_CLI_TOOLS.has(cliToolId)) {
+      return NextResponse.json({ error: 'Invalid CLI tool' }, { status: 400 });
     }
 
     const now = Date.now();

@@ -246,11 +246,10 @@ describe('cmate-validator', () => {
       expect(fields).toContain('message');
     });
 
-    it('should detect empty permission when column is present', () => {
+    it('should allow empty permission (parser applies default)', () => {
       const rows = [['valid-name', '0 * * * *', 'msg', 'claude', 'true', '']];
       const errors = validateSchedulesSection(rows);
-      expect(errors).toHaveLength(1);
-      expect(errors[0].field).toBe('permission');
+      expect(errors).toEqual([]);
     });
 
     it('should not error when permission column is omitted', () => {
