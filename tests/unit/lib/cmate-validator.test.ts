@@ -39,10 +39,10 @@ describe('cmate-validator', () => {
     it('should parse a valid Schedules section', () => {
       const content = `## Schedules
 
-| Name | Cron | Message | CLI Tool | Enabled |
-|------|------|---------|----------|---------|
-| task1 | 0 * * * * | Do something | claude | true |
-| task2 | 0 9 * * 1 | Weekly check | codex | false |
+| Name | Cron | Message | CLI Tool | Enabled | Permission |
+|------|------|---------|----------|---------|------------|
+| task1 | 0 * * * * | Do something | claude | true | acceptEdits |
+| task2 | 0 9 * * 1 | Weekly check | codex | false | workspace-write |
 `;
       const sections = parseCmateContent(content);
       expect(sections.has('Schedules')).toBe(true);
@@ -96,9 +96,9 @@ describe('cmate-validator', () => {
     it('should return no errors for valid headers', () => {
       const content = `## Schedules
 
-| Name | Cron | Message | CLI Tool | Enabled |
-|------|------|---------|----------|---------|
-| task1 | 0 * * * * | msg | claude | true |
+| Name | Cron | Message | CLI Tool | Enabled | Permission |
+|------|------|---------|----------|---------|------------|
+| task1 | 0 * * * * | msg | claude | true | acceptEdits |
 `;
       expect(validateScheduleHeaders(content)).toEqual([]);
     });
@@ -106,9 +106,9 @@ describe('cmate-validator', () => {
     it('should detect wrong header name', () => {
       const content = `## Schedules
 
-| Name | Cron | Message2 | CLI Tool | Enabled |
-|------|------|----------|----------|---------|
-| task1 | 0 * * * * | msg | claude | true |
+| Name | Cron | Message2 | CLI Tool | Enabled | Permission |
+|------|------|----------|----------|---------|------------|
+| task1 | 0 * * * * | msg | claude | true | acceptEdits |
 `;
       const errors = validateScheduleHeaders(content);
       expect(errors).toHaveLength(1);
@@ -121,12 +121,13 @@ describe('cmate-validator', () => {
     it('should detect multiple wrong headers', () => {
       const content = `## Schedules
 
-| Foo | Bar | Baz |
-|-----|-----|-----|
-| x | y | z |
+| Foo | Bar | Baz | Qux | Quux | Corge |
+|-----|-----|-----|-----|------|-------|
+| x | y | z | a | b | c |
 `;
       const errors = validateScheduleHeaders(content);
-      expect(errors).toHaveLength(3);
+      // 5 required header mismatches + 1 optional header mismatch (Corge != Permission)
+      expect(errors).toHaveLength(6);
       expect(errors.every((e) => e.field === 'header')).toBe(true);
     });
 
@@ -138,9 +139,18 @@ describe('cmate-validator', () => {
 | x | y |
 `;
       const errors = validateScheduleHeaders(content);
-      expect(errors).toHaveLength(1);
-      expect(errors[0].message).toContain('Message');
-      expect(errors[0].message).toContain('(missing)');
+      expect(errors.length).toBeGreaterThanOrEqual(1);
+      expect(errors.some((e) => e.message.includes('(missing)'))).toBe(true);
+    });
+
+    it('should accept headers without optional Permission column', () => {
+      const content = `## Schedules
+
+| Name | Cron | Message | CLI Tool | Enabled |
+|------|------|---------|----------|---------|
+| task1 | 0 * * * * | msg | claude | true |
+`;
+      expect(validateScheduleHeaders(content)).toEqual([]);
     });
 
     it('should return empty for content with no Schedules section', () => {
@@ -161,8 +171,8 @@ describe('cmate-validator', () => {
   describe('validateSchedulesSection', () => {
     it('should return no errors for valid rows', () => {
       const rows = [
-        ['my-task', '0 * * * *', 'Do something', 'claude', 'true'],
-        ['task-2', '0 9 * * 1-5', 'Weekday job', 'codex', 'false'],
+        ['my-task', '0 * * * *', 'Do something', 'claude', 'true', 'acceptEdits'],
+        ['task-2', '0 9 * * 1-5', 'Weekday job', 'codex', 'false', 'workspace-write'],
       ];
       const errors = validateSchedulesSection(rows);
       expect(errors).toEqual([]);
@@ -234,6 +244,19 @@ describe('cmate-validator', () => {
       expect(fields).toContain('name');
       expect(fields).toContain('cron');
       expect(fields).toContain('message');
+    });
+
+    it('should detect empty permission when column is present', () => {
+      const rows = [['valid-name', '0 * * * *', 'msg', 'claude', 'true', '']];
+      const errors = validateSchedulesSection(rows);
+      expect(errors).toHaveLength(1);
+      expect(errors[0].field).toBe('permission');
+    });
+
+    it('should not error when permission column is omitted', () => {
+      const rows = [['valid-name', '0 * * * *', 'msg', 'claude', 'true']];
+      const errors = validateSchedulesSection(rows);
+      expect(errors).toEqual([]);
     });
 
     it('should accept Japanese names', () => {

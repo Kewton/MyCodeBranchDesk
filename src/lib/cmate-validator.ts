@@ -44,11 +44,14 @@ export interface CmateValidationError {
   /** Human-readable error message */
   message: string;
   /** Field that caused the error */
-  field: 'columns' | 'name' | 'cron' | 'message' | 'header';
+  field: 'columns' | 'name' | 'cron' | 'message' | 'header' | 'permission';
 }
 
-/** Expected header columns for the Schedules table (minimum required) */
-const EXPECTED_SCHEDULE_HEADERS = ['Name', 'Cron', 'Message'] as const;
+/** Required header columns for the Schedules table */
+const REQUIRED_SCHEDULE_HEADERS = ['Name', 'Cron', 'Message', 'CLI Tool', 'Enabled'] as const;
+
+/** Optional header columns (validated only when present) */
+const OPTIONAL_SCHEDULE_HEADERS = ['Permission'] as const;
 
 // =============================================================================
 // Template
@@ -57,9 +60,9 @@ const EXPECTED_SCHEDULE_HEADERS = ['Name', 'Cron', 'Message'] as const;
 /** Default CMATE.md template content */
 export const CMATE_TEMPLATE_CONTENT = `## Schedules
 
-| Name | Cron | Message | CLI Tool | Enabled |
-|------|------|---------|----------|---------|
-| example-task | 0 * * * * | README.mdを要約してください | claude | true |
+| Name | Cron | Message | CLI Tool | Enabled | Permission |
+|------|------|---------|----------|---------|------------|
+| example-task | 0 * * * * | README.mdを要約してください | claude | true | acceptEdits |
 `;
 
 // =============================================================================
@@ -173,13 +176,28 @@ export function validateScheduleHeaders(
       .slice(1, -1)
       .map((cell) => cell.trim());
 
-    for (let i = 0; i < EXPECTED_SCHEDULE_HEADERS.length; i++) {
-      const expected = EXPECTED_SCHEDULE_HEADERS[i];
+    // Validate required headers
+    for (let i = 0; i < REQUIRED_SCHEDULE_HEADERS.length; i++) {
+      const expected = REQUIRED_SCHEDULE_HEADERS[i];
       const actual = cells[i];
       if (!actual || actual !== expected) {
         errors.push({
           row: -1,
           message: `Header column ${i + 1}: expected "${expected}", got "${actual || '(missing)'}"`,
+          field: 'header',
+        });
+      }
+    }
+
+    // Validate optional headers (only when present)
+    for (let j = 0; j < OPTIONAL_SCHEDULE_HEADERS.length; j++) {
+      const colIndex = REQUIRED_SCHEDULE_HEADERS.length + j;
+      const expected = OPTIONAL_SCHEDULE_HEADERS[j];
+      const actual = cells[colIndex];
+      if (actual !== undefined && actual !== expected) {
+        errors.push({
+          row: -1,
+          message: `Header column ${colIndex + 1}: expected "${expected}", got "${actual}"`,
           field: 'header',
         });
       }
@@ -244,6 +262,16 @@ export function validateSchedulesSection(
         row: i,
         message: `Row ${i + 1}: empty message`,
         field: 'message',
+      });
+    }
+
+    // Validate permission (6th column) - empty check only on client side
+    const permissionStr = row[5];
+    if (permissionStr !== undefined && permissionStr.trim() === '') {
+      errors.push({
+        row: i,
+        message: `Row ${i + 1}: empty permission`,
+        field: 'permission',
       });
     }
   }
