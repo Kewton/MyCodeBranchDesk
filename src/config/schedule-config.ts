@@ -27,7 +27,7 @@ export const MAX_SCHEDULE_CRON_LENGTH = 100;
 // =============================================================================
 
 /** Allowed permission values for claude CLI (--permission-mode) */
-export const CLAUDE_PERMISSIONS = ['default', 'acceptEdits', 'full'] as const;
+export const CLAUDE_PERMISSIONS = ['default', 'acceptEdits', 'plan', 'dontAsk', 'bypassPermissions'] as const;
 export type ClaudePermission = (typeof CLAUDE_PERMISSIONS)[number];
 
 /** Allowed sandbox values for codex CLI (--sandbox) */
