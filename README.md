@@ -37,16 +37,18 @@ Of course, it works great on desktop too — the two-column layout gives you a f
 
 ---
 
-## The 6 Pillars
+## Key Features
 
-| Pillar | What it does | Why it matters |
-|--------|-------------|----------------|
+| Feature | What it does | Why it matters |
+|---------|-------------|----------------|
 | **Auto Yes Mode** | Agent runs without stopping for confirmations | No babysitting — Claude Code keeps working while you're away |
 | **Git Worktree Sessions** | One session per worktree, parallel execution | Multiple tasks progress simultaneously |
 | **Mobile Web UI** | Full session control from any browser | Monitor and steer from your phone |
 | **File Viewer** | Browse worktree files from the browser | Review code changes without touching your PC |
 | **Markdown Editor** | Edit Markdown files in the browser | Update AI instructions on the go |
 | **Screenshot Instructions** | Attach images to your prompts | Snap a bug → "Fix this" — the agent sees the screenshot |
+| **Token Authentication** | SHA-256 hashed token + HTTPS + rate limiting | Secure remote access — no credentials leaked, brute-force protected |
+| **Scheduled Execution** | Cron-based auto-run via CMATE.md | Daily reviews, nightly tests — Claude Code works on a schedule |
 
 ---
 
@@ -72,6 +74,8 @@ Of course, it works great on desktop too — the two-column layout gives you a f
 | File Viewer | Yes | No | No | No |
 | Markdown Editor | Yes | No | No | No |
 | Screenshot Instructions | Yes | No | Not possible | No |
+| Token Authentication | Yes | N/A (app) | No | N/A (cloud) |
+| Scheduled Execution | Yes | No | No | No |
 | Free / OSS | Yes | Free + Paid | Yes | $20/mo |
 | Runs 100% Locally | Yes | Server-routed | Yes | Cloud fallback |
 
