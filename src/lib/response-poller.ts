@@ -30,7 +30,7 @@ import type { PromptDetectionResult } from './prompt-detector';
 import { recordClaudeConversation } from './conversation-logger';
 import type { CLIToolType } from './cli-tools/types';
 import { parseClaudeOutput } from './claude-output';
-import { getCliToolPatterns, stripAnsi, buildDetectPromptOptions, PASTED_TEXT_PATTERN } from './cli-patterns';
+import { getCliToolPatterns, stripAnsi, stripBoxDrawing, buildDetectPromptOptions, PASTED_TEXT_PATTERN } from './cli-patterns';
 
 /**
  * Polling interval in milliseconds (default: 2 seconds)
@@ -163,7 +163,7 @@ function detectPromptWithOptions(
   cliToolId: CLIToolType
 ): PromptDetectionResult {
   const promptOptions = buildDetectPromptOptions(cliToolId);
-  return detectPrompt(stripAnsi(output), promptOptions);
+  return detectPrompt(stripBoxDrawing(stripAnsi(output)), promptOptions);
 }
 
 /**

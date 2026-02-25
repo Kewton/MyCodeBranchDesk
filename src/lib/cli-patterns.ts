@@ -300,6 +300,23 @@ export function stripAnsi(str: string): string {
 }
 
 /**
+ * Strip box-drawing border characters from CLI output.
+ * Gemini CLI wraps Action Required prompts in ╭─╮│╰─╯ borders.
+ * Removes │ (U+2502) prefix/suffix and border-only lines (╭╮╰╯─).
+ *
+ * @param str - Input string (typically after stripAnsi())
+ * @returns String with box-drawing borders removed
+ */
+export function stripBoxDrawing(str: string): string {
+  return str.split('\n').map(line => {
+    // Remove border-only lines (╭──╮, ╰──╯, │ only, etc.)
+    if (/^[\u2502\u256D\u256E\u256F\u2570\u2500\s]+$/.test(line)) return '';
+    // Strip leading │ + optional space, trailing space + │
+    return line.replace(/^\u2502\s?/, '').replace(/\s*\u2502$/, '');
+  }).join('\n');
+}
+
+/**
  * Build DetectPromptOptions for a given CLI tool.
  * Centralizes cliToolId-to-options mapping logic (DRY - MF-001).
  *
