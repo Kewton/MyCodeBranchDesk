@@ -15,6 +15,7 @@ import {
   createSession,
   sendKeys,
   killSession,
+  capturePane,
 } from '../tmux';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -31,6 +32,12 @@ function getErrorMessage(error: unknown): string {
 
 /** Wait for Gemini CLI to initialize after launch */
 const GEMINI_INIT_WAIT_MS = 3000;
+
+/** Interval for polling trust dialog detection */
+const TRUST_DIALOG_POLL_INTERVAL_MS = 500;
+
+/** Max attempts to detect trust dialog */
+const TRUST_DIALOG_MAX_ATTEMPTS = 10;
 
 /**
  * Gemini CLI tool implementation
@@ -92,10 +99,42 @@ export class GeminiTool extends BaseCLITool {
       // Wait for Gemini to initialize
       await new Promise((resolve) => setTimeout(resolve, GEMINI_INIT_WAIT_MS));
 
+      // Auto-handle "Do you trust this folder?" dialog on first run
+      await this.handleTrustDialog(sessionName);
+
       console.log(`✓ Started Gemini session: ${sessionName}`);
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
       throw new Error(`Failed to start Gemini session: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Handle Gemini "Do you trust this folder?" dialog
+   * On first run in a new directory, Gemini shows a trust confirmation.
+   * Auto-selects "1. Trust folder" to allow execution.
+   */
+  private async handleTrustDialog(sessionName: string): Promise<void> {
+    for (let i = 0; i < TRUST_DIALOG_MAX_ATTEMPTS; i++) {
+      try {
+        const output = await capturePane(sessionName, 50);
+        if (output.includes('Do you trust this folder?')) {
+          // Option 1 "Trust folder" is pre-selected (● marker).
+          // Send Enter to confirm the selection.
+          await execAsync(`tmux send-keys -t "${sessionName}" Enter`);
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          console.log('✓ Auto-trusted folder for Gemini session');
+          return;
+        }
+        // No trust dialog - Gemini is ready or still loading
+        if (i > 2) {
+          // After a few checks, assume no dialog needed
+          return;
+        }
+      } catch {
+        // Capture may fail during initialization - continue polling
+      }
+      await new Promise((resolve) => setTimeout(resolve, TRUST_DIALOG_POLL_INTERVAL_MS));
     }
   }
 
