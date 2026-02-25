@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDbInstance } from '@/lib/db-instance';
 import { getWorktreeById, updateWorktreeDescription, updateWorktreeLink, updateFavorite, updateStatus, updateCliToolId, updateSelectedAgents, updateVibeLocalModel, getMessages, markPendingPromptsAsAnswered, getInitialBranch } from '@/lib/db';
 import { CLIToolManager } from '@/lib/cli-tools/manager';
-import { CLI_TOOL_IDS, type CLIToolType } from '@/lib/cli-tools/types';
+import { CLI_TOOL_IDS, OLLAMA_MODEL_PATTERN, type CLIToolType } from '@/lib/cli-tools/types';
 import { captureSessionOutput } from '@/lib/cli-session';
 import { detectSessionStatus } from '@/lib/status-detector';
 import { getGitStatus } from '@/lib/git-utils';
@@ -228,7 +228,7 @@ export async function PATCH(
             { status: 400 }
           );
         }
-        if (!/^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$/.test(model)) {
+        if (!OLLAMA_MODEL_PATTERN.test(model)) {
           return NextResponse.json(
             { error: 'vibeLocalModel contains invalid characters' },
             { status: 400 }

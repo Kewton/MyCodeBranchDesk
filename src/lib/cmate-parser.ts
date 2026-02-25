@@ -15,6 +15,7 @@
 import { readFileSync, realpathSync } from 'fs';
 import path from 'path';
 import type { ScheduleEntry, CmateConfig } from '@/types/cmate';
+import { isCliToolType } from '@/lib/cli-tools/types';
 import {
   CLAUDE_PERMISSIONS,
   CODEX_SANDBOXES,
@@ -248,8 +249,14 @@ export function parseSchedulesSection(rows: string[][]): ScheduleEntry[] {
       enabledStr === '' ||
       enabledStr.toLowerCase() === 'true';
 
-    // Parse permission with validation
+    // Parse and validate CLI tool ID [SEC-002]
     const resolvedCliToolId = cliToolId?.trim() || 'claude';
+    if (!isCliToolType(resolvedCliToolId)) {
+      console.warn(
+        `[cmate-parser] Skipping entry "${sanitizedName}" with invalid CLI tool: "${resolvedCliToolId}"`
+      );
+      continue;
+    }
     const defaultPermission = DEFAULT_PERMISSIONS[resolvedCliToolId] ?? '';
     let permission = permissionStr?.trim() || defaultPermission;
 

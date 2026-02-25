@@ -9,20 +9,17 @@
  */
 
 import { BaseCLITool } from './base';
-import type { CLIToolType } from './types';
+import { OLLAMA_MODEL_PATTERN, type CLIToolType } from './types';
 import {
   hasSession,
   createSession,
   sendKeys,
+  sendSpecialKey,
   killSession,
 } from '../tmux';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { detectAndResendIfPastedText } from '../pasted-text-helper';
 import { getDbInstance } from '../db-instance';
 import { getWorktreeById } from '../db';
-
-const execAsync = promisify(exec);
 
 /**
  * Extract error message from unknown error type (DRY)
@@ -87,11 +84,12 @@ export class VibeLocalTool extends BaseCLITool {
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Read Ollama model preference from DB
+      // [SEC-001] Re-validate model name at point of use (defense-in-depth)
       let vibeLocalCommand = 'vibe-local -y';
       try {
         const db = getDbInstance();
         const wt = getWorktreeById(db, worktreeId);
-        if (wt?.vibeLocalModel) {
+        if (wt?.vibeLocalModel && OLLAMA_MODEL_PATTERN.test(wt.vibeLocalModel)) {
           vibeLocalCommand = `vibe-local -y -m ${wt.vibeLocalModel}`;
         }
       } catch {
@@ -138,9 +136,9 @@ export class VibeLocalTool extends BaseCLITool {
       // vibe-local uses IME mode: first Enter creates a new line,
       // second Enter on empty line submits the message.
       // Send Enter twice with a short delay between.
-      await execAsync(`tmux send-keys -t "${sessionName}" C-m`);
+      await sendSpecialKey(sessionName, 'C-m');
       await new Promise((resolve) => setTimeout(resolve, 200));
-      await execAsync(`tmux send-keys -t "${sessionName}" C-m`);
+      await sendSpecialKey(sessionName, 'C-m');
 
       // Wait a moment for the message to be processed
       await new Promise((resolve) => setTimeout(resolve, 200));
@@ -169,11 +167,11 @@ export class VibeLocalTool extends BaseCLITool {
       const exists = await hasSession(sessionName);
       if (exists) {
         // Send Ctrl+C to interrupt any running operation
-        await execAsync(`tmux send-keys -t "${sessionName}" C-c`);
+        await sendSpecialKey(sessionName, 'C-c');
         await new Promise((resolve) => setTimeout(resolve, 300));
 
         // Send Ctrl+C again to ensure exit
-        await execAsync(`tmux send-keys -t "${sessionName}" C-c`);
+        await sendSpecialKey(sessionName, 'C-c');
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
 

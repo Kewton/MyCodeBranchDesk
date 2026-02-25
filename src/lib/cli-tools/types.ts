@@ -129,6 +129,15 @@ export function getCliToolDisplayNameSafe(cliToolId?: string, fallback = 'Assist
 }
 
 /**
+ * Ollama model name validation pattern.
+ * Allows: alphanumeric start, followed by alphanumeric, dots, underscores, colons, slashes, hyphens.
+ * Max 100 characters. Used for defense-in-depth validation at point of use.
+ *
+ * [SEC-001] Shared between API route validation and CLI command construction
+ */
+export const OLLAMA_MODEL_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$/;
+
+/**
  * CLIツール情報
  */
 export interface CLIToolInfo {

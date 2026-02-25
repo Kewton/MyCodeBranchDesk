@@ -14,14 +14,11 @@ import {
   hasSession,
   createSession,
   sendKeys,
+  sendSpecialKey,
   killSession,
   capturePane,
 } from '../tmux';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { detectAndResendIfPastedText } from '../pasted-text-helper';
-
-const execAsync = promisify(exec);
 
 /**
  * Extract error message from unknown error type (DRY)
@@ -121,7 +118,7 @@ export class GeminiTool extends BaseCLITool {
         if (output.includes('Do you trust this folder?')) {
           // Option 1 "Trust folder" is pre-selected (● marker).
           // Send Enter to confirm the selection.
-          await execAsync(`tmux send-keys -t "${sessionName}" Enter`);
+          await sendSpecialKey(sessionName, 'Enter');
           await new Promise((resolve) => setTimeout(resolve, 2000));
           console.log('✓ Auto-trusted folder for Gemini session');
           return;
@@ -164,7 +161,7 @@ export class GeminiTool extends BaseCLITool {
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Send Enter key separately
-      await execAsync(`tmux send-keys -t "${sessionName}" C-m`);
+      await sendSpecialKey(sessionName, 'C-m');
 
       // Wait a moment for the message to be processed
       await new Promise((resolve) => setTimeout(resolve, 200));
@@ -193,7 +190,7 @@ export class GeminiTool extends BaseCLITool {
       const exists = await hasSession(sessionName);
       if (exists) {
         // Send Ctrl+C to interrupt any running operation
-        await execAsync(`tmux send-keys -t "${sessionName}" C-c`);
+        await sendSpecialKey(sessionName, 'C-c');
         await new Promise((resolve) => setTimeout(resolve, 300));
 
         // Send /quit to exit Gemini gracefully
