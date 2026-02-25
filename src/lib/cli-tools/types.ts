@@ -90,6 +90,17 @@ export const CLI_TOOL_DISPLAY_NAMES: Record<CLIToolType, string> = {
 };
 
 /**
+ * Check if a string is a valid CLIToolType
+ * Issue #368: Type guard for safe casting of untrusted CLI tool ID strings
+ *
+ * @param value - String to check
+ * @returns True if value is a valid CLIToolType
+ */
+export function isCliToolType(value: string): value is CLIToolType {
+  return (CLI_TOOL_IDS as readonly string[]).includes(value);
+}
+
+/**
  * Get the display name for a CLI tool ID
  * Issue #368: Centralized display name function for DRY compliance
  *
@@ -98,6 +109,23 @@ export const CLI_TOOL_DISPLAY_NAMES: Record<CLIToolType, string> = {
  */
 export function getCliToolDisplayName(id: CLIToolType): string {
   return CLI_TOOL_DISPLAY_NAMES[id] ?? id;
+}
+
+/**
+ * Get the display name for a CLI tool ID string, with fallback for unknown IDs
+ * Issue #368: Safe wrapper for UI components receiving untyped cliToolId strings
+ *
+ * Unlike getCliToolDisplayName(), this accepts optional/untyped strings and
+ * returns a fallback value ('Assistant') for null, undefined, or unknown IDs.
+ *
+ * @param cliToolId - Optional CLI tool ID string (may be untyped)
+ * @param fallback - Fallback display name for missing/unknown IDs (default: 'Assistant')
+ * @returns Human-readable display name or fallback
+ */
+export function getCliToolDisplayNameSafe(cliToolId?: string, fallback = 'Assistant'): string {
+  if (!cliToolId) return fallback;
+  if (isCliToolType(cliToolId)) return getCliToolDisplayName(cliToolId);
+  return fallback;
 }
 
 /**

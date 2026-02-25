@@ -18,8 +18,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import { PromptMessage } from './PromptMessage';
 import AnsiToHtml from 'ansi-to-html';
-import { getCliToolDisplayName } from '@/lib/cli-tools/types';
-import type { CLIToolType } from '@/lib/cli-tools/types';
+import { getCliToolDisplayNameSafe } from '@/lib/cli-tools/types';
 
 export interface MessageListProps {
   messages: ChatMessage[];
@@ -65,12 +64,6 @@ const MessageBubble = React.memo(function MessageBubble({
   // State for handling text input options
   const [selectedTextInputOption, setSelectedTextInputOption] = React.useState<number | null>(null);
   const [textInputValue, setTextInputValue] = React.useState('');
-
-  // Issue #368: Use centralized getCliToolDisplayName (DRY)
-  const getToolName = (cliToolId?: string) => {
-    if (!cliToolId) return 'Assistant';
-    return getCliToolDisplayName(cliToolId as CLIToolType);
-  };
 
   // Check if content contains ANSI escape codes
   const hasAnsiCodes = (text: string): boolean => {
@@ -185,7 +178,7 @@ const MessageBubble = React.memo(function MessageBubble({
           {/* Header */}
           <div className="flex items-center gap-2 mb-2">
             <span className={`text-xs font-medium ${isUser ? 'text-blue-100' : 'text-gray-500'}`}>
-              {isUser ? 'You' : getToolName(message.cliToolId)}
+              {isUser ? 'You' : getCliToolDisplayNameSafe(message.cliToolId)}
             </span>
             <span className={`text-xs ${isUser ? 'text-blue-200' : 'text-gray-400'}`}>
               {timestamp}
@@ -395,12 +388,6 @@ export function MessageList({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const tWorktree = useTranslations('worktree');
 
-  // Issue #368: Use centralized getCliToolDisplayName (DRY)
-  const getToolName = (cliToolId?: string) => {
-    if (!cliToolId) return 'Assistant';
-    return getCliToolDisplayName(cliToolId as CLIToolType);
-  };
-
   // Track previous message count to detect new messages
   const prevMessageCountRef = useRef(messages.length);
   // Issue #131: Track previous worktreeId to detect worktree changes
@@ -555,7 +542,7 @@ export function MessageList({
               <div className="rounded-lg px-4 py-3 bg-white border border-gray-200 shadow-sm">
                 {/* Header with status indicator */}
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="text-xs font-medium text-gray-500">{getToolName(selectedCliTool)}</span>
+                  <span className="text-xs font-medium text-gray-500">{getCliToolDisplayNameSafe(selectedCliTool)}</span>
                   <div className="flex gap-1">
                     <div className="w-1.5 h-1.5 bg-green-600 rounded-full animate-pulse" />
                   </div>

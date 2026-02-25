@@ -10,7 +10,7 @@
 
 'use client';
 
-import React, { useState, useCallback, memo } from 'react';
+import React, { useState, useCallback, useRef, memo } from 'react';
 import { useTranslations } from 'next-intl';
 import { CLI_TOOL_IDS, getCliToolDisplayName, type CLIToolType } from '@/lib/cli-tools/types';
 
@@ -18,6 +18,7 @@ import { CLI_TOOL_IDS, getCliToolDisplayName, type CLIToolType } from '@/lib/cli
 // Types
 // ============================================================================
 
+/** Props for the AgentSettingsPane component */
 export interface AgentSettingsPaneProps {
   /** Worktree ID for API calls */
   worktreeId: string;
@@ -26,6 +27,13 @@ export interface AgentSettingsPaneProps {
   /** Callback when selected agents change (after successful API persist) */
   onSelectedAgentsChange: (agents: [CLIToolType, CLIToolType]) => void;
 }
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/** Maximum number of agents that can be selected */
+const MAX_SELECTED_AGENTS = 2;
 
 // ============================================================================
 // Component
@@ -44,9 +52,13 @@ export const AgentSettingsPane = memo(function AgentSettingsPane({
   );
   const [saving, setSaving] = useState(false);
 
+  // Use ref to access latest checkedIds inside async callback without recreating it
+  const checkedIdsRef = useRef(checkedIds);
+  checkedIdsRef.current = checkedIds;
+
   const handleCheckboxChange = useCallback(
     async (toolId: CLIToolType, checked: boolean) => {
-      const next = new Set(checkedIds);
+      const next = new Set(checkedIdsRef.current);
       if (checked) {
         next.add(toolId);
       } else {
@@ -55,7 +67,7 @@ export const AgentSettingsPane = memo(function AgentSettingsPane({
       setCheckedIds(next);
 
       // Only persist when exactly 2 are selected
-      if (next.size === 2) {
+      if (next.size === MAX_SELECTED_AGENTS) {
         const pair = Array.from(next) as [CLIToolType, CLIToolType];
         setSaving(true);
         try {
@@ -78,10 +90,10 @@ export const AgentSettingsPane = memo(function AgentSettingsPane({
         }
       }
     },
-    [checkedIds, worktreeId, selectedAgents, onSelectedAgentsChange]
+    [worktreeId, selectedAgents, onSelectedAgentsChange]
   );
 
-  const isMaxSelected = checkedIds.size >= 2;
+  const isMaxSelected = checkedIds.size >= MAX_SELECTED_AGENTS;
 
   return (
     <div className="p-4">
