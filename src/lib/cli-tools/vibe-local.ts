@@ -1,15 +1,11 @@
 /**
- * Vibe Local CLI tool implementation (stub)
- * Issue #368: Added as 4th CLI tool option
+ * Vibe Local CLI tool implementation
+ * Provides integration with vibe-local (vibe-coder) in interactive mode
  *
- * NOTE: This is a stub implementation. Full implementation requires
- * technical investigation (Task 3.1) to determine:
- * - Execution command name
- * - Startup arguments
- * - Prompt detection patterns
- * - Status detection patterns
- *
- * Implementation pattern follows gemini.ts as reference.
+ * @remarks Issue #368: Rewritten from non-interactive pipe mode to interactive REPL mode.
+ * Previous implementation used `echo 'msg' | vibe-local` which caused the process to exit
+ * immediately with "(Cancelled)" + "Goodbye!", making response polling impossible.
+ * Now launches `vibe-local -y` in interactive mode within tmux (same approach as Claude/Codex/Gemini).
  */
 
 import { BaseCLITool } from './base';
@@ -20,10 +16,28 @@ import {
   sendKeys,
   killSession,
 } from '../tmux';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { detectAndResendIfPastedText } from '../pasted-text-helper';
+
+const execAsync = promisify(exec);
+
+/**
+ * Extract error message from unknown error type (DRY)
+ */
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Wait for vibe-local to initialize after launch.
+ * vibe-local shows a permission check prompt, banner, and model loading.
+ */
+const VIBE_LOCAL_INIT_WAIT_MS = 5000;
 
 /**
  * Vibe Local CLI tool implementation
- * Manages vibe-local sessions using tmux
+ * Manages vibe-local interactive sessions using tmux
  */
 export class VibeLocalTool extends BaseCLITool {
   readonly id: CLIToolType = 'vibe-local';
@@ -40,6 +54,10 @@ export class VibeLocalTool extends BaseCLITool {
 
   /**
    * Start a new vibe-local session for a worktree
+   * Launches `vibe-local -y` in interactive mode within tmux
+   *
+   * @param worktreeId - Worktree ID
+   * @param worktreePath - Worktree path
    */
   async startSession(worktreeId: string, worktreePath: string): Promise<void> {
     const vibeLocalAvailable = await this.isInstalled();
@@ -56,21 +74,35 @@ export class VibeLocalTool extends BaseCLITool {
     }
 
     try {
+      // Create tmux session with large history buffer
       await createSession({
         sessionName,
         workingDirectory: worktreePath,
         historyLimit: 50000,
       });
 
-      console.log(`Started Vibe Local session: ${sessionName}`);
+      // Wait a moment for the session to be created
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Start vibe-local in interactive mode with auto-approve (-y)
+      // -y flag skips the permission confirmation prompt
+      await sendKeys(sessionName, 'vibe-local -y', true);
+
+      // Wait for vibe-local to initialize (banner + model loading)
+      await new Promise((resolve) => setTimeout(resolve, VIBE_LOCAL_INIT_WAIT_MS));
+
+      console.log(`✓ Started Vibe Local session: ${sessionName}`);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = getErrorMessage(error);
       throw new Error(`Failed to start Vibe Local session: ${errorMessage}`);
     }
   }
 
   /**
-   * Send a message to vibe-local session
+   * Send a message to vibe-local interactive session
+   *
+   * @param worktreeId - Worktree ID
+   * @param message - Message to send
    */
   async sendMessage(worktreeId: string, message: string): Promise<void> {
     const sessionName = this.getSessionName(worktreeId);
@@ -83,28 +115,62 @@ export class VibeLocalTool extends BaseCLITool {
     }
 
     try {
-      const escapedMessage = message.replace(/'/g, "'\\''");
-      await sendKeys(sessionName, `echo '${escapedMessage}' | vibe-local`, true);
-      console.log(`Sent message to Vibe Local session: ${sessionName}`);
+      // Send message to vibe-local (without Enter)
+      await sendKeys(sessionName, message, false);
+
+      // Wait a moment for the text to be typed
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // vibe-local uses IME mode: first Enter creates a new line,
+      // second Enter on empty line submits the message.
+      // Send Enter twice with a short delay between.
+      await execAsync(`tmux send-keys -t "${sessionName}" C-m`);
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      await execAsync(`tmux send-keys -t "${sessionName}" C-m`);
+
+      // Wait a moment for the message to be processed
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      // Detect [Pasted text] and resend Enter for multi-line messages
+      if (message.includes('\n')) {
+        await detectAndResendIfPastedText(sessionName);
+      }
+
+      console.log(`✓ Sent message to Vibe Local session: ${sessionName}`);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = getErrorMessage(error);
       throw new Error(`Failed to send message to Vibe Local: ${errorMessage}`);
     }
   }
 
   /**
    * Kill vibe-local session
+   *
+   * @param worktreeId - Worktree ID
    */
   async killSession(worktreeId: string): Promise<void> {
     const sessionName = this.getSessionName(worktreeId);
 
     try {
+      const exists = await hasSession(sessionName);
+      if (exists) {
+        // Send Ctrl+C to interrupt any running operation
+        await execAsync(`tmux send-keys -t "${sessionName}" C-c`);
+        await new Promise((resolve) => setTimeout(resolve, 300));
+
+        // Send Ctrl+C again to ensure exit
+        await execAsync(`tmux send-keys -t "${sessionName}" C-c`);
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+
+      // Kill the tmux session
       const killed = await killSession(sessionName);
+
       if (killed) {
-        console.log(`Stopped Vibe Local session: ${sessionName}`);
+        console.log(`✓ Stopped Vibe Local session: ${sessionName}`);
       }
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = getErrorMessage(error);
       console.error(`Error stopping Vibe Local session: ${errorMessage}`);
       throw error;
     }

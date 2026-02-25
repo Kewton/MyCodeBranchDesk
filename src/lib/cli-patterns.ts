@@ -138,6 +138,21 @@ export const GEMINI_PROMPT_PATTERN = /^[>❯]\s*$/m;
 export const GEMINI_THINKING_PATTERN = /[\u2800-\u28FF]|Thinking\.\.\./;
 
 /**
+ * Vibe Local prompt pattern
+ * vibe-local (vibe-coder) shows `ctx:N% ❯` prompt when waiting for user input.
+ * The prompt line includes a context usage percentage prefix.
+ * Examples: "ctx:9% ❯", "ctx:30% ❯", "ctx:9% ❯ /model"
+ */
+export const VIBE_LOCAL_PROMPT_PATTERN = /ctx:\d+%\s*[>❯]/m;
+
+/**
+ * Vibe Local thinking/processing pattern
+ * vibe-local shows spinner characters and status text while processing.
+ * Matches braille spinners, "Thinking", and tool execution indicators.
+ */
+export const VIBE_LOCAL_THINKING_PATTERN = /[\u2800-\u28FF]|Thinking|⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏|Running|Executing/;
+
+/**
  * Detect if CLI tool is showing "thinking" indicator
  */
 export function detectThinking(cliToolId: CLIToolType, content: string): boolean {
@@ -154,6 +169,9 @@ export function detectThinking(cliToolId: CLIToolType, content: string): boolean
       break;
     case 'gemini':
       result = GEMINI_THINKING_PATTERN.test(content);
+      break;
+    case 'vibe-local':
+      result = VIBE_LOCAL_THINKING_PATTERN.test(content);
       break;
     default:
       result = CLAUDE_THINKING_PATTERN.test(content);
@@ -223,6 +241,29 @@ export function getCliToolPatterns(cliToolId: CLIToolType): {
           GEMINI_THINKING_PATTERN, // Thinking indicators
           /^\s*$/, // Empty lines
           /Gemini\s+\d+\.\d+/, // Version line
+          PASTED_TEXT_PATTERN, // [Pasted text #N +XX lines]
+        ],
+      };
+
+    case 'vibe-local':
+      return {
+        promptPattern: VIBE_LOCAL_PROMPT_PATTERN,
+        separatorPattern: /^[·]{10,}$/m, // vibe-local uses middle dot separators
+        thinkingPattern: VIBE_LOCAL_THINKING_PATTERN,
+        skipPatterns: [
+          VIBE_LOCAL_PROMPT_PATTERN, // Prompt line (ctx:N% ❯)
+          VIBE_LOCAL_THINKING_PATTERN, // Thinking indicators
+          /^\s*$/, // Empty lines
+          /vibe-local|vibe-coder/, // Version/banner lines
+          /ctx:\s*\d+%/, // Context usage indicator
+          /Model\s+\w/, // Model info line
+          /Engine\s+\w/, // Engine info line
+          /Mode\s+/, // Mode info line
+          /RAM\s+/, // RAM info line
+          /CWD\s+/, // Working directory line
+          /^[·]{10,}$/, // Middle dot separator lines
+          /✦\s*Ready/, // Status bar "Ready" indicator
+          /ESC:\s*stop/, // Status bar "ESC: stop" hint
           PASTED_TEXT_PATTERN, // [Pasted text #N +XX lines]
         ],
       };

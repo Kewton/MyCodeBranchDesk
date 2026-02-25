@@ -30,13 +30,13 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-/** Wait for Gemini CLI to initialize after launch */
-const GEMINI_INIT_WAIT_MS = 3000;
+/** Wait for Gemini CLI to initialize after launch (banner + auth + dialog) */
+const GEMINI_INIT_WAIT_MS = 6000;
 
 /** Interval for polling trust dialog detection */
-const TRUST_DIALOG_POLL_INTERVAL_MS = 500;
+const TRUST_DIALOG_POLL_INTERVAL_MS = 1000;
 
-/** Max attempts to detect trust dialog */
+/** Max attempts to detect trust dialog (10 * 1000ms = 10s polling window) */
 const TRUST_DIALOG_MAX_ATTEMPTS = 10;
 
 /**
@@ -122,13 +122,13 @@ export class GeminiTool extends BaseCLITool {
           // Option 1 "Trust folder" is pre-selected (● marker).
           // Send Enter to confirm the selection.
           await execAsync(`tmux send-keys -t "${sessionName}" Enter`);
-          await new Promise((resolve) => setTimeout(resolve, 1000));
+          await new Promise((resolve) => setTimeout(resolve, 2000));
           console.log('✓ Auto-trusted folder for Gemini session');
           return;
         }
-        // No trust dialog - Gemini is ready or still loading
-        if (i > 2) {
-          // After a few checks, assume no dialog needed
+        // Check if Gemini interactive prompt is already showing (no dialog needed)
+        if (output.match(/^[>❯]\s*$/m)) {
+          console.log('✓ Gemini prompt detected - no trust dialog needed');
           return;
         }
       } catch {
@@ -136,6 +136,7 @@ export class GeminiTool extends BaseCLITool {
       }
       await new Promise((resolve) => setTimeout(resolve, TRUST_DIALOG_POLL_INTERVAL_MS));
     }
+    console.log('⚠ Trust dialog detection timed out - proceeding anyway');
   }
 
   /**

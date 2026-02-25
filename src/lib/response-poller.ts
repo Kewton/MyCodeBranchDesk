@@ -450,11 +450,12 @@ function extractResponse(
   const hasSeparator = separatorPattern.test(cleanOutputToCheck);
   const isThinking = thinkingPattern.test(cleanOutputToCheck);
 
-  // Codex/Gemini completion logic: prompt detected and not thinking (separator optional)
+  // Codex/Gemini/Vibe-Local completion logic: prompt detected and not thinking (separator optional)
   // - Codex: Interactive TUI, detects › prompt
   // - Gemini: Interactive REPL, detects > / ❯ prompt
+  // - Vibe-Local: Interactive REPL, detects > prompt
   // Claude: require both prompt and separator
-  const isCodexOrGeminiComplete = (cliToolId === 'codex' || cliToolId === 'gemini') && hasPrompt && !isThinking;
+  const isCodexOrGeminiComplete = (cliToolId === 'codex' || cliToolId === 'gemini' || cliToolId === 'vibe-local') && hasPrompt && !isThinking;
   const isClaudeComplete = cliToolId === 'claude' && hasPrompt && hasSeparator && !isThinking;
 
   if (isCodexOrGeminiComplete || isClaudeComplete) {
