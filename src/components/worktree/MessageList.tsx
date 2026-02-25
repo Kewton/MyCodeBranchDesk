@@ -18,6 +18,8 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import { PromptMessage } from './PromptMessage';
 import AnsiToHtml from 'ansi-to-html';
+import { getCliToolDisplayName } from '@/lib/cli-tools/types';
+import type { CLIToolType } from '@/lib/cli-tools/types';
 
 export interface MessageListProps {
   messages: ChatMessage[];
@@ -64,18 +66,10 @@ const MessageBubble = React.memo(function MessageBubble({
   const [selectedTextInputOption, setSelectedTextInputOption] = React.useState<number | null>(null);
   const [textInputValue, setTextInputValue] = React.useState('');
 
-  // Get CLI tool display name
+  // Issue #368: Use centralized getCliToolDisplayName (DRY)
   const getToolName = (cliToolId?: string) => {
-    switch (cliToolId) {
-      case 'claude':
-        return 'Claude';
-      case 'codex':
-        return 'Codex';
-      case 'gemini':
-        return 'Gemini';
-      default:
-        return 'Assistant';
-    }
+    if (!cliToolId) return 'Assistant';
+    return getCliToolDisplayName(cliToolId as CLIToolType);
   };
 
   // Check if content contains ANSI escape codes
@@ -401,18 +395,10 @@ export function MessageList({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const tWorktree = useTranslations('worktree');
 
-  // Get CLI tool display name
+  // Issue #368: Use centralized getCliToolDisplayName (DRY)
   const getToolName = (cliToolId?: string) => {
-    switch (cliToolId) {
-      case 'claude':
-        return 'Claude';
-      case 'codex':
-        return 'Codex';
-      case 'gemini':
-        return 'Gemini';
-      default:
-        return 'Assistant';
-    }
+    if (!cliToolId) return 'Assistant';
+    return getCliToolDisplayName(cliToolId as CLIToolType);
   };
 
   // Track previous message count to detect new messages

@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbInstance } from '@/lib/db-instance';
 import { getWorktreeById, upsertWorktree } from '@/lib/db';
-import type { CLIToolType } from '@/lib/cli-tools/types';
+import { CLI_TOOL_IDS, type CLIToolType } from '@/lib/cli-tools/types';
 
 interface UpdateCliToolRequest {
   cliToolId: CLIToolType;
@@ -39,10 +39,10 @@ export async function PATCH(
       );
     }
 
-    const validToolIds: CLIToolType[] = ['claude', 'codex', 'gemini'];
-    if (!validToolIds.includes(body.cliToolId)) {
+    // Issue #368: Use CLI_TOOL_IDS instead of hardcoded array (DRY, R2-001)
+    if (!(CLI_TOOL_IDS as readonly string[]).includes(body.cliToolId)) {
       return NextResponse.json(
-        { error: `Invalid CLI tool ID: ${body.cliToolId}. Valid values are: ${validToolIds.join(', ')}` },
+        { error: `Invalid CLI tool ID: ${body.cliToolId}. Valid values are: ${CLI_TOOL_IDS.join(', ')}` },
         { status: 400 }
       );
     }
