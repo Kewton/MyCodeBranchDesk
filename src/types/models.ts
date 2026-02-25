@@ -77,6 +77,8 @@ export interface Worktree {
   cliToolId?: CLIToolType;
   /** Selected agents for UI display (Issue #368) - 2 CLI tool IDs */
   selectedAgents?: [CLIToolType, CLIToolType];
+  /** Ollama model name for vibe-local (Issue #368) - null means default */
+  vibeLocalModel?: string | null;
   /** Git status information (Issue #111) - optional for backward compatibility */
   gitStatus?: GitStatus;
 }

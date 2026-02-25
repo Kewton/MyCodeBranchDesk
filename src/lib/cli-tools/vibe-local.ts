@@ -19,6 +19,8 @@ import {
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { detectAndResendIfPastedText } from '../pasted-text-helper';
+import { getDbInstance } from '../db-instance';
+import { getWorktreeById } from '../db';
 
 const execAsync = promisify(exec);
 
@@ -84,9 +86,21 @@ export class VibeLocalTool extends BaseCLITool {
       // Wait a moment for the session to be created
       await new Promise((resolve) => setTimeout(resolve, 100));
 
+      // Read Ollama model preference from DB
+      let vibeLocalCommand = 'vibe-local -y';
+      try {
+        const db = getDbInstance();
+        const wt = getWorktreeById(db, worktreeId);
+        if (wt?.vibeLocalModel) {
+          vibeLocalCommand = `vibe-local -y -m ${wt.vibeLocalModel}`;
+        }
+      } catch {
+        // DB read failure is non-fatal; use default model
+      }
+
       // Start vibe-local in interactive mode with auto-approve (-y)
       // -y flag skips the permission confirmation prompt
-      await sendKeys(sessionName, 'vibe-local -y', true);
+      await sendKeys(sessionName, vibeLocalCommand, true);
 
       // Wait for vibe-local to initialize (banner + model loading)
       await new Promise((resolve) => setTimeout(resolve, VIBE_LOCAL_INIT_WAIT_MS));

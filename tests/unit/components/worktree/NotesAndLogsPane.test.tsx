@@ -33,6 +33,8 @@ describe('NotesAndLogsPane', () => {
     worktreeId: 'test-worktree',
     selectedAgents: ['claude', 'codex'] as [CLIToolType, CLIToolType],
     onSelectedAgentsChange: vi.fn(),
+    vibeLocalModel: null as string | null,
+    onVibeLocalModelChange: vi.fn(),
   };
 
   beforeEach(() => {

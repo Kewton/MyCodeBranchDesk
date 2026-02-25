@@ -801,6 +801,10 @@ interface MobileContentProps {
   selectedAgents: [CLIToolType, CLIToolType];
   /** [Issue #368] Callback when selected agents change */
   onSelectedAgentsChange: (agents: [CLIToolType, CLIToolType]) => void;
+  /** [Issue #368] Current vibe-local model selection */
+  vibeLocalModel: string | null;
+  /** [Issue #368] Callback when vibe-local model changes */
+  onVibeLocalModelChange: (model: string | null) => void;
 }
 
 /** [Issue #21] Type for file search hook return */
@@ -830,6 +834,8 @@ const MobileContent = memo(function MobileContent({
   onCmateSetup,
   selectedAgents,
   onSelectedAgentsChange,
+  vibeLocalModel,
+  onVibeLocalModelChange,
 }: MobileContentProps) {
   switch (activeTab) {
     case 'terminal':
@@ -896,6 +902,8 @@ const MobileContent = memo(function MobileContent({
             className="h-full"
             selectedAgents={selectedAgents}
             onSelectedAgentsChange={onSelectedAgentsChange}
+            vibeLocalModel={vibeLocalModel}
+            onVibeLocalModelChange={onVibeLocalModelChange}
           />
         </ErrorBoundary>
       );
@@ -954,6 +962,8 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
   const [stopReasonPending, setStopReasonPending] = useState(false);
   // Issue #368: Selected agents state (initialized from API, drives terminal header tabs)
   const [selectedAgents, setSelectedAgents] = useState<[CLIToolType, CLIToolType]>(DEFAULT_SELECTED_AGENTS);
+  // Issue #368: Vibe-local Ollama model state (initialized from API)
+  const [vibeLocalModel, setVibeLocalModel] = useState<string | null>(null);
   // Issue #4: CLI tool tab state - initialized from selectedAgents[0]
   const [activeCliTab, setActiveCliTab] = useState<CLIToolType>(DEFAULT_SELECTED_AGENTS[0]);
   // Issue #4: Ref to avoid polling callback recreation on tab switch
@@ -1002,6 +1012,10 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
       // Issue #368: Sync selectedAgents from API response
       if (data.selectedAgents) {
         setSelectedAgents(data.selectedAgents);
+      }
+      // Issue #368: Sync vibeLocalModel from API response
+      if ('vibeLocalModel' in data) {
+        setVibeLocalModel(data.vibeLocalModel ?? null);
       }
       return data;
     } catch (err) {
@@ -1084,6 +1098,11 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
   /** Issue #368: Callback for AgentSettingsPane to update selectedAgents */
   const handleSelectedAgentsChange = useCallback((agents: [CLIToolType, CLIToolType]) => {
     setSelectedAgents(agents);
+  }, []);
+
+  /** Issue #368: Callback for AgentSettingsPane to update vibeLocalModel */
+  const handleVibeLocalModelChange = useCallback((model: string | null) => {
+    setVibeLocalModel(model);
   }, []);
 
   // Issue #4: Immediately refresh data when CLI tab changes (without polling restart)
@@ -1924,6 +1943,8 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
                           className="h-full"
                           selectedAgents={selectedAgents}
                           onSelectedAgentsChange={handleSelectedAgentsChange}
+                          vibeLocalModel={vibeLocalModel}
+                          onVibeLocalModelChange={handleVibeLocalModelChange}
                         />
                       </ErrorBoundary>
                     )}
@@ -2176,6 +2197,8 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
             onCmateSetup={handleCmateSetup}
             selectedAgents={selectedAgents}
             onSelectedAgentsChange={handleSelectedAgentsChange}
+            vibeLocalModel={vibeLocalModel}
+            onVibeLocalModelChange={handleVibeLocalModelChange}
           />
         </main>
 

@@ -18,6 +18,8 @@ describe('AgentSettingsPane', () => {
     worktreeId: 'test-worktree-id',
     selectedAgents: ['claude', 'codex'] as [CLIToolType, CLIToolType],
     onSelectedAgentsChange: vi.fn(),
+    vibeLocalModel: null as string | null,
+    onVibeLocalModelChange: vi.fn(),
   };
 
   beforeEach(() => {

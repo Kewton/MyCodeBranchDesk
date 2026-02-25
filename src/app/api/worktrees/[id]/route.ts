@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbInstance } from '@/lib/db-instance';
-import { getWorktreeById, updateWorktreeDescription, updateWorktreeLink, updateFavorite, updateStatus, updateCliToolId, updateSelectedAgents, getMessages, markPendingPromptsAsAnswered, getInitialBranch } from '@/lib/db';
+import { getWorktreeById, updateWorktreeDescription, updateWorktreeLink, updateFavorite, updateStatus, updateCliToolId, updateSelectedAgents, updateVibeLocalModel, getMessages, markPendingPromptsAsAnswered, getInitialBranch } from '@/lib/db';
 import { CLIToolManager } from '@/lib/cli-tools/manager';
 import { CLI_TOOL_IDS, type CLIToolType } from '@/lib/cli-tools/types';
 import { captureSessionOutput } from '@/lib/cli-session';
@@ -215,6 +215,27 @@ export async function PATCH(
         updateCliToolId(db, params.id, newCliToolId);
         cliToolIdAutoUpdated = true;
       }
+    }
+
+    // Update vibe-local model if provided (Issue #368)
+    if ('vibeLocalModel' in body) {
+      const model = body.vibeLocalModel;
+      // Allow null (reset to default) or valid model name string
+      if (model !== null) {
+        if (typeof model !== 'string' || model.length === 0 || model.length > 100) {
+          return NextResponse.json(
+            { error: 'vibeLocalModel must be null or a string (1-100 characters)' },
+            { status: 400 }
+          );
+        }
+        if (!/^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$/.test(model)) {
+          return NextResponse.json(
+            { error: 'vibeLocalModel contains invalid characters' },
+            { status: 400 }
+          );
+        }
+      }
+      updateVibeLocalModel(db, params.id, model);
     }
 
     // Return updated worktree with session status

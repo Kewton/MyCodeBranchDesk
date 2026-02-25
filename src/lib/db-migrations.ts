@@ -11,7 +11,7 @@ import { initDatabase } from './db';
  * Current schema version
  * Increment this when adding new migrations
  */
-export const CURRENT_SCHEMA_VERSION = 18;
+export const CURRENT_SCHEMA_VERSION = 19;
 
 /**
  * Migration definition
@@ -927,6 +927,23 @@ const migrations: Migration[] = [
       // selected_agents is a nullable TEXT column; dropping it requires table recreation
       // which is disproportionate for a rollback. The column is harmless if unused.
       console.log('No rollback for selected_agents column (SQLite limitation)');
+    }
+  },
+  {
+    version: 19,
+    name: 'add-vibe-local-model-column',
+    up: (db) => {
+      // Issue #368: Add vibe_local_model column for Ollama model selection
+      // NULL means use the default model (vibe-local decides)
+      db.exec(`
+        ALTER TABLE worktrees ADD COLUMN vibe_local_model TEXT DEFAULT NULL;
+      `);
+
+      console.log('✓ Added vibe_local_model column to worktrees table');
+    },
+    down: () => {
+      // vibe_local_model is a nullable TEXT column; harmless if unused
+      console.log('No rollback for vibe_local_model column (SQLite limitation)');
     }
   }
 ];

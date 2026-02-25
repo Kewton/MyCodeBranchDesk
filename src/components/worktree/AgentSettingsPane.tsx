@@ -5,12 +5,14 @@
  * Renders CLI_TOOL_IDS as checkboxes with max 2 selection constraint.
  * When 2 are selected, calls PATCH /api/worktrees/[id] to persist.
  *
+ * Also renders Ollama model dropdown when vibe-local is selected.
+ *
  * [R4-006] No dangerouslySetInnerHTML - all display names rendered as text nodes.
  */
 
 'use client';
 
-import React, { useState, useCallback, useRef, memo } from 'react';
+import React, { useState, useCallback, useRef, useEffect, memo } from 'react';
 import { useTranslations } from 'next-intl';
 import { CLI_TOOL_IDS, getCliToolDisplayName, type CLIToolType } from '@/lib/cli-tools/types';
 
@@ -26,6 +28,17 @@ export interface AgentSettingsPaneProps {
   selectedAgents: [CLIToolType, CLIToolType];
   /** Callback when selected agents change (after successful API persist) */
   onSelectedAgentsChange: (agents: [CLIToolType, CLIToolType]) => void;
+  /** Current vibe-local model selection (null = default) */
+  vibeLocalModel: string | null;
+  /** Callback when vibe-local model changes */
+  onVibeLocalModelChange: (model: string | null) => void;
+}
+
+/** Ollama model info from API */
+interface OllamaModelInfo {
+  name: string;
+  size: number;
+  parameterSize: string;
 }
 
 // ============================================================================
@@ -43,6 +56,8 @@ export const AgentSettingsPane = memo(function AgentSettingsPane({
   worktreeId,
   selectedAgents,
   onSelectedAgentsChange,
+  vibeLocalModel,
+  onVibeLocalModelChange,
 }: AgentSettingsPaneProps) {
   const t = useTranslations('schedule');
 
@@ -52,9 +67,47 @@ export const AgentSettingsPane = memo(function AgentSettingsPane({
   );
   const [saving, setSaving] = useState(false);
 
+  // Ollama model state
+  const [ollamaModels, setOllamaModels] = useState<OllamaModelInfo[]>([]);
+  const [ollamaError, setOllamaError] = useState<string | null>(null);
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [savingModel, setSavingModel] = useState(false);
+
   // Use ref to access latest checkedIds inside async callback without recreating it
   const checkedIdsRef = useRef(checkedIds);
   checkedIdsRef.current = checkedIds;
+
+  const isVibeLocalChecked = checkedIds.has('vibe-local');
+
+  // Fetch Ollama models when vibe-local is checked
+  useEffect(() => {
+    if (!isVibeLocalChecked) {
+      setOllamaModels([]);
+      setOllamaError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingModels(true);
+
+    fetch('/api/ollama/models')
+      .then((res) => res.json())
+      .then((data: { models: OllamaModelInfo[]; error?: string }) => {
+        if (cancelled) return;
+        setOllamaModels(data.models);
+        setOllamaError(data.models.length === 0 && data.error ? data.error : null);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setOllamaModels([]);
+        setOllamaError('Failed to fetch models');
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingModels(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [isVibeLocalChecked]);
 
   const handleCheckboxChange = useCallback(
     async (toolId: CLIToolType, checked: boolean) => {
@@ -91,6 +144,29 @@ export const AgentSettingsPane = memo(function AgentSettingsPane({
       }
     },
     [worktreeId, selectedAgents, onSelectedAgentsChange]
+  );
+
+  const handleModelChange = useCallback(
+    async (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const value = e.target.value;
+      const model = value === '' ? null : value;
+      setSavingModel(true);
+      try {
+        const response = await fetch(`/api/worktrees/${worktreeId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ vibeLocalModel: model }),
+        });
+        if (response.ok) {
+          onVibeLocalModelChange(model);
+        }
+      } catch {
+        // Silently fail - model selection is non-critical
+      } finally {
+        setSavingModel(false);
+      }
+    },
+    [worktreeId, onVibeLocalModelChange]
   );
 
   const isMaxSelected = checkedIds.size >= MAX_SELECTED_AGENTS;
@@ -144,6 +220,41 @@ export const AgentSettingsPane = memo(function AgentSettingsPane({
         >
           <span className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           {t('loading')}
+        </div>
+      )}
+
+      {/* Ollama model selector - shown when vibe-local is checked */}
+      {isVibeLocalChecked && (
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <h4 className="text-sm font-semibold text-gray-700 mb-2">
+            {t('vibeLocalModel')}
+          </h4>
+
+          {loadingModels ? (
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <span className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              {t('loading')}
+            </div>
+          ) : ollamaError && ollamaModels.length === 0 ? (
+            <p className="text-xs text-amber-600">
+              {t('ollamaNotAvailable')}
+            </p>
+          ) : (
+            <select
+              data-testid="vibe-local-model-select"
+              value={vibeLocalModel ?? ''}
+              onChange={handleModelChange}
+              disabled={savingModel}
+              className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
+            >
+              <option value="">{t('vibeLocalModelDefault')}</option>
+              {ollamaModels.map((model) => (
+                <option key={model.name} value={model.name}>
+                  {model.name}{model.parameterSize ? ` (${model.parameterSize})` : ''}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       )}
     </div>
