@@ -1991,6 +1991,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
                 answering={state.prompt.answering}
                 onRespond={handlePromptRespond}
                 onDismiss={handlePromptDismiss}
+                cliToolName={getCliToolDisplayName(activeCliTab)}
               />
             </div>
           )}
@@ -2230,6 +2231,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
             answering={state.prompt.answering}
             onRespond={handlePromptRespond}
             onDismiss={handlePromptDismiss}
+            cliToolName={getCliToolDisplayName(activeCliTab)}
           />
         )}
 

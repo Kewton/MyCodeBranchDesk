@@ -582,7 +582,7 @@ export async function detectAndRespondToPrompt(
   try {
     // 1. Detect prompt
     const promptOptions = buildDetectPromptOptions(cliToolId);
-    const promptDetection = detectPrompt(cleanOutput, promptOptions);
+    const promptDetection = detectPrompt(stripBoxDrawing(cleanOutput), promptOptions);
 
     if (!promptDetection.isPrompt || !promptDetection.promptData) {
       // No prompt detected - reset lastAnsweredPromptKey (Issue #306)

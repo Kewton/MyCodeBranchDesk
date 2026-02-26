@@ -804,11 +804,17 @@ export function startPolling(worktreeId: string, cliToolId: CLIToolType): void {
   // Record start time
   pollingStartTimes.set(pollerKey, Date.now());
 
-  // Start polling
-  const interval = setInterval(async () => {
-    const startTime = pollingStartTimes.get(pollerKey);
+  // Start polling with setTimeout chain to prevent race conditions
+  scheduleNextResponsePoll(worktreeId, cliToolId);
+}
 
+/** Schedule next checkForResponse() after current one completes (setTimeout chain) */
+function scheduleNextResponsePoll(worktreeId: string, cliToolId: CLIToolType): void {
+  const pollerKey = getPollerKey(worktreeId, cliToolId);
+
+  const timerId = setTimeout(async () => {
     // Check if max duration exceeded
+    const startTime = pollingStartTimes.get(pollerKey);
     if (startTime && Date.now() - startTime > MAX_POLLING_DURATION) {
       stopPolling(worktreeId, cliToolId);
       return;
@@ -820,9 +826,15 @@ export function startPolling(worktreeId: string, cliToolId: CLIToolType): void {
     } catch (error: unknown) {
       console.error(`[Poller] Error:`, error);
     }
+
+    // Schedule next poll ONLY after current one completes
+    // Guard: only if poller is still active (not stopped during checkForResponse)
+    if (activePollers.has(pollerKey)) {
+      scheduleNextResponsePoll(worktreeId, cliToolId);
+    }
   }, POLLING_INTERVAL);
 
-  activePollers.set(pollerKey, interval);
+  activePollers.set(pollerKey, timerId);
 }
 
 /**
@@ -838,10 +850,10 @@ export function startPolling(worktreeId: string, cliToolId: CLIToolType): void {
  */
 export function stopPolling(worktreeId: string, cliToolId: CLIToolType): void {
   const pollerKey = getPollerKey(worktreeId, cliToolId);
-  const interval = activePollers.get(pollerKey);
+  const timerId = activePollers.get(pollerKey);
 
-  if (interval) {
-    clearInterval(interval);
+  if (timerId) {
+    clearTimeout(timerId);
     activePollers.delete(pollerKey);
     pollingStartTimes.delete(pollerKey);
   }
