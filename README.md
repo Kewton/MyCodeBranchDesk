@@ -1,5 +1,6 @@
 # CommandMate
 
+[![GitHub Stars](https://img.shields.io/github/stars/Kewton/CommandMate?style=social)](https://github.com/Kewton/CommandMate)
 ![npm version](https://img.shields.io/npm/v/commandmate)
 ![npm downloads](https://img.shields.io/npm/dm/commandmate)
 ![license](https://img.shields.io/github/license/Kewton/CommandMate)
@@ -16,12 +17,17 @@
 
 Not a "remote control" — a **mobile dev cockpit**.
 
-AI writes code for you. That was supposed to mean freedom.
-Instead, you're watching a terminal, afraid to walk away.
-Your friends are at dinner. Your kid needs a bath. You just want ten minutes on the couch.
-But close the lid and every session dies. So you sit there — babysitting the machine that was supposed to babysit your code.
+```bash
+npx commandmate
+```
 
-CommandMate changes that. Auto Yes keeps the agent moving. Sessions survive in the background. And a Web UI on your phone means you can check in, review diffs, edit instructions, and send screenshots — from anywhere.
+**From install to mobile monitoring in 60 seconds.** macOS / Linux · Node.js v20+ · npm · git · tmux · openssl
+
+---
+
+AI writes code for you — but you're stuck watching a terminal, afraid to walk away.
+Close the lid and every session dies.
+**CommandMate keeps it alive, and puts the controls on your phone.**
 
 Of course, it works great on desktop too — the two-column layout gives you a full overview of all sessions and worktrees at a glance.
 
@@ -29,83 +35,69 @@ Of course, it works great on desktop too — the two-column layout gives you a f
   <img src="./docs/images/demo-desktop.gif" alt="CommandMate desktop demo" width="600">
 </p>
 
-```bash
-npx commandmate
-```
-
 ---
 
-## The 6 Pillars
+## Key Features
 
-| Pillar | What it does | Why it matters |
-|--------|-------------|----------------|
+| Feature | What it does | Why it matters |
+|---------|-------------|----------------|
 | **Auto Yes Mode** | Agent runs without stopping for confirmations | No babysitting — Claude Code keeps working while you're away |
 | **Git Worktree Sessions** | One session per worktree, parallel execution | Multiple tasks progress simultaneously |
 | **Mobile Web UI** | Full session control from any browser | Monitor and steer from your phone |
 | **File Viewer** | Browse worktree files from the browser | Review code changes without touching your PC |
 | **Markdown Editor** | Edit Markdown files in the browser | Update AI instructions on the go |
 | **Screenshot Instructions** | Attach images to your prompts | Snap a bug → "Fix this" — the agent sees the screenshot |
+| **Token Authentication** | SHA-256 hashed token + HTTPS + rate limiting | Secure remote access — no credentials leaked, brute-force protected |
+| **Scheduled Execution** | Cron-based auto-run via CMATE.md | Daily reviews, nightly tests — Claude Code works on a schedule |
 
 ---
 
-## Quick Start
+## Use Cases
 
-**Prerequisites:** macOS / Linux, Node.js v20+, npm, git, tmux, openssl
-
-```bash
-# Install & start in one command
-npx commandmate
-
-# Or install globally
-npm install -g commandmate
-commandmate init
-commandmate start --daemon
-```
-
-Open http://localhost:3000 in your browser.
-
-See the [CLI Setup Guide](./docs/en/user-guide/cli-setup-guide.md) for details.
+| Scenario | How CommandMate helps |
+|----------|----------------------|
+| **Couch coding** | Start a task on your PC, then monitor and steer from the sofa |
+| **Commute review** | Review AI-generated code changes on the train |
+| **Overnight runs** | Let Claude Code work all night — check progress from bed |
+| **Visual bug fix** | Snap a UI bug on your phone, send it with "Fix this" |
+| **Parallel tasks** | Run multiple worktree sessions, manage them all from one dashboard |
 
 ---
 
 ## Comparison
 
-| Feature | CommandMate | Happy Coder | claude-squad | Omnara |
-|---------|:-----------:|:-----------:|:------------:|:------:|
-| Auto Yes Mode | Yes | No | Yes (TUI only) | No |
-| Git Worktree Management | Yes | No | Yes (TUI only) | No |
-| Mobile Web UI | Yes | Yes | **No** | Yes |
-| File Viewer | Yes | No | No | No |
-| Markdown Editor | Yes | No | No | No |
-| Screenshot Instructions | Yes | No | Not possible | No |
-| Free / OSS | Yes | Free + Paid | Yes | $20/mo |
-| Runs 100% Locally | Yes | Server-routed | Yes | Cloud fallback |
+| Feature | CommandMate | Remote Control (Official) | Happy Coder | claude-squad | Omnara |
+|---------|:-----------:|:------------------------:|:-----------:|:------------:|:------:|
+| Auto Yes Mode | Yes | No | No | Yes (TUI only) | No |
+| Git Worktree Management | Yes | No | No | Yes (TUI only) | No |
+| Parallel Sessions | Yes | **No (1 only)** | Yes | Yes | No |
+| Mobile Web UI | Yes | Yes (claude.ai) | Yes | **No** | Yes |
+| File Viewer | Yes | No | No | No | No |
+| Markdown Editor | Yes | No | No | No | No |
+| Screenshot Instructions | Yes | No | No | Not possible | No |
+| Scheduled Execution | Yes | No | No | No | No |
+| Survives Laptop Close | Yes (daemon) | **No (terminal must stay open)** | Yes | Yes | Yes |
+| Token Authentication | Yes | N/A (Anthropic account) | N/A (app) | No | N/A (cloud) |
+| Free / OSS | Yes | Requires Pro/Max | Free + Paid | Yes | $20/mo |
+| Runs 100% Locally | Yes | Via Anthropic API | Server-routed | Yes | Cloud fallback |
 
 ---
 
-## Workflow
+## Screenshots
 
-```
-1. Start tasks on your PC
-   $ commandmate start --daemon
-   → Claude Code begins working with Auto Yes
+### Desktop
 
-2. Close your laptop and go
+![Desktop view](./docs/images/screenshot-desktop.png)
 
-3. Check in from your phone
-   → Web UI shows all sessions at a glance
+### Mobile
 
-4. Review code changes
-   → File Viewer lets you read diffs on mobile
+| Top Page | Worktree (History) | Worktree (Terminal) |
+|----------|-------------------|-------------------|
+| ![Mobile view](./docs/images/screenshot-mobile.png) | ![Mobile - History](./docs/images/screenshot-worktree-mobile.png) | ![Mobile - Terminal](./docs/images/screenshot-worktree-mobile-terminal.png) |
 
-5. Adjust direction
-   → Edit a Markdown instruction file, or type a new prompt
+### Worktree Detail (Desktop)
 
-6. Snap a bug
-   → Screenshot Instructions: attach a photo and say "Fix this"
-
-7. Claude Code sees the image and starts fixing
-```
+![Desktop - Worktree detail](./docs/images/screenshot-worktree-desktop.png)
 
 ---
 
@@ -115,7 +107,7 @@ Runs **100% locally**. No external server, no cloud relay, no account required. 
 
 - Fully open-source ([MIT License](./LICENSE))
 - Local database, local sessions
-- For remote access, use a VPN or authenticated reverse proxy
+- For remote access, use a tunneling service ([Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/), [ngrok](https://ngrok.com/), [Pinggy](https://pinggy.io/)), a VPN, or an authenticated reverse proxy
 
 See the [Security Guide](./docs/security-guide.md) and [Trust & Safety](./docs/en/TRUST_AND_SAFETY.md) for details.
 
@@ -135,6 +127,25 @@ flowchart LR
 Each Git worktree gets its own tmux session, so multiple tasks run in parallel without interference.
 
 ---
+
+<details>
+<summary><strong>Quick Start (detailed)</strong></summary>
+
+```bash
+# Install & start in one command
+npx commandmate
+
+# Or install globally
+npm install -g commandmate
+commandmate init
+commandmate start --daemon
+```
+
+Open http://localhost:3000 in your browser.
+
+See the [CLI Setup Guide](./docs/en/user-guide/cli-setup-guide.md) for details.
+
+</details>
 
 <details>
 <summary><strong>CLI Commands</strong></summary>
@@ -197,25 +208,6 @@ See `commandmate --help` for all options.
 </details>
 
 <details>
-<summary><strong>Screenshots</strong></summary>
-
-### Desktop
-
-![Desktop view](./docs/images/screenshot-desktop.png)
-
-### Worktree Detail View (Message / Console / History)
-
-| Desktop | Mobile (History) | Mobile (Terminal) |
-|---------|-----------------|-------------------|
-| ![Desktop - Worktree detail](./docs/images/screenshot-worktree-desktop.png) | ![Mobile - History](./docs/images/screenshot-worktree-mobile.png) | ![Mobile - Terminal](./docs/images/screenshot-worktree-mobile-terminal.png) |
-
-### Top Page (Mobile)
-
-![Mobile view](./docs/images/screenshot-mobile.png)
-
-</details>
-
-<details>
 <summary><strong>Troubleshooting & FAQ</strong></summary>
 
 ### Claude CLI not found / path changed?
@@ -258,7 +250,13 @@ Claude Code sets `CLAUDECODE=1` to prevent nesting. CommandMate removes this aut
 A: CommandMate runs a web server on your PC. To access it from your phone, your phone and PC must be on the same network (Wi-Fi). Run `commandmate init` and enable external access — this sets `CM_BIND=0.0.0.0`. Then open `http://<your-PC-IP>:3000` in your phone's browser.
 
 **Q: Can I access it from outside my home network?**
-A: Yes. Use a tunneling service like [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) to securely expose your local server without opening router ports. Alternatively, a VPN or an authenticated reverse proxy (Basic Auth, OIDC, etc.) also works. **Do not** expose the server directly to the internet without authentication.
+A: Yes. Use a tunneling service to securely expose your local server without opening router ports:
+
+- [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) — free, requires Cloudflare account
+- [ngrok](https://ngrok.com/) — free tier available, easy setup
+- [Pinggy](https://pinggy.io/) — no sign-up required, simple SSH-based tunnel
+
+Alternatively, a VPN or an authenticated reverse proxy (Basic Auth, OIDC, etc.) also works. **Do not** expose the server directly to the internet without authentication.
 
 **Q: Does it work on iPhone / Android?**
 A: Yes. CommandMate's Web UI is responsive and works on any modern mobile browser (Safari, Chrome, etc.). No app install required.
