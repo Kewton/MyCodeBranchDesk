@@ -2102,7 +2102,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
 
         {/* Issue #111: Branch mismatch warning (Mobile) */}
         {worktree?.gitStatus && worktree.gitStatus.isBranchMismatch && (
-          <div className="fixed inset-x-0 z-35" style={{ top: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}>
+          <div className="z-35">
             <BranchMismatchAlert
               isBranchMismatch={worktree.gitStatus.isBranchMismatch}
               currentBranch={worktree.gitStatus.currentBranch}
@@ -2112,7 +2112,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
         )}
 
         {/* Auto Yes + CLI Tool Tabs combined row (Mobile) */}
-        <div className="fixed inset-x-0 z-30 flex items-center justify-between px-3 py-1.5 bg-gray-50 border-b border-gray-200" style={{ top: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}>
+        <div className="sticky top-0 z-30 flex items-center justify-between px-3 py-1.5 bg-gray-50 border-b border-gray-200">
           {/* Left: Auto Yes toggle (inline mode) */}
           <AutoYesToggle
             enabled={autoYesEnabled}
@@ -2174,7 +2174,6 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
         <main
           className="flex-1 pb-32 overflow-hidden"
           style={{
-            paddingTop: 'calc(6.25rem + env(safe-area-inset-top, 0px))',
             paddingBottom: 'calc(8rem + env(safe-area-inset-bottom, 0px))',
           }}
         >
