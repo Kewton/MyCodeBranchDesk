@@ -429,9 +429,12 @@ function extractResponse(
     return -1;
   };
 
-  // Early check for Claude permission prompts (before extraction logic)
-  // Permission prompts appear after normal responses and need special handling
-  if (cliToolId === 'claude') {
+  // Early check for interactive prompts (before extraction logic)
+  // Permission prompts appear after normal responses and need special handling.
+  // Issue #372: Codex command confirmation prompts (› 1. Yes, proceed) match
+  // CODEX_PROMPT_PATTERN, causing isCodexOrGeminiComplete to fire prematurely.
+  // Early detection ensures prompt options are preserved in the extraction result.
+  if (cliToolId === 'claude' || cliToolId === 'codex') {
     const fullOutput = lines.join('\n');
     const promptDetection = detectPromptWithOptions(fullOutput, cliToolId);
 
