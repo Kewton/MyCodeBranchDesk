@@ -157,10 +157,30 @@ describe('HTTP Proxy Handler', () => {
 
       await proxyHttp(request, mockApp, '/nested/page?query=1');
 
-      // buildUpstreamUrl strips the proxy prefix and forwards to upstream's root
-      // This allows upstream apps to work without special basePath configuration
+      // buildUpstreamUrl forwards the full path including proxy prefix to upstream
+      // Upstream apps must be configured with basePath: '/proxy/{pathPrefix}'
       expect(global.fetch).toHaveBeenCalledWith(
         'http://127.0.0.1:5173/nested/page?query=1',
+        expect.any(Object)
+      );
+    });
+
+    it('should correctly forward path with proxy prefix to upstream', async () => {
+      const { proxyHttp } = await import('@/lib/proxy/handler');
+
+      const mockApp = createMockApp({
+        targetHost: '127.0.0.1',
+        targetPort: 5173,
+        pathPrefix: 'app-svelte',
+      });
+      const request = new Request('http://localhost:3000/proxy/app-svelte/nested/page?query=1');
+
+      global.fetch = vi.fn().mockResolvedValue(new Response('OK'));
+
+      await proxyHttp(request, mockApp, '/proxy/app-svelte/nested/page?query=1');
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://127.0.0.1:5173/proxy/app-svelte/nested/page?query=1',
         expect.any(Object)
       );
     });
@@ -227,8 +247,8 @@ describe('HTTP Proxy Handler', () => {
   });
 
   describe('buildUpstreamUrl', () => {
-    // buildUpstreamUrl strips the proxy prefix and forwards to upstream's root
-    // This allows upstream apps to work without special basePath configuration
+    // buildUpstreamUrl forwards the full path including proxy prefix to upstream
+    // Upstream apps must be configured with basePath: '/proxy/{pathPrefix}'
 
     it('should build URL with host and port', async () => {
       const { buildUpstreamUrl } = await import('@/lib/proxy/handler');
@@ -241,7 +261,7 @@ describe('HTTP Proxy Handler', () => {
 
       const url = buildUpstreamUrl(mockApp, '/page');
 
-      // Path is forwarded directly to upstream without proxy prefix
+      // Path is forwarded directly to upstream including proxy prefix
       expect(url).toBe('http://localhost:5173/page');
     });
 
@@ -256,7 +276,7 @@ describe('HTTP Proxy Handler', () => {
 
       const url = buildUpstreamUrl(mockApp, '/api?key=value&other=123');
 
-      // Query strings are preserved, proxy prefix is stripped
+      // Query strings are preserved with full proxy path
       expect(url).toBe('http://127.0.0.1:8501/api?key=value&other=123');
     });
 

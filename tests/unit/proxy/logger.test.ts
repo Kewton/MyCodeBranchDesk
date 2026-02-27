@@ -51,7 +51,7 @@ describe('Proxy Logger', () => {
         timestamp: Date.now(),
         pathPrefix: 'app-svelte',
         method: 'GET',
-        path: '/page',
+        path: '/proxy/app-svelte/page',
         statusCode: 200,
         responseTime: 50,
         isWebSocket: false,
@@ -60,7 +60,7 @@ describe('Proxy Logger', () => {
       expect(entry.timestamp).toBeDefined();
       expect(entry.pathPrefix).toBe('app-svelte');
       expect(entry.method).toBe('GET');
-      expect(entry.path).toBe('/page');
+      expect(entry.path).toBe('/proxy/app-svelte/page');
       expect(entry.statusCode).toBe(200);
       expect(entry.responseTime).toBe(50);
       expect(entry.isWebSocket).toBe(false);
@@ -71,7 +71,7 @@ describe('Proxy Logger', () => {
         timestamp: Date.now(),
         pathPrefix: 'app-svelte',
         method: 'GET',
-        path: '/page',
+        path: '/proxy/app-svelte/page',
         statusCode: 502,
         responseTime: 0,
         isWebSocket: false,
@@ -90,7 +90,7 @@ describe('Proxy Logger', () => {
         timestamp: Date.now(),
         pathPrefix: 'app-svelte',
         method: 'GET',
-        path: '/page',
+        path: '/proxy/app-svelte/page',
         statusCode: 200,
         responseTime: 50,
         isWebSocket: false,
@@ -112,7 +112,7 @@ describe('Proxy Logger', () => {
         timestamp: Date.now(),
         pathPrefix: 'app-svelte',
         method: 'GET',
-        path: '/page',
+        path: '/proxy/app-svelte/page',
         statusCode: 502,
         responseTime: 0,
         isWebSocket: false,
@@ -135,7 +135,7 @@ describe('Proxy Logger', () => {
         timestamp: Date.now(),
         pathPrefix: 'app-streamlit',
         method: 'POST',
-        path: '/api/data',
+        path: '/proxy/app-streamlit/api/data',
         statusCode: 201,
         responseTime: 120,
         isWebSocket: false,
@@ -156,7 +156,7 @@ describe('Proxy Logger', () => {
         timestamp: Date.now(),
         pathPrefix: 'app-streamlit',
         method: 'GET',
-        path: '/_stcore/stream',
+        path: '/proxy/app-streamlit/_stcore/stream',
         statusCode: 101,
         responseTime: 0,
         isWebSocket: true,
@@ -178,7 +178,7 @@ describe('Proxy Logger', () => {
       const error = new Error('ECONNREFUSED');
       error.stack = 'Error: ECONNREFUSED\n    at test.ts:1:1';
 
-      logProxyError('app-svelte', 'GET', '/page', error);
+      logProxyError('app-svelte', 'GET', '/proxy/app-svelte/page', error);
 
       expect(mockLogger.error).toHaveBeenCalledTimes(1);
       expect(mockLogger.error).toHaveBeenCalledWith(
@@ -186,7 +186,7 @@ describe('Proxy Logger', () => {
         expect.objectContaining({
           pathPrefix: 'app-svelte',
           method: 'GET',
-          path: '/page',
+          path: '/proxy/app-svelte/page',
           error: 'ECONNREFUSED',
         })
       );
@@ -198,7 +198,7 @@ describe('Proxy Logger', () => {
       const error = new Error('Connection timeout');
       error.stack = 'Error: Connection timeout\n    at handler.ts:50:10';
 
-      logProxyError('app-next2', 'POST', '/api/submit', error);
+      logProxyError('app-next2', 'POST', '/proxy/app-next2/api/submit', error);
 
       expect(mockLogger.error).toHaveBeenCalledWith(
         expect.any(String),

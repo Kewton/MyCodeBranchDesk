@@ -22,7 +22,7 @@ export interface ProxyLogEntry {
   /** HTTP method (GET, POST, etc.) */
   method: string;
 
-  /** Request path (after /proxy/{pathPrefix}) */
+  /** Full request path including proxy prefix (e.g., /proxy/{pathPrefix}/page) */
   path: string;
 
   /** HTTP status code of the response */
@@ -49,7 +49,7 @@ export interface ProxyLogEntry {
  *   timestamp: Date.now(),
  *   pathPrefix: 'app-svelte',
  *   method: 'GET',
- *   path: '/page',
+ *   path: '/proxy/app-svelte/page',
  *   statusCode: 200,
  *   responseTime: 50,
  *   isWebSocket: false,
@@ -57,7 +57,7 @@ export interface ProxyLogEntry {
  * ```
  */
 export function logProxyRequest(entry: ProxyLogEntry): void {
-  const message = `[Proxy] ${entry.method} /proxy/${entry.pathPrefix}${entry.path} -> ${entry.statusCode} (${entry.responseTime}ms)`;
+  const message = `[Proxy] ${entry.method} ${entry.path} -> ${entry.statusCode} (${entry.responseTime}ms)`;
 
   if (entry.error) {
     logger.warn(message, { ...entry });
@@ -76,7 +76,7 @@ export function logProxyRequest(entry: ProxyLogEntry): void {
  *
  * @example
  * ```typescript
- * logProxyError('app-svelte', 'GET', '/page', new Error('ECONNREFUSED'));
+ * logProxyError('app-svelte', 'GET', '/proxy/app-svelte/page', new Error('ECONNREFUSED'));
  * ```
  */
 export function logProxyError(
@@ -85,7 +85,7 @@ export function logProxyError(
   path: string,
   error: Error
 ): void {
-  logger.error(`[Proxy] ${method} /proxy/${pathPrefix}${path} failed: ${error.message}`, {
+  logger.error(`[Proxy] ${method} ${path} failed: ${error.message}`, {
     pathPrefix,
     method,
     path,
