@@ -15,14 +15,17 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import QRCode from 'react-qr-code';
 
+const INPUT_CLASS =
+  'w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white text-sm';
+
 export function QrCodeGenerator() {
   const t = useTranslations('auth');
   const [url, setUrl] = useState('');
   const [token, setToken] = useState('');
   const [qrVisible, setQrVisible] = useState(false); // S001: default hidden
 
-  const qrValue = url && token ? `${url}/login#token=${token}` : '';
-  const isHttp = url.startsWith('http://') && !url.startsWith('https://');
+  const qrValue = url && token ? `${url}/login#token=${encodeURIComponent(token)}` : '';
+  const isHttp = url.startsWith('http://');
 
   return (
     <div className="mt-6 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
@@ -38,7 +41,7 @@ export function QrCodeGenerator() {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             aria-label={t('login.qr.urlLabel')}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white text-sm"
+            className={INPUT_CLASS}
           />
           {isHttp && (
             <p className="mt-1 text-sm text-yellow-600 dark:text-yellow-400">
@@ -54,7 +57,7 @@ export function QrCodeGenerator() {
             value={token}
             onChange={(e) => setToken(e.target.value)}
             aria-label={t('login.qr.tokenLabel')}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white text-sm"
+            className={INPUT_CLASS}
             autoComplete="off"
           />
         </div>

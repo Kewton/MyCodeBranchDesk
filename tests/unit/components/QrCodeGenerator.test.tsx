@@ -162,7 +162,7 @@ describe('QrCodeGenerator', () => {
     const qrCode = screen.getByTestId('qr-code');
     expect(qrCode).toHaveAttribute(
       'data-value',
-      'https://example.ngrok-free.app/login#token=my secret token'
+      'https://example.ngrok-free.app/login#token=my%20secret%20token'
     );
   });
 });

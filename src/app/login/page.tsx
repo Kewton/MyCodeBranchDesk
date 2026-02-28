@@ -36,18 +36,12 @@ export default function LoginPage() {
   const { autoLoginErrorKey, retryAfterSeconds } = useFragmentLogin(authEnabled);
 
   // Map autoLoginErrorKey to localized message
-  const autoLoginError = (() => {
-    switch (autoLoginErrorKey) {
-      case 'token_invalid':
-        return t('login.qr.tokenExpiredOrInvalid');
-      case 'rate_limited':
-        return t('login.qr.rateLimited');
-      case 'auto_login_failed':
-        return t('login.qr.autoLoginError');
-      default:
-        return null;
-    }
-  })();
+  const autoLoginErrorMessages: Record<string, string> = {
+    token_invalid: t('login.qr.tokenExpiredOrInvalid'),
+    rate_limited: t('login.qr.rateLimited'),
+    auto_login_failed: t('login.qr.autoLoginError'),
+  };
+  const autoLoginError = autoLoginErrorKey ? autoLoginErrorMessages[autoLoginErrorKey] ?? null : null;
 
   // Redirect to home if auth is not enabled
   useEffect(() => {
