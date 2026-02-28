@@ -157,8 +157,8 @@ tests/
 | `src/hooks/useAutoYes.ts` | Auto-Yesクライアント側フック（重複応答防止対応。**Issue #287: promptType/defaultOptionNumber送信** - prompt-response APIリクエストにpromptType/defaultOptionNumberを含め、promptCheck再検証失敗時のフォールバック対応。**Issue #306: generatePromptKey()使用** - promptKey生成をprompt-key.tsの共通ユーティリティに統一） |
 | `src/lib/prompt-response-body-builder.ts` | プロンプト応答リクエストボディ構築ユーティリティ（Issue #287: buildPromptResponseBody()関数でpromptType/defaultOptionNumberを含むリクエストボディを生成、DRY原則対応、useAutoYes/WorktreeDetailRefactoredから共通化） |
 | `src/lib/cli-tools/` | CLIツール抽象化（Strategy パターン） |
-| `src/lib/cli-tools/types.ts` | CLIツール型定義（Issue #368: CLI_TOOL_IDS=['claude','codex','gemini','vibe-local']、CLIToolType、CLI_TOOL_DISPLAY_NAMES、getCliToolDisplayName()で表示名共通化、isCliToolType()型ガード、getCliToolDisplayNameSafe()フォールバック付きラッパー） |
-| `src/lib/cli-tools/vibe-local.ts` | Vibe Local CLIツール実装（Issue #368: VibeLocalTool、BaseCLITool継承、tmuxセッション管理） |
+| `src/lib/cli-tools/types.ts` | CLIツール型定義（Issue #368: CLI_TOOL_IDS=['claude','codex','gemini','vibe-local']、CLIToolType、CLI_TOOL_DISPLAY_NAMES、getCliToolDisplayName()で表示名共通化、isCliToolType()型ガード、getCliToolDisplayNameSafe()フォールバック付きラッパー。**Issue #374: VIBE_LOCAL_CONTEXT_WINDOW_MIN=128、VIBE_LOCAL_CONTEXT_WINDOW_MAX=2097152定数追加、isValidVibeLocalContextWindow(value:unknown):value is number 型ガード関数追加（API層・CLI層で共有）**） |
+| `src/lib/cli-tools/vibe-local.ts` | Vibe Local CLIツール実装（Issue #368: VibeLocalTool、BaseCLITool継承、tmuxセッション管理。**Issue #374: startSession()で--context-windowオプション対応、DBからvibeLocalContextWindow取得、defense-in-depth バリデーション後 --context-window ${Number(ctxWindow)} を追加（tmuxセッションのみ、-pモードはスコープ外）**） |
 | `src/lib/selected-agents-validator.ts` | エージェント選択バリデーター（Issue #368: validateAgentsPair()共通コア、parseSelectedAgents()DB読取用・フォールバック付き、validateSelectedAgentsInput()API入力用、DEFAULT_SELECTED_AGENTS=['claude','codex']） |
 | `src/lib/cli-tools/codex.ts` | Codex CLI tmuxセッション管理（Issue #212: 複数行メッセージのPasted text検知+Enter再送、getErrorMessage()ヘルパー抽出） |
 | `src/lib/session-cleanup.ts` | セッション/ポーラー/スケジューラー停止の一元管理（Facade パターン。**Issue #294: stopScheduleForWorktree()呼び出し追加**） |
@@ -168,6 +168,9 @@ tests/
 | `src/lib/claude-executor.ts` | claude -p プロセス実行エンジン（Issue #294: child_process.execFile使用[SEC-001]、sanitizeEnvForChildProcess()でSENSITIVE_ENV_KEYS除去、MAX_OUTPUT_SIZE=1MB/MAX_STORED_OUTPUT_SIZE=100KB[S1-014]、EXECUTION_TIMEOUT_MS=5分、MAX_MESSAGE_LENGTH=10000、executeClaudeCommand()、truncateOutput()） |
 | `src/lib/schedule-manager.ts` | サーバーサイドスケジューラー（Issue #294: globalThis.__scheduleManagerStates/globalThis.__scheduleActiveProcesses、cronパターンでcron評価[croner]、単一タイマー全worktree巡回[60秒]、同時実行防止、MAX_CONCURRENT_SCHEDULES=100、再起動リカバリ[status=running→failed]、initScheduleManager()はinitializeWorktrees()完了後に呼び出し[S3-010]、stopAllSchedules()でSIGKILL fire-and-forget[S3-001]） |
 | `src/config/schedule-config.ts` | スケジュール関連設定定数の一元管理（Issue #294リファクタリング: UUID_V4_PATTERN、isValidUuidV4()、MAX_NAME_LENGTH、MAX_MESSAGE_LENGTH、MAX_CRON_LENGTH。DRY原則対応） |
+| `src/lib/proxy/handler.ts` | HTTPプロキシハンドラ（Issue #42: proxyHttp/proxyWebSocket/buildUpstreamUrl/isWebSocketUpgrade。**Issue #376: buildUpstreamUrl()がpathPrefix含むフルパスを転送するよう修正**、コメント・JSDoc更新） |
+| `src/lib/proxy/logger.ts` | プロキシリクエストログ（Issue #42: logProxyRequest/logProxyError、ProxyLogEntry型。**Issue #376: 二重プレフィックス修正** - pathが既に/proxy/{pathPrefix}/...形式のためpathPrefix手動結合を除去） |
+| `src/lib/proxy/config.ts` | プロキシ設定定数（PROXY_TIMEOUT/HOP_BY_HOP_REQUEST_HEADERS/HOP_BY_HOP_RESPONSE_HEADERS/PROXY_STATUS_CODES/PROXY_ERROR_MESSAGES） |
 | `src/lib/url-normalizer.ts` | Git URL正規化（重複検出用） |
 | `src/lib/url-path-encoder.ts` | ファイルパスのURLエンコード（Issue #300: encodePathForUrl()関数、スラッシュを保護しながら各セグメントを個別にencodeURIComponent、catch-allルートのパス分割を維持） |
 | `src/lib/clone-manager.ts` | クローン処理管理（DBベース排他制御。**Issue #308: basePath修正** - resolveDefaultBasePath()でCM_ROOT_DIR/WORKTREE_BASE_PATH/process.cwd()優先順位制御、WORKTREE_BASE_PATH非推奨警告（モジュールスコープwarnedWorktreeBasePathフラグで初回のみ出力）、path.resolve()による絶対パス正規化、resetWorktreeBasePathWarning()テスト用エクスポート） |
@@ -203,7 +206,7 @@ tests/
 | `src/components/worktree/ContextMenu.tsx` | ファイル/ディレクトリコンテキストメニュー（Issue #162: 「移動」メニュー項目追加、FolderInputアイコン、onMoveコールバック。Issue #299: z-50除去、Z_INDEX.CONTEXT_MENU使用） |
 | `src/components/worktree/FileViewer.tsx` | ファイルビューア（Issue #162: コピーボタン追加、Copy/Checkアイコン切替、useMemo最適化、画像ファイル非表示。**Issue #302: 動画表示分岐追加、canCopyロジック修正（isVideo除外）**） |
 | `src/components/worktree/FileTreeView.tsx` | ファイルツリー表示（Issue #162: birthtime表示、formatRelativeTime()ロケール対応、sm:inline条件表示。Issue #300: 非空状態にツールバー追加、data-testid=file-tree-toolbar/toolbar-new-file-button/toolbar-new-directory-button、onNewFile('')/onNewDirectory('')でルートレベル作成） |
-| `src/components/worktree/AgentSettingsPane.tsx` | エージェント選択UIコンポーネント（Issue #368: checkbox UIで2ツールまで選択、2選択済み時未選択項目disabled、PATCH APIで永続化、getCliToolDisplayName()使用、MAX_SELECTED_AGENTS=2定数、useRef安定コールバック） |
+| `src/components/worktree/AgentSettingsPane.tsx` | エージェント選択UIコンポーネント（Issue #368: checkbox UIで2ツールまで選択、2選択済み時未選択項目disabled、PATCH APIで永続化、getCliToolDisplayName()使用、MAX_SELECTED_AGENTS=2定数、useRef安定コールバック。**Issue #374: vibeLocalContextWindow props追加、Vibe Local選択時にコンテキストウィンドウ入力欄表示（type=number/min=128/max=2097152/step=1）、VIBE_LOCAL_CONTEXT_WINDOW_MIN/MAX定数使用**） |
 | `src/components/worktree/NotesAndLogsPane.tsx` | Notes/Logs/Agentサブタブコンテナ（Issue #368: SubTab型に'agent'追加、AgentSettingsPane描画、SUB_TABS設定配列でDRY化） |
 | `src/components/worktree/WorktreeDetailRefactored.tsx` | Worktree詳細画面（Issue #162: handleMoveハンドラー追加、MoveDialog統合、useFileOperations呼び出し。Issue #300: handleNewFile/handleNewDirectory/handleRename/handleDelete/handleFileInputChangeの5箇所でencodeURIComponentをencodePathForUrl()に置換。Issue #368: selectedAgents stateをAPIから取得、デスクトップ/モバイルのハードコード配列を動的置換、activeCliTab sync useEffect） |
 | `src/components/worktree/MemoCard.tsx` | メモカードコンポーネント（インライン編集・自動保存・削除ボタン。**Issue #321: コピーボタン追加**、Copy/Checkアイコン切替（2秒）、useRefタイマークリーンアップ（S1-002）、COPY_FEEDBACK_DURATION_MS定数、サイレントエラーハンドリング） |

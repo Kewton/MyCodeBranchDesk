@@ -2252,4 +2252,79 @@ Are you sure you want to continue? (yes/no)
       }
     });
   });
+
+  describe('Issue #372: Codex CLI command confirmation prompt detection', () => {
+    it('should detect Codex command execution confirmation prompt', () => {
+      const output = [
+        'Would you like to run the following command?',
+        '',
+        '  $ npm run test:e2e -- tests/e2e/mobile-cmate-tab.spec.ts',
+        '',
+        '\u203A 1. Yes, proceed (y)',
+        '  2. Yes, and don\'t ask again for commands that start with \'npm run test:e2e\' (p)',
+        '  3. No, and tell Codex what to do differently (esc)',
+        '',
+        'Press enter to confirm or esc to cancel',
+      ].join('\n');
+
+      const result = detectPrompt(output);
+
+      expect(result.isPrompt).toBe(true);
+      expect(result.promptData?.type).toBe('multiple_choice');
+      if (isMultipleChoicePrompt(result.promptData)) {
+        expect(result.promptData.options).toHaveLength(3);
+        expect(result.promptData.options[0].label).toContain('Yes, proceed');
+        expect(result.promptData.options[0].isDefault).toBe(true);
+        expect(result.promptData.options[1].isDefault).toBe(false);
+        expect(result.promptData.options[2].isDefault).toBe(false);
+      }
+    });
+
+    it('should detect Codex prompt with \u203A (U+203A) as default indicator', () => {
+      const output = [
+        'Which model to use?',
+        '\u203A 1. gpt-4o',
+        '  2. gpt-4o-mini',
+      ].join('\n');
+
+      const result = detectPrompt(output);
+
+      expect(result.isPrompt).toBe(true);
+      expect(result.promptData?.type).toBe('multiple_choice');
+      if (isMultipleChoicePrompt(result.promptData)) {
+        expect(result.promptData.options).toHaveLength(2);
+        expect(result.promptData.options[0].isDefault).toBe(true);
+        expect(result.promptData.options[0].label).toBe('gpt-4o');
+      }
+    });
+
+    it('should use \u203A line as barrier when no options collected', () => {
+      // A lone › prompt line should stop scanning (same behavior as ❯ barrier)
+      const output = [
+        'Some previous output',
+        '\u203A',
+        'This is not a prompt',
+      ].join('\n');
+
+      const result = detectPrompt(output);
+
+      expect(result.isPrompt).toBe(false);
+    });
+
+    it('should extract question text for Codex prompt', () => {
+      const output = [
+        'Would you like to run the following command?',
+        '',
+        '  $ git status',
+        '',
+        '\u203A 1. Yes, proceed (y)',
+        '  2. No (esc)',
+      ].join('\n');
+
+      const result = detectPrompt(output);
+
+      expect(result.isPrompt).toBe(true);
+      expect(result.promptData?.question).toContain('Would you like to run');
+    });
+  });
 });

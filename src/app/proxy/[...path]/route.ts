@@ -26,9 +26,9 @@ async function handleProxy(
   const startTime = Date.now();
   const method = request.method;
 
-  // Extract path prefix and remaining path
-  const [pathPrefix, ...rest] = pathSegments;
-  const path = '/' + rest.join('/');
+  // Extract path prefix for app lookup; forward full path to upstream
+  const [pathPrefix] = pathSegments;
+  const path = '/proxy/' + pathSegments.join('/');
 
   // Handle empty path prefix
   if (!pathPrefix) {

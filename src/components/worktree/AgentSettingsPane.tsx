@@ -14,7 +14,13 @@
 
 import React, { useState, useCallback, useRef, useEffect, memo } from 'react';
 import { useTranslations } from 'next-intl';
-import { CLI_TOOL_IDS, getCliToolDisplayName, type CLIToolType } from '@/lib/cli-tools/types';
+import {
+  CLI_TOOL_IDS,
+  getCliToolDisplayName,
+  VIBE_LOCAL_CONTEXT_WINDOW_MIN,
+  VIBE_LOCAL_CONTEXT_WINDOW_MAX,
+  type CLIToolType,
+} from '@/lib/cli-tools/types';
 
 // ============================================================================
 // Types
@@ -32,6 +38,10 @@ export interface AgentSettingsPaneProps {
   vibeLocalModel: string | null;
   /** Callback when vibe-local model changes */
   onVibeLocalModelChange: (model: string | null) => void;
+  /** Current vibe-local context window (null = default) - Issue #374 */
+  vibeLocalContextWindow?: number | null;
+  /** Callback when vibe-local context window changes - Issue #374 */
+  onVibeLocalContextWindowChange?: (value: number | null) => void;
 }
 
 /** Ollama model info from API */
@@ -58,6 +68,8 @@ export const AgentSettingsPane = memo(function AgentSettingsPane({
   onSelectedAgentsChange,
   vibeLocalModel,
   onVibeLocalModelChange,
+  vibeLocalContextWindow,
+  onVibeLocalContextWindowChange,
 }: AgentSettingsPaneProps) {
   const t = useTranslations('schedule');
 
@@ -72,6 +84,11 @@ export const AgentSettingsPane = memo(function AgentSettingsPane({
   const [ollamaError, setOllamaError] = useState<string | null>(null);
   const [loadingModels, setLoadingModels] = useState(false);
   const [savingModel, setSavingModel] = useState(false);
+  // Issue #374: Context window local input state (decoupled from prop to allow free typing)
+  const [contextWindowInput, setContextWindowInput] = useState<string>(
+    vibeLocalContextWindow != null ? String(vibeLocalContextWindow) : ''
+  );
+  const [savingContextWindow, setSavingContextWindow] = useState(false);
 
   // Use ref to access latest checkedIds inside async callback without recreating it
   const checkedIdsRef = useRef(checkedIds);
@@ -81,6 +98,13 @@ export const AgentSettingsPane = memo(function AgentSettingsPane({
   useEffect(() => {
     setCheckedIds(new Set(selectedAgents));
   }, [selectedAgents]);
+
+  // Keep local context window input in sync with server-backed prop.
+  useEffect(() => {
+    setContextWindowInput(
+      vibeLocalContextWindow != null ? String(vibeLocalContextWindow) : ''
+    );
+  }, [vibeLocalContextWindow]);
 
   const isVibeLocalChecked = checkedIds.has('vibe-local');
 
@@ -174,6 +198,52 @@ export const AgentSettingsPane = memo(function AgentSettingsPane({
     [worktreeId, onVibeLocalModelChange]
   );
 
+  // Issue #374: Handle context window input (local state only, no API call)
+  const handleContextWindowInput = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setContextWindowInput(e.target.value);
+    },
+    []
+  );
+
+  // Issue #374: Save context window on blur (when user finishes editing)
+  const handleContextWindowBlur = useCallback(
+    async () => {
+      const raw = contextWindowInput.trim();
+      const parsed = parseInt(raw, 10);
+      const ctxWindow = raw === '' ? null : (Number.isNaN(parsed) ? null : parsed);
+
+      // Skip API call if value hasn't changed
+      const currentValue = vibeLocalContextWindow ?? null;
+      if (ctxWindow === currentValue) return;
+
+      setSavingContextWindow(true);
+      try {
+        const response = await fetch(`/api/worktrees/${worktreeId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ vibeLocalContextWindow: ctxWindow }),
+        });
+        if (response.ok) {
+          onVibeLocalContextWindowChange?.(ctxWindow);
+        } else {
+          // Revert input to previous value on server rejection
+          setContextWindowInput(
+            currentValue != null ? String(currentValue) : ''
+          );
+        }
+      } catch {
+        // Revert input on network error
+        setContextWindowInput(
+          currentValue != null ? String(currentValue) : ''
+        );
+      } finally {
+        setSavingContextWindow(false);
+      }
+    },
+    [contextWindowInput, vibeLocalContextWindow, worktreeId, onVibeLocalContextWindowChange]
+  );
+
   const isMaxSelected = checkedIds.size >= MAX_SELECTED_AGENTS;
 
   return (
@@ -260,6 +330,26 @@ export const AgentSettingsPane = memo(function AgentSettingsPane({
               ))}
             </select>
           )}
+
+          {/* Issue #374: Context window input */}
+          <div className="mt-3">
+            <h4 className="text-sm font-semibold text-gray-700 mb-2">
+              {t('vibeLocalContextWindow')}
+            </h4>
+            <input
+              type="number"
+              data-testid="vibe-local-context-window-input"
+              step="1"
+              min={VIBE_LOCAL_CONTEXT_WINDOW_MIN}
+              max={VIBE_LOCAL_CONTEXT_WINDOW_MAX}
+              value={contextWindowInput}
+              onChange={handleContextWindowInput}
+              onBlur={handleContextWindowBlur}
+              placeholder={t('vibeLocalContextWindowDefault')}
+              disabled={savingContextWindow}
+              className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
+            />
+          </div>
         </div>
       )}
     </div>
