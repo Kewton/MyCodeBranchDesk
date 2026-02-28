@@ -23,10 +23,16 @@ const MAX_TOKEN_LENGTH = 256;
 export function useFragmentLogin(authEnabled: boolean): {
   autoLoginErrorKey: FragmentLoginErrorKey;
   retryAfterSeconds: number | null;
+  clearError: () => void;
 } {
   const [autoLoginErrorKey, setAutoLoginErrorKey] = useState<FragmentLoginErrorKey>(null);
   const [retryAfterSeconds, setRetryAfterSeconds] = useState<number | null>(null);
   const processedRef = useRef(false);
+
+  const clearError = () => {
+    setAutoLoginErrorKey(null);
+    setRetryAfterSeconds(null);
+  };
 
   useEffect(() => {
     if (!authEnabled) return;
@@ -84,5 +90,5 @@ export function useFragmentLogin(authEnabled: boolean): {
     })();
   }, [authEnabled]);
 
-  return { autoLoginErrorKey, retryAfterSeconds };
+  return { autoLoginErrorKey, retryAfterSeconds, clearError };
 }

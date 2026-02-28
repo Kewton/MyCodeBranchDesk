@@ -11,7 +11,7 @@
  * - Token is never sent to the server (client-side only QR generation)
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import QRCode from 'react-qr-code';
 
@@ -24,7 +24,13 @@ export function QrCodeGenerator() {
   const [token, setToken] = useState('');
   const [qrVisible, setQrVisible] = useState(false); // S001: default hidden
 
-  const qrValue = url && token ? `${url}/login#token=${encodeURIComponent(token)}` : '';
+  // S001: Reset QR visibility when inputs change to prevent bypass
+  useEffect(() => {
+    setQrVisible(false);
+  }, [url, token]);
+
+  const normalizedUrl = url.replace(/\/+$/, '');
+  const qrValue = normalizedUrl && token ? `${normalizedUrl}/login#token=${encodeURIComponent(token)}` : '';
   const isHttp = url.startsWith('http://');
 
   return (

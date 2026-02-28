@@ -33,7 +33,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [retryAfter, setRetryAfter] = useState<number | null>(null);
 
-  const { autoLoginErrorKey, retryAfterSeconds } = useFragmentLogin(authEnabled);
+  const { autoLoginErrorKey, retryAfterSeconds, clearError: clearAutoLoginError } = useFragmentLogin(authEnabled);
 
   // Map autoLoginErrorKey to localized message
   const autoLoginErrorMessages: Record<string, string> = {
@@ -75,6 +75,7 @@ export default function LoginPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    clearAutoLoginError();
     setLoading(true);
 
     try {

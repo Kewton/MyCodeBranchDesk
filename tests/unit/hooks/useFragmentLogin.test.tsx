@@ -260,6 +260,30 @@ describe('useFragmentLogin', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('should clear error and retryAfterSeconds when clearError is called', async () => {
+    setHash('#token=badtoken');
+
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      headers: new Headers({ 'Retry-After': '60' }),
+    });
+
+    const { result } = renderHook(() => useFragmentLogin(true));
+
+    await waitFor(() => {
+      expect(result.current.autoLoginErrorKey).toBe('rate_limited');
+    });
+    expect(result.current.retryAfterSeconds).toBe(60);
+
+    act(() => {
+      result.current.clearError();
+    });
+
+    expect(result.current.autoLoginErrorKey).toBeNull();
+    expect(result.current.retryAfterSeconds).toBeNull();
+  });
+
   it('should not process twice due to processedRef (React Strict Mode)', async () => {
     setHash('#token=validtoken');
 

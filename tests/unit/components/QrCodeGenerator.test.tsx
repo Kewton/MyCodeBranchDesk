@@ -148,6 +148,40 @@ describe('QrCodeGenerator', () => {
     expect(tokenInput).toHaveAttribute('type', 'password');
   });
 
+  it('should reset QR visibility when inputs change (S001 bypass prevention)', () => {
+    render(<QrCodeGenerator />);
+
+    const urlInput = screen.getByLabelText('auth.login.qr.urlLabel');
+    const tokenInput = screen.getByLabelText('auth.login.qr.tokenLabel');
+
+    // Enter values and show QR
+    fireEvent.change(urlInput, { target: { value: 'https://example.ngrok-free.app' } });
+    fireEvent.change(tokenInput, { target: { value: 'mytoken' } });
+    fireEvent.click(screen.getByText('auth.login.qr.showQrButton'));
+    expect(screen.getByTestId('qr-code')).toBeInTheDocument();
+
+    // Change token - QR should be hidden again
+    fireEvent.change(tokenInput, { target: { value: 'newtoken' } });
+    expect(screen.queryByTestId('qr-code')).not.toBeInTheDocument();
+  });
+
+  it('should strip trailing slash from URL', () => {
+    render(<QrCodeGenerator />);
+
+    const urlInput = screen.getByLabelText('auth.login.qr.urlLabel');
+    const tokenInput = screen.getByLabelText('auth.login.qr.tokenLabel');
+
+    fireEvent.change(urlInput, { target: { value: 'https://example.ngrok-free.app/' } });
+    fireEvent.change(tokenInput, { target: { value: 'mytoken' } });
+    fireEvent.click(screen.getByText('auth.login.qr.showQrButton'));
+
+    const qrCode = screen.getByTestId('qr-code');
+    expect(qrCode).toHaveAttribute(
+      'data-value',
+      'https://example.ngrok-free.app/login#token=mytoken'
+    );
+  });
+
   it('should encode token in QR code URL', () => {
     render(<QrCodeGenerator />);
 
