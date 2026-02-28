@@ -37,8 +37,8 @@ export function isWebSocketUpgrade(request: Request): boolean {
  * @returns The full upstream URL
  */
 export function buildUpstreamUrl(app: ExternalApp, path: string): string {
-  // Strip the path prefix and forward to the upstream app's root
-  // This allows upstream apps to work without special basePath configuration
+  // Forward the full path including proxy prefix to the upstream
+  // Upstream apps must be configured with basePath: '/proxy/{pathPrefix}'
   return `http://${app.targetHost}:${app.targetPort}${path}`;
 }
 
@@ -47,7 +47,7 @@ export function buildUpstreamUrl(app: ExternalApp, path: string): string {
  *
  * @param request - The incoming request
  * @param app - The external app configuration
- * @param path - The request path (after /proxy/{pathPrefix})
+ * @param path - The full request path including proxy prefix (e.g., /proxy/{pathPrefix}/page)
  * @returns The proxied response
  */
 export async function proxyHttp(
@@ -137,7 +137,7 @@ export async function proxyHttp(
  *
  * @param request - The incoming WebSocket upgrade request
  * @param app - The external app configuration
- * @param path - The request path
+ * @param path - The full request path including proxy prefix (e.g., /proxy/{pathPrefix}/ws)
  * @returns A 426 response indicating WebSocket is not supported
  */
 export async function proxyWebSocket(

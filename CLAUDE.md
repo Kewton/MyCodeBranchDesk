@@ -168,6 +168,9 @@ tests/
 | `src/lib/claude-executor.ts` | claude -p プロセス実行エンジン（Issue #294: child_process.execFile使用[SEC-001]、sanitizeEnvForChildProcess()でSENSITIVE_ENV_KEYS除去、MAX_OUTPUT_SIZE=1MB/MAX_STORED_OUTPUT_SIZE=100KB[S1-014]、EXECUTION_TIMEOUT_MS=5分、MAX_MESSAGE_LENGTH=10000、executeClaudeCommand()、truncateOutput()） |
 | `src/lib/schedule-manager.ts` | サーバーサイドスケジューラー（Issue #294: globalThis.__scheduleManagerStates/globalThis.__scheduleActiveProcesses、cronパターンでcron評価[croner]、単一タイマー全worktree巡回[60秒]、同時実行防止、MAX_CONCURRENT_SCHEDULES=100、再起動リカバリ[status=running→failed]、initScheduleManager()はinitializeWorktrees()完了後に呼び出し[S3-010]、stopAllSchedules()でSIGKILL fire-and-forget[S3-001]） |
 | `src/config/schedule-config.ts` | スケジュール関連設定定数の一元管理（Issue #294リファクタリング: UUID_V4_PATTERN、isValidUuidV4()、MAX_NAME_LENGTH、MAX_MESSAGE_LENGTH、MAX_CRON_LENGTH。DRY原則対応） |
+| `src/lib/proxy/handler.ts` | HTTPプロキシハンドラ（Issue #42: proxyHttp/proxyWebSocket/buildUpstreamUrl/isWebSocketUpgrade。**Issue #376: buildUpstreamUrl()がpathPrefix含むフルパスを転送するよう修正**、コメント・JSDoc更新） |
+| `src/lib/proxy/logger.ts` | プロキシリクエストログ（Issue #42: logProxyRequest/logProxyError、ProxyLogEntry型。**Issue #376: 二重プレフィックス修正** - pathが既に/proxy/{pathPrefix}/...形式のためpathPrefix手動結合を除去） |
+| `src/lib/proxy/config.ts` | プロキシ設定定数（PROXY_TIMEOUT/HOP_BY_HOP_REQUEST_HEADERS/HOP_BY_HOP_RESPONSE_HEADERS/PROXY_STATUS_CODES/PROXY_ERROR_MESSAGES） |
 | `src/lib/url-normalizer.ts` | Git URL正規化（重複検出用） |
 | `src/lib/url-path-encoder.ts` | ファイルパスのURLエンコード（Issue #300: encodePathForUrl()関数、スラッシュを保護しながら各セグメントを個別にencodeURIComponent、catch-allルートのパス分割を維持） |
 | `src/lib/clone-manager.ts` | クローン処理管理（DBベース排他制御。**Issue #308: basePath修正** - resolveDefaultBasePath()でCM_ROOT_DIR/WORKTREE_BASE_PATH/process.cwd()優先順位制御、WORKTREE_BASE_PATH非推奨警告（モジュールスコープwarnedWorktreeBasePathフラグで初回のみ出力）、path.resolve()による絶対パス正規化、resetWorktreeBasePathWarning()テスト用エクスポート） |
