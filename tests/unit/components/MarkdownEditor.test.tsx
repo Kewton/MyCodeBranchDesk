@@ -91,6 +91,16 @@ describe('MarkdownEditor', () => {
     vi.useRealTimers();
   });
 
+  /**
+   * Helper: wait for the editor to finish loading file content.
+   * Replaces the repeated `await waitFor(() => expect(...textarea...).toBeInTheDocument())` pattern.
+   */
+  async function waitForEditorReady() {
+    await waitFor(() => {
+      expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
+    });
+  }
+
   describe('Rendering', () => {
     it('should render loading state initially', () => {
       render(<MarkdownEditor {...defaultProps} />);
@@ -153,9 +163,7 @@ describe('MarkdownEditor', () => {
     it('should switch to editor-only mode', async () => {
       render(<MarkdownEditor {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
-      });
+      await waitForEditorReady();
 
       const editorButton = screen.getByTestId('view-mode-editor');
       fireEvent.click(editorButton);
@@ -170,9 +178,7 @@ describe('MarkdownEditor', () => {
     it('should switch to preview-only mode', async () => {
       render(<MarkdownEditor {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
-      });
+      await waitForEditorReady();
 
       const previewButton = screen.getByTestId('view-mode-preview');
       fireEvent.click(previewButton);
@@ -188,9 +194,7 @@ describe('MarkdownEditor', () => {
     it('should have save button disabled when no changes', async () => {
       render(<MarkdownEditor {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
-      });
+      await waitForEditorReady();
 
       const saveButton = screen.getByTestId('save-button');
       expect(saveButton).toBeDisabled();
@@ -199,9 +203,7 @@ describe('MarkdownEditor', () => {
     it('should enable save button when content changes', async () => {
       render(<MarkdownEditor {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
-      });
+      await waitForEditorReady();
 
       const textarea = screen.getByTestId('markdown-editor-textarea');
       fireEvent.change(textarea, { target: { value: 'Modified content' } });
@@ -224,9 +226,7 @@ describe('MarkdownEditor', () => {
 
       render(<MarkdownEditor {...defaultProps} onSave={onSave} />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
-      });
+      await waitForEditorReady();
 
       const textarea = screen.getByTestId('markdown-editor-textarea');
       fireEvent.change(textarea, { target: { value: 'Modified content' } });
@@ -264,9 +264,7 @@ describe('MarkdownEditor', () => {
 
       render(<MarkdownEditor {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
-      });
+      await waitForEditorReady();
 
       const textarea = screen.getByTestId('markdown-editor-textarea');
       fireEvent.change(textarea, { target: { value: 'Modified content' } });
@@ -297,9 +295,7 @@ describe('MarkdownEditor', () => {
 
       render(<MarkdownEditor {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
-      });
+      await waitForEditorReady();
 
       const textarea = screen.getByTestId('markdown-editor-textarea');
       fireEvent.change(textarea, { target: { value: 'Modified content' } });
@@ -333,9 +329,7 @@ describe('MarkdownEditor', () => {
 
       render(<MarkdownEditor {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
-      });
+      await waitForEditorReady();
 
       const textarea = screen.getByTestId('markdown-editor-textarea');
       fireEvent.change(textarea, { target: { value: 'Modified content' } });
@@ -353,9 +347,7 @@ describe('MarkdownEditor', () => {
     it('should show dirty indicator when content changes', async () => {
       render(<MarkdownEditor {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
-      });
+      await waitForEditorReady();
 
       const textarea = screen.getByTestId('markdown-editor-textarea');
       fireEvent.change(textarea, { target: { value: 'Modified content' } });
@@ -368,9 +360,7 @@ describe('MarkdownEditor', () => {
     it('should register beforeunload handler when dirty', async () => {
       render(<MarkdownEditor {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
-      });
+      await waitForEditorReady();
 
       const textarea = screen.getByTestId('markdown-editor-textarea');
       fireEvent.change(textarea, { target: { value: 'Modified content' } });
@@ -396,9 +386,7 @@ describe('MarkdownEditor', () => {
 
       render(<MarkdownEditor {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
-      });
+      await waitForEditorReady();
 
       const textarea = screen.getByTestId('markdown-editor-textarea');
       fireEvent.change(textarea, { target: { value: 'Modified content' } });
@@ -434,9 +422,7 @@ describe('MarkdownEditor', () => {
     it('should not show warning for files under 500KB', async () => {
       render(<MarkdownEditor {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
-      });
+      await waitForEditorReady();
 
       expect(screen.queryByTestId('large-file-warning')).not.toBeInTheDocument();
     });
@@ -446,9 +432,7 @@ describe('MarkdownEditor', () => {
     it('should save view mode to localStorage on change', async () => {
       render(<MarkdownEditor {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
-      });
+      await waitForEditorReady();
 
       const editorButton = screen.getByTestId('view-mode-editor');
       fireEvent.click(editorButton);
@@ -510,9 +494,7 @@ describe('MarkdownEditor', () => {
       // We can verify this by checking that preview content eventually matches editor content
       render(<MarkdownEditor {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
-      });
+      await waitForEditorReady();
 
       const textarea = screen.getByTestId('markdown-editor-textarea');
 
@@ -601,9 +583,7 @@ describe('MarkdownEditor', () => {
     it('should show ESC hint when maximized', async () => {
       render(<MarkdownEditor {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
-      });
+      await waitForEditorReady();
 
       // Click maximize button
       const maximizeButton = screen.getByTestId('maximize-button');
@@ -637,9 +617,7 @@ describe('MarkdownEditor', () => {
 
       render(<MarkdownEditor {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
-      });
+      await waitForEditorReady();
 
       // Should have a separator element (PaneResizer) - but only in split mode on desktop
       // Note: The resizer might not render if mobile detection returns true
@@ -654,9 +632,7 @@ describe('MarkdownEditor', () => {
     it('should not render PaneResizer in editor-only mode', async () => {
       render(<MarkdownEditor {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
-      });
+      await waitForEditorReady();
 
       // Switch to editor-only mode
       const editorButton = screen.getByTestId('view-mode-editor');
@@ -677,9 +653,7 @@ describe('MarkdownEditor', () => {
 
       render(<MarkdownEditor {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
-      });
+      await waitForEditorReady();
 
       // The editor container should have a custom width based on the split ratio
       const editorContainer = screen.getByTestId('markdown-editor-container');
@@ -691,9 +665,7 @@ describe('MarkdownEditor', () => {
     it('should handle Ctrl+Shift+F for maximize toggle', async () => {
       render(<MarkdownEditor {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
-      });
+      await waitForEditorReady();
 
       const editor = screen.getByTestId('markdown-editor');
 
@@ -709,9 +681,7 @@ describe('MarkdownEditor', () => {
     it('should handle ESC to exit maximized mode', async () => {
       render(<MarkdownEditor {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
-      });
+      await waitForEditorReady();
 
       // First maximize
       const maximizeButton = screen.getByTestId('maximize-button');
@@ -731,16 +701,12 @@ describe('MarkdownEditor', () => {
     });
   });
 
-  // [DR3-003] handleClose is async; existing tests updated with waitFor for safety
   describe('onClose callback', () => {
-    // auto-save OFF (default) -- existing behavior preserved
     it('should call onClose when close button is clicked', async () => {
       const onClose = vi.fn();
       render(<MarkdownEditor {...defaultProps} onClose={onClose} />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
-      });
+      await waitForEditorReady();
 
       const closeButton = screen.getByTestId('close-button');
       fireEvent.click(closeButton);
@@ -756,9 +722,7 @@ describe('MarkdownEditor', () => {
 
       render(<MarkdownEditor {...defaultProps} onClose={onClose} />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
-      });
+      await waitForEditorReady();
 
       const textarea = screen.getByTestId('markdown-editor-textarea');
       fireEvent.change(textarea, { target: { value: 'Modified content' } });
@@ -780,9 +744,7 @@ describe('MarkdownEditor', () => {
 
       render(<MarkdownEditor {...defaultProps} onClose={onClose} />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
-      });
+      await waitForEditorReady();
 
       const textarea = screen.getByTestId('markdown-editor-textarea');
       fireEvent.change(textarea, { target: { value: 'Modified content' } });
@@ -859,9 +821,7 @@ describe('MarkdownEditor', () => {
     it('should set z-index=55 when isMaximized=true and isFallbackMode=true (CSS fallback)', async () => {
       render(<MarkdownEditor {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
-      });
+      await waitForEditorReady();
 
       // Click maximize button - in jsdom, Fullscreen API is not available, so fallback mode is used
       const maximizeButton = screen.getByTestId('maximize-button');
@@ -879,9 +839,7 @@ describe('MarkdownEditor', () => {
     it('should not set z-index when isMaximized=false', async () => {
       render(<MarkdownEditor {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
-      });
+      await waitForEditorReady();
 
       const editor = screen.getByTestId('markdown-editor');
       // When not maximized, z-index should not be inline styled
@@ -910,9 +868,7 @@ describe('MarkdownEditor', () => {
 
       render(<MarkdownEditor {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('markdown-editor-textarea')).toBeInTheDocument();
-      });
+      await waitForEditorReady();
 
       const copyButton = screen.getByTestId('copy-content-button');
       fireEvent.click(copyButton);

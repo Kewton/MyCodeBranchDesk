@@ -127,7 +127,7 @@ export function MarkdownEditor({
   const [error, setError] = useState<string | null>(null);
   const [showLargeFileWarning, setShowLargeFileWarning] = useState(false);
 
-  // [Issue #162] Copy to clipboard state
+  // Copy to clipboard state
   const [copied, setCopied] = useState(false);
 
   // Mobile tab state (for portrait mode)
@@ -178,7 +178,7 @@ export function MarkdownEditor({
     validate: isValidSplitRatio,
   });
 
-  // [Issue #389] Auto-save setting with localStorage persistence
+  // Auto-save setting with localStorage persistence
   const { value: isAutoSaveEnabled, setValue: setAutoSaveEnabled } = useLocalStorageState({
     key: LOCAL_STORAGE_KEY_AUTO_SAVE,
     defaultValue: false,
@@ -251,9 +251,9 @@ export function MarkdownEditor({
   }, [worktreeId, filePath]);
 
   /**
-   * [Issue #389] API save function for both manual and auto-save
-   * [DR1-001] Uses saveFn parameter (valueToSave) instead of closure content state
-   * [DR4-001] Session expiry detection (401/redirected)
+   * API save function shared by manual and auto-save.
+   * Accepts the value to save as a parameter (not closure state) so that
+   * useAutoSave can pass the latest ref value directly.
    */
   const saveToApi = useCallback(
     async (valueToSave: string): Promise<void> => {
@@ -265,7 +265,7 @@ export function MarkdownEditor({
           body: JSON.stringify({ content: valueToSave }),
         }
       );
-      // [DR4-001] Session expiry detection before JSON parsing
+      // Session expiry detection before JSON parsing
       if (response.status === 401 || response.redirected) {
         throw new Error('Session expired. Please re-login.');
       }
@@ -273,14 +273,12 @@ export function MarkdownEditor({
       if (!response.ok || !data.success) {
         throw new Error(data.error?.message || 'Failed to save file');
       }
-      // [DR1-001] Update originalContent with the actually saved value
       setOriginalContent(valueToSave);
     },
     [worktreeId, filePath]
   );
 
-  // [Issue #389] useAutoSave integration
-  // [DR2-001] onSaveComplete is not used; dirty state reset is handled in saveToApi
+  // Auto-save integration (dirty state reset is handled inside saveToApi)
   const {
     isSaving: isAutoSaving,
     error: autoSaveError,
@@ -293,12 +291,10 @@ export function MarkdownEditor({
   });
 
   /**
-   * [Issue #389] Handle auto-save toggle
-   * [DR1-003] When toggling ON with dirty content, save immediately.
-   * Note: saveNow() cannot be used here because useAutoSave's saveNow checks the
-   * disabled flag from its closure. When setAutoSaveEnabled(true) is called,
-   * disabled still equals true in the current render cycle, so saveNow() would
-   * be a no-op. We call saveToApi(content) directly instead.
+   * Handle auto-save toggle.
+   * When toggling ON with dirty content, saves immediately via saveToApi
+   * (saveNow() would be a no-op because the disabled flag is still true
+   * in the current render cycle).
    */
   const handleAutoSaveToggle = useCallback((enabled: boolean) => {
     setAutoSaveEnabled(enabled);
@@ -308,8 +304,7 @@ export function MarkdownEditor({
   }, [setAutoSaveEnabled, isDirty, saveToApi, content]);
 
   /**
-   * Save file content (manual save - Ctrl+S or Save button)
-   * [DR1-001] saveToApi handles setOriginalContent internally
+   * Save file content (manual save via Ctrl+S or Save button)
    */
   const saveContent = useCallback(async () => {
     if (!isDirty || isSaving) return;
@@ -354,23 +349,20 @@ export function MarkdownEditor({
   }, []);
 
   /**
-   * Handle close with unsaved changes check
-   * [Issue #389] Async for auto-save support
-   * [DR1-006] saveNow() failure handling with confirm dialog
+   * Handle close with unsaved changes check.
+   * Auto-save ON: flush pending changes, confirm on failure.
+   * Auto-save OFF: traditional confirm dialog.
    */
   const handleClose = useCallback(async () => {
     if (isAutoSaveEnabled) {
-      // auto-save ON: save pending changes before closing
       if (isDirty || isAutoSaving) {
         await saveNow();
-        // [DR1-006] Check if save failed after saveNow()
         if (autoSaveError) {
           const confirmed = window.confirm('Save failed. Close anyway?');
           if (!confirmed) return;
         }
       }
     } else {
-      // auto-save OFF: traditional confirm dialog
       if (isDirty) {
         const confirmed = window.confirm(
           'You have unsaved changes. Are you sure you want to close?'
@@ -382,7 +374,7 @@ export function MarkdownEditor({
   }, [isAutoSaveEnabled, isDirty, isAutoSaving, saveNow, autoSaveError, onClose]);
 
   /**
-   * [Issue #162] Handle copy content to clipboard
+   * Handle copy content to clipboard
    */
   const handleCopy = useCallback(async () => {
     try {
@@ -424,16 +416,13 @@ export function MarkdownEditor({
   }, [setSplitRatio]);
 
   /**
-   * Handle keyboard shortcuts
-   * [Issue #389] Ctrl+S branching for auto-save ON/OFF
+   * Handle keyboard shortcuts (Ctrl+S, Ctrl+Shift+F, ESC)
    */
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      // Ctrl+S or Cmd+S to save
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
         if (isAutoSaveEnabled) {
-          // [DR1-009] auto-save ON: saveNow() then onSave for file tree refresh
           void (async () => {
             await saveNow();
             onSave?.(filePath);
@@ -444,14 +433,12 @@ export function MarkdownEditor({
         return;
       }
 
-      // Ctrl+Shift+F or Cmd+Shift+F to toggle maximize
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
         e.preventDefault();
         toggleFullscreen();
         return;
       }
 
-      // ESC to exit maximized mode
       if (e.key === 'Escape' && isMaximized) {
         e.preventDefault();
         exitFullscreen();
@@ -521,9 +508,7 @@ export function MarkdownEditor({
     loadContent();
   }, [loadContent]);
 
-  // [Issue #389] Manage beforeunload handler
-  // auto-save ON: warn if isDirty OR isAutoSaving (debounce pending or save in progress)
-  // auto-save OFF: warn only if isDirty (traditional behavior)
+  // Manage beforeunload handler based on unsaved state
   useEffect(() => {
     const shouldWarn = isAutoSaveEnabled
       ? (isDirty || isAutoSaving)
@@ -553,7 +538,7 @@ export function MarkdownEditor({
     };
   }, [isDirty, isAutoSaving, isAutoSaveEnabled]);
 
-  // [Issue #389] Auto-save error fallback: disable auto-save and show Toast
+  // Auto-save error fallback: disable auto-save and notify user
   useEffect(() => {
     if (autoSaveError && isAutoSaveEnabled) {
       setAutoSaveEnabled(false);
@@ -754,7 +739,7 @@ export function MarkdownEditor({
             </div>
           )}
 
-          {/* [Issue #162] Copy content button */}
+          {/* Copy content button */}
           <button
             data-testid="copy-content-button"
             onClick={handleCopy}
@@ -785,7 +770,7 @@ export function MarkdownEditor({
             )}
           </button>
 
-          {/* [Issue #389] Auto-save toggle */}
+          {/* Auto-save toggle */}
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-gray-500">Auto</span>
             <button
