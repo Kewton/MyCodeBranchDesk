@@ -12,7 +12,7 @@
 import { readFile, writeFile, mkdir, rm, rename, stat, readdir } from 'fs/promises';
 import { existsSync, realpathSync, statSync } from 'fs';
 import { join, extname, dirname, basename, sep, resolve } from 'path';
-import { isPathSafe } from './path-validator';
+import { isPathSafe, resolveAndValidateRealPath } from './path-validator';
 import { isEditableExtension } from '@/config/editable-extensions';
 import { DELETE_SAFETY_CONFIG, isProtectedDirectory } from '@/config/file-operations';
 
@@ -231,6 +231,11 @@ export async function readFileContent(
     return createErrorResult('INVALID_PATH');
   }
 
+  // [SEC-394] Symlink traversal validation
+  if (!resolveAndValidateRealPath(relativePath, worktreeRoot)) {
+    return createErrorResult('INVALID_PATH');
+  }
+
   const fullPath = join(worktreeRoot, relativePath);
 
   // Check if file exists
@@ -265,6 +270,11 @@ export async function updateFileContent(
 ): Promise<FileOperationResult> {
   // Validate path
   if (!isPathSafe(relativePath, worktreeRoot)) {
+    return createErrorResult('INVALID_PATH');
+  }
+
+  // [SEC-394] Symlink traversal validation
+  if (!resolveAndValidateRealPath(relativePath, worktreeRoot)) {
     return createErrorResult('INVALID_PATH');
   }
 
@@ -303,6 +313,11 @@ export async function createFileOrDirectory(
 ): Promise<FileOperationResult> {
   // Validate path
   if (!isPathSafe(relativePath, worktreeRoot)) {
+    return createErrorResult('INVALID_PATH');
+  }
+
+  // [SEC-394] Symlink traversal validation
+  if (!resolveAndValidateRealPath(relativePath, worktreeRoot)) {
     return createErrorResult('INVALID_PATH');
   }
 
@@ -379,6 +394,11 @@ export async function deleteFileOrDirectory(
 ): Promise<FileOperationResult> {
   // Validate path
   if (!isPathSafe(relativePath, worktreeRoot)) {
+    return createErrorResult('INVALID_PATH');
+  }
+
+  // [SEC-394] Symlink traversal validation
+  if (!resolveAndValidateRealPath(relativePath, worktreeRoot)) {
     return createErrorResult('INVALID_PATH');
   }
 
@@ -462,6 +482,11 @@ export function validateFileOperation(
 ): { success: true; resolvedSource: string } | { success: false; error: FileOperationResult } {
   // 1. isPathSafe() for source path safety
   if (!isPathSafe(sourcePath, worktreeRoot)) {
+    return { success: false, error: createErrorResult('INVALID_PATH') };
+  }
+
+  // [SEC-394] Symlink traversal validation (resolvedSource stays as lexical path)
+  if (!resolveAndValidateRealPath(sourcePath, worktreeRoot)) {
     return { success: false, error: createErrorResult('INVALID_PATH') };
   }
 
@@ -678,6 +703,11 @@ export async function writeBinaryFile(
 ): Promise<FileOperationResult> {
   // Validate path (defense-in-depth)
   if (!isPathSafe(relativePath, worktreeRoot)) {
+    return createErrorResult('INVALID_PATH');
+  }
+
+  // [SEC-394] Symlink traversal validation
+  if (!resolveAndValidateRealPath(relativePath, worktreeRoot)) {
     return createErrorResult('INVALID_PATH');
   }
 
