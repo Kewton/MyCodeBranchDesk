@@ -295,19 +295,19 @@ export async function fetchLmStudioModels(): Promise<ProviderModels> {
     });
 
     if (!response.ok) {
-      console.warn(`LM Studio API returned status ${response.status}`);
+      console.warn(`LM Studio API returned status ${response.status}, skipping model fetch`);
       return {};
     }
 
     const text = await response.text();
     if (text.length > MAX_LM_STUDIO_RESPONSE_SIZE) {
-      console.warn('LM Studio API response too large');
+      console.warn('LM Studio API response too large, skipping model fetch');
       return {};
     }
 
     const data = JSON.parse(text);
     if (!data || !Array.isArray(data.data)) {
-      console.warn('Invalid LM Studio API response structure');
+      console.warn('Invalid LM Studio API response structure, skipping model fetch');
       return {};
     }
 
@@ -319,9 +319,9 @@ export async function fetchLmStudioModels(): Promise<ProviderModels> {
     }
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      console.warn('LM Studio API timeout');
+      console.warn('LM Studio API timeout, skipping model fetch');
     } else {
-      console.warn('Failed to fetch LM Studio models');
+      console.warn('Failed to fetch LM Studio models, skipping model fetch');
     }
   }
   return models;
