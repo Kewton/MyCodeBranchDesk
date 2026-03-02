@@ -3,10 +3,10 @@
  * Provides functions to manage tmux sessions for Claude CLI integration
  */
 
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 /**
  * Default timeout for tmux commands (5 seconds)
@@ -44,7 +44,7 @@ export interface CapturePaneOptions {
  */
 export async function isTmuxAvailable(): Promise<boolean> {
   try {
-    await execAsync('tmux -V', { timeout: DEFAULT_TIMEOUT });
+    await execFileAsync('tmux', ['-V'], { timeout: DEFAULT_TIMEOUT });
     return true;
   } catch {
     return false;
@@ -67,7 +67,7 @@ export async function isTmuxAvailable(): Promise<boolean> {
  */
 export async function hasSession(sessionName: string): Promise<boolean> {
   try {
-    await execAsync(`tmux has-session -t "${sessionName}"`, { timeout: DEFAULT_TIMEOUT });
+    await execFileAsync('tmux', ['has-session', '-t', sessionName], { timeout: DEFAULT_TIMEOUT });
     return true;
   } catch {
     // tmux has-session returns non-zero exit code if session doesn't exist
@@ -88,8 +88,9 @@ export async function hasSession(sessionName: string): Promise<boolean> {
  */
 export async function listSessions(): Promise<TmuxSession[]> {
   try {
-    const { stdout } = await execAsync(
-      'tmux list-sessions -F "#{session_name}|#{session_windows}|#{session_attached}"',
+    const { stdout } = await execFileAsync(
+      'tmux',
+      ['list-sessions', '-F', '#{session_name}|#{session_windows}|#{session_attached}'],
       { timeout: DEFAULT_TIMEOUT }
     );
 
@@ -172,14 +173,16 @@ export async function createSession(
 
   try {
     // Create session
-    await execAsync(
-      `tmux new-session -d -s "${sessionName}" -c "${workingDirectory}"`,
+    await execFileAsync(
+      'tmux',
+      ['new-session', '-d', '-s', sessionName, '-c', workingDirectory],
       { timeout: DEFAULT_TIMEOUT }
     );
 
     // Set history limit
-    await execAsync(
-      `tmux set-option -t "${sessionName}" history-limit ${historyLimit}`,
+    await execFileAsync(
+      'tmux',
+      ['set-option', '-t', sessionName, 'history-limit', String(historyLimit)],
       { timeout: DEFAULT_TIMEOUT }
     );
   } catch (error: unknown) {
@@ -209,15 +212,14 @@ export async function sendKeys(
   keys: string,
   sendEnter: boolean = true
 ): Promise<void> {
-  // Escape single quotes in the keys
-  const escapedKeys = keys.replace(/'/g, "'\\''");
-
-  const command = sendEnter
-    ? `tmux send-keys -t "${sessionName}" '${escapedKeys}' C-m`
-    : `tmux send-keys -t "${sessionName}" '${escapedKeys}'`;
+  // execFile() passes arguments directly without shell interpretation,
+  // so no shell-level escaping is needed (D2-003: escape logic removed)
+  const args = sendEnter
+    ? ['send-keys', '-t', sessionName, keys, 'C-m']
+    : ['send-keys', '-t', sessionName, keys];
 
   try {
-    await execAsync(command, { timeout: DEFAULT_TIMEOUT });
+    await execFileAsync('tmux', args, { timeout: DEFAULT_TIMEOUT });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     throw new Error(`Failed to send keys to tmux session: ${errorMessage}`);
@@ -264,8 +266,7 @@ export async function sendSpecialKeys(
 
   try {
     for (let i = 0; i < keys.length; i++) {
-      const command = `tmux send-keys -t "${sessionName}" ${keys[i]}`;
-      await execAsync(command, { timeout: DEFAULT_TIMEOUT });
+      await execFileAsync('tmux', ['send-keys', '-t', sessionName, keys[i]], { timeout: DEFAULT_TIMEOUT });
       // Delay between key presses (skip after the last key)
       if (i < keys.length - 1) {
         await new Promise(resolve => setTimeout(resolve, SPECIAL_KEY_DELAY_MS));
@@ -335,8 +336,9 @@ export async function capturePane(
   }
 
   try {
-    const { stdout } = await execAsync(
-      `tmux capture-pane -t "${sessionName}" -p -e -S ${startLine} -E ${endLine}`,
+    const { stdout } = await execFileAsync(
+      'tmux',
+      ['capture-pane', '-t', sessionName, '-p', '-e', '-S', String(startLine), '-E', String(endLine)],
       {
         timeout: DEFAULT_TIMEOUT,
         maxBuffer: 10 * 1024 * 1024  // 10MB buffer for large Claude outputs
@@ -365,7 +367,7 @@ export async function capturePane(
  */
 export async function killSession(sessionName: string): Promise<boolean> {
   try {
-    await execAsync(`tmux kill-session -t "${sessionName}"`, {
+    await execFileAsync('tmux', ['kill-session', '-t', sessionName], {
       timeout: DEFAULT_TIMEOUT,
     });
     return true;
@@ -410,18 +412,33 @@ export async function ensureSession(
 }
 
 /**
+ * Allowed values for sendSpecialKey() (single special key).
+ * D2-006 (案A): Separate from ALLOWED_SPECIAL_KEYS (used by sendSpecialKeys() for cursor/TUI navigation).
+ * This set is for control keys sent individually (Escape, Ctrl combinations, Enter).
+ * R2F007 (推奨案1): SpecialKey type is derived from this array to ensure compile-time and runtime sync.
+ */
+export const SPECIAL_KEY_VALUES = ['Escape', 'C-c', 'C-d', 'C-m', 'Enter'] as const;
+
+/**
  * Special key type for tmux send-keys
+ * Derived from SPECIAL_KEY_VALUES for type safety and sync (R2F007)
  * C-m is equivalent to Enter in tmux
  */
-export type SpecialKey = 'Escape' | 'C-c' | 'C-d' | 'C-m' | 'Enter';
+export type SpecialKey = typeof SPECIAL_KEY_VALUES[number];
+
+/**
+ * Runtime whitelist for sendSpecialKey() (defense-in-depth, D2-005/R1F004).
+ * Prevents bypass via `as any` casts or JavaScript callers.
+ */
+const ALLOWED_SINGLE_SPECIAL_KEYS = new Set<string>(SPECIAL_KEY_VALUES);
 
 /**
  * Send a special key to a tmux session
  *
  * @param sessionName - Target session name
- * @param key - Special key to send (Escape, C-c, C-d)
+ * @param key - Special key to send (Escape, C-c, C-d, C-m, Enter)
  *
- * @throws {Error} If session doesn't exist or command fails
+ * @throws {Error} If key is not in ALLOWED_SINGLE_SPECIAL_KEYS or command fails
  *
  * @example
  * ```typescript
@@ -436,11 +453,13 @@ export async function sendSpecialKey(
   sessionName: string,
   key: SpecialKey
 ): Promise<void> {
+  // D2-005: Runtime validation (defense-in-depth against as-any casts)
+  if (!ALLOWED_SINGLE_SPECIAL_KEYS.has(key)) {
+    throw new Error(`Invalid special key: ${key}`);
+  }
+
   try {
-    await execAsync(
-      `tmux send-keys -t "${sessionName}" ${key}`,
-      { timeout: DEFAULT_TIMEOUT }
-    );
+    await execFileAsync('tmux', ['send-keys', '-t', sessionName, key], { timeout: DEFAULT_TIMEOUT });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     throw new Error(`Failed to send special key: ${errorMessage}`);
