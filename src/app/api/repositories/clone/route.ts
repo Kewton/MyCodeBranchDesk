@@ -13,6 +13,12 @@ import type { CloneError } from '@/types/clone';
 const LOG_PREFIX = '[Clone API]';
 
 /**
+ * [S1-003][S4-007] Maximum allowed length for targetDir input.
+ * DoS defense: prevents excessive memory consumption in path.resolve() / decodeURIComponent().
+ */
+const MAX_TARGET_DIR_LENGTH = 1024;
+
+/**
  * Response type for successful clone start
  */
 interface CloneStartResponse {
@@ -93,15 +99,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<CloneStar
 
     console.info(`${LOG_PREFIX} Starting clone job for: ${cloneUrl}`);
 
-    // [S4-007] DoS defense: reject excessively long targetDir values.
-    const MAX_TARGET_DIR_LENGTH = 1024;
+    // [S1-003] Trim and validate targetDir length before passing to startCloneJob().
     const trimmedTargetDir = targetDir?.trim() || undefined;
     if (trimmedTargetDir && trimmedTargetDir.length > MAX_TARGET_DIR_LENGTH) {
       return NextResponse.json(
         {
           success: false,
           error: {
-            category: 'validation' as const,
+            category: 'validation',
             code: 'INVALID_TARGET_PATH',
             message: 'Target directory path is too long',
             recoverable: true,

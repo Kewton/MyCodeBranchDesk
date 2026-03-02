@@ -376,7 +376,7 @@ export class CloneManager {
     }
 
     // 5. Check if directory exists
-    // [D4-003] Use default error message to avoid leaking full targetPath
+    // [D4-001] Use default error message to avoid leaking full targetPath
     if (existsSync(targetPath)) {
       return { success: false, error: ERROR_DEFINITIONS.DIRECTORY_EXISTS };
     }

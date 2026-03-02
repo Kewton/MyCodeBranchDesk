@@ -567,6 +567,9 @@ describe('resolveCustomTargetPath', () => {
     expect(result).toBeNull();
   });
 
+  // [S1-005] Defensive test: in production, route.ts converts empty/whitespace-only
+  // targetDir to undefined, so resolveCustomTargetPath() is never called with ''.
+  // This test validates the function's own robustness in isolation.
   it('H-003: returns null for empty string (defensive test - unreachable in normal flow)', () => {
     const result = resolveCustomTargetPath('', '/tmp/repos');
     expect(result).toBeNull();
@@ -578,6 +581,9 @@ describe('resolveCustomTargetPath', () => {
   });
 });
 
+// S4-001: Verify that validateWorktreePath()'s internal decodeURIComponent
+// does not create a double-decode bypass for path traversal.
+// See design policy section 7-5 for attack scenario details.
 describe('resolveCustomTargetPath - double decoding safety (S4-001)', () => {
   it('S4-001-T1: double-encoded path traversal stays within basePath (no bypass)', () => {
     // %252e%252e%252f decodes to %2e%2e%2f, which path.resolve treats as a
