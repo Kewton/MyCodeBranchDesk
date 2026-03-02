@@ -181,7 +181,8 @@ tests/
 | `src/lib/db-repository.ts` | リポジトリDB操作関数群（Issue #190: 除外・復活・パス正規化・バリデーション関数追加、Issue #202: registerAndFilterRepositories統合関数追加） |
 | `src/types/sidebar.ts` | サイドバーステータス判定 |
 | `src/types/clone.ts` | クローン関連型定義（CloneJob, CloneError等） |
-| `src/lib/file-operations.ts` | ファイル操作（読取/更新/作成/削除/リネーム/移動）、Issue #162: moveFileOrDirectory()追加、5層セキュリティ（SEC-005〜009: 保護ディレクトリ/シンボリック/自己移動/最終パス/TOCTOU検証）、validateFileOperation()共通検証、mapFsError()エラーマッピング |
+| `src/lib/path-validator.ts` | パスバリデーション（isPathSafe()レキシカル検証、validateWorktreePath()ラッパー。**Issue #394: resolveAndValidateRealPath()追加** - realpathSyncによるsymlinkトラバーサル防御、祖先走査フォールバック（create/upload用）、isWithinRoot()境界チェックヘルパー、macOS tmpdir互換性、fail-safe設計、[SEC-394]ログ出力） |
+| `src/lib/file-operations.ts` | ファイル操作（読取/更新/作成/削除/リネーム/移動）、Issue #162: moveFileOrDirectory()追加、5層セキュリティ（SEC-005〜009: 保護ディレクトリ/シンボリック/自己移動/最終パス/TOCTOU検証）、validateFileOperation()共通検証、mapFsError()エラーマッピング。**Issue #394: checkPathSafety()追加** - isPathSafe+resolveAndValidateRealPathの二重検証をDRY化、readFileContent/updateFileContent/createFileOrDirectory/deleteFileOrDirectory/writeBinaryFile/validateFileOperationに統合 |
 | `src/lib/date-utils.ts` | 相対時刻フォーマット（Issue #162: formatRelativeTime()、date-fnsベース、ロケール対応、無効日付ガード） |
 | `src/lib/file-tree.ts` | ディレクトリツリー構造生成（Issue #162: readDirectory()でbirthtime取得、TreeItem.birthtimeフィールド対応） |
 | `src/lib/git-utils.ts` | Git情報取得（getGitStatus関数、execFile使用、1秒タイムアウト） |
