@@ -78,6 +78,10 @@ export const AgentSettingsPane = memo(function AgentSettingsPane({
     () => new Set(selectedAgents)
   );
   const [saving, setSaving] = useState(false);
+  // Issue #391: isEditing flag to prevent polling-driven prop sync from overwriting
+  // intermediate checkbox state. Similar Optimistic Sync pattern as contextWindowInput (blur-based).
+  // [S1-001] If 3+ fields adopt this pattern, consider extracting useOptimisticSync hook.
+  const [isEditing, setIsEditing] = useState(false);
 
   // Ollama model state
   const [ollamaModels, setOllamaModels] = useState<OllamaModelInfo[]>([]);
@@ -95,9 +99,12 @@ export const AgentSettingsPane = memo(function AgentSettingsPane({
   checkedIdsRef.current = checkedIds;
 
   // Keep local checkbox state in sync with server-backed selectedAgents prop.
+  // Issue #391: Guard with isEditing to prevent polling-driven overwrites during editing.
   useEffect(() => {
-    setCheckedIds(new Set(selectedAgents));
-  }, [selectedAgents]);
+    if (!isEditing) {
+      setCheckedIds(new Set(selectedAgents));
+    }
+  }, [selectedAgents, isEditing]);
 
   // Keep local context window input in sync with server-backed prop.
   useEffect(() => {
@@ -145,6 +152,7 @@ export const AgentSettingsPane = memo(function AgentSettingsPane({
         next.add(toolId);
       } else {
         next.delete(toolId);
+        setIsEditing(true); // Issue #391: Enter editing state to prevent polling overwrites
       }
       setCheckedIds(next);
 
@@ -159,6 +167,8 @@ export const AgentSettingsPane = memo(function AgentSettingsPane({
             body: JSON.stringify({ selectedAgents: pair }),
           });
           if (response.ok) {
+            // [S1-002] Set confirmed value before releasing isEditing
+            setCheckedIds(new Set(pair));
             onSelectedAgentsChange(pair);
           } else {
             // Revert on failure
@@ -169,9 +179,11 @@ export const AgentSettingsPane = memo(function AgentSettingsPane({
           setCheckedIds(new Set(selectedAgents));
         } finally {
           setSaving(false);
+          setIsEditing(false); // Issue #391: Release editing state (success or failure)
         }
       }
     },
+    // [S1-006] isEditing excluded: setIsEditing is a stable setter reference
     [worktreeId, selectedAgents, onSelectedAgentsChange]
   );
 
