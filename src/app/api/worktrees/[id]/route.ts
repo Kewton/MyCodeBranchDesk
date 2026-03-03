@@ -16,6 +16,8 @@ import { getGitStatus } from '@/lib/git-utils';
 import type { GitStatus } from '@/types/models';
 import { isValidWorktreeId } from '@/lib/auto-yes-manager';
 import { validateSelectedAgentsInput } from '@/lib/selected-agents-validator';
+import { listSessions } from '@/lib/tmux';
+import { isSessionHealthy } from '@/lib/claude-session';
 
 export async function GET(
   request: NextRequest,
@@ -45,6 +47,10 @@ export async function GET(
     const manager = CLIToolManager.getInstance();
     const allCliTools: readonly CLIToolType[] = CLI_TOOL_IDS;
 
+    // Issue #405: Batch query all tmux sessions once (N+1 elimination)
+    const tmuxSessions = await listSessions();
+    const sessionNameSet = new Set(tmuxSessions.map(s => s.name));
+
     const sessionStatusByCli: Partial<Record<CLIToolType, { isRunning: boolean; isWaitingForResponse: boolean; isProcessing: boolean }>> = {};
 
     let anyRunning = false;
@@ -53,7 +59,18 @@ export async function GET(
 
     for (const cliToolId of allCliTools) {
       const cliTool = manager.getTool(cliToolId);
-      const isRunning = await cliTool.isRunning(params.id);
+      const sessionName = cliTool.getSessionName(params.id);
+
+      // Issue #405: Use Set.has() instead of individual hasSession() calls
+      let isRunning = sessionNameSet.has(sessionName);
+
+      // [DR1-005] Claude-only health check (other tools use simple session existence)
+      if (isRunning && cliToolId === 'claude') {
+        const healthResult = await isSessionHealthy(sessionName);
+        if (!healthResult.healthy) {
+          isRunning = false;
+        }
+      }
 
       // Check status based on terminal state
       // - isWaitingForResponse: Interactive prompt (yes/no, multiple choice)

@@ -15,6 +15,8 @@ import { CLI_TOOL_IDS, type CLIToolType } from '@/lib/cli-tools/types';
 import { captureSessionOutput } from '@/lib/cli-session';
 import { detectSessionStatus } from '@/lib/status-detector';
 import { OPENCODE_PANE_HEIGHT } from '@/lib/cli-tools/opencode';
+import { listSessions } from '@/lib/tmux';
+import { isSessionHealthy } from '@/lib/claude-session';
 
 export async function GET(request: NextRequest) {
   try {
@@ -32,6 +34,10 @@ export async function GET(request: NextRequest) {
     // R1-003/R3-008: Use CLI_TOOL_IDS instead of hardcoded array
     const allCliTools: readonly CLIToolType[] = CLI_TOOL_IDS;
 
+    // Issue #405: Batch query all tmux sessions once (N+1 elimination)
+    const tmuxSessions = await listSessions();
+    const sessionNameSet = new Set(tmuxSessions.map(s => s.name));
+
     const worktreesWithStatus = await Promise.all(
       worktrees.map(async (worktree) => {
         // Check status for all CLI tools
@@ -43,7 +49,18 @@ export async function GET(request: NextRequest) {
 
         for (const cliToolId of allCliTools) {
           const cliTool = manager.getTool(cliToolId);
-          const isRunning = await cliTool.isRunning(worktree.id);
+          const sessionName = cliTool.getSessionName(worktree.id);
+
+          // Issue #405: Use Set.has() instead of individual hasSession() calls
+          let isRunning = sessionNameSet.has(sessionName);
+
+          // [DR1-005] Claude-only health check (other tools use simple session existence)
+          if (isRunning && cliToolId === 'claude') {
+            const healthResult = await isSessionHealthy(sessionName);
+            if (!healthResult.healthy) {
+              isRunning = false;
+            }
+          }
 
           // Check status based on terminal state
           // - isWaitingForResponse: Interactive prompt (yes/no, multiple choice)
