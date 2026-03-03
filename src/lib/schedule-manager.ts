@@ -61,7 +61,21 @@ interface ManagerState {
   schedules: Map<string, ScheduleState>;
   /** Whether the manager is initialized */
   initialized: boolean;
-  /** CMATE.md mtime cache keyed by worktree path, value is mtimeMs */
+  /**
+   * CMATE.md file mtime cache: worktree path -> mtimeMs
+   *
+   * Size upper bound (SEC4-001):
+   * This Map's entry count corresponds 1:1 with getAllWorktrees() results.
+   * syncSchedules() iterates the worktree list from getAllWorktrees() and
+   * calls cache.set() per worktree, so entry count is always <= the
+   * worktrees table row count. Worktree count is bounded by
+   * MAX_CONCURRENT_SCHEDULES=100 (schedule-config.ts) in practice.
+   * Each entry is approximately 100-200 bytes (path string + number),
+   * so memory exhaustion risk is negligible.
+   * When a worktree is deleted from DB, it is no longer returned by
+   * getAllWorktrees(), so its cache entry is removed in the next
+   * syncSchedules() cycle (CMATE.md deletion path in Step 3b).
+   */
   cmateFileCache: Map<string, number>;
 }
 
@@ -133,14 +147,20 @@ function getLazyDbInstance(): ReturnType<typeof import('./db-instance').getDbIns
 /**
  * Get the modification time (mtimeMs) of the CMATE.md file in a worktree directory.
  *
- * @param worktreePath - Path to the worktree directory
+ * Trust boundary (SEC4-003): worktreePath is DB-derived from getAllWorktrees()
+ * and was validated by validateWorktreePath() at worktree registration time.
+ * Therefore, path traversal re-validation is not needed here.
+ * readCmateFile() has validateCmatePath() because it can be called externally,
+ * whereas getCmateMtime() is an internal function called only from syncSchedules().
+ *
+ * @param worktreePath - Path to the worktree directory (DB-derived, trusted)
  * @returns mtimeMs value, or null if the file does not exist or cannot be read
  */
 function getCmateMtime(worktreePath: string): number | null {
+  // Uses CMATE_FILENAME from @/config/cmate-constants directly (DR1-001, CR2-001)
+  const filePath = path.join(worktreePath, CMATE_FILENAME);
   try {
-    const filePath = path.join(worktreePath, CMATE_FILENAME);
-    const stats = statSync(filePath);
-    return stats.mtimeMs;
+    return statSync(filePath).mtimeMs;
   } catch (error) {
     if (
       error instanceof Error &&
@@ -149,7 +169,8 @@ function getCmateMtime(worktreePath: string): number | null {
     ) {
       return null;
     }
-    console.warn('[schedule-manager] Failed to stat CMATE.md:', error);
+    // Permission errors etc. - log and treat as no file (SEC4-004-note)
+    console.warn(`[schedule-manager] Failed to stat ${filePath}:`, error);
     return null;
   }
 }
@@ -175,12 +196,24 @@ function getAllWorktrees(): WorktreeRow[] {
 
 /**
  * Batch upsert schedule entries into the database.
- * Replaces the previous per-entry upsertSchedule() function.
- * Uses a single SELECT to fetch existing schedules, then a transaction
- * for all INSERT/UPDATE operations.
+ * Replaces the previous per-entry upsertSchedule() function (DR1-002).
+ *
+ * Uses a single SELECT to build an existing schedules map, then performs
+ * all UPDATE/INSERT operations within a single transaction.
+ *
+ * Sanitization chain (SEC4-004): This function is called exclusively from
+ * syncSchedules(), which passes entries produced by parseSchedulesSection().
+ * parseSchedulesSection() calls sanitizeMessageContent() (S4-002) on all
+ * message fields, so entries arriving here are already sanitized.
+ * If batchUpsertSchedules() is called from a different code path in the
+ * future, an input validation layer must be added at the call site.
+ *
+ * Note on next_execute_at (CR2-002): The scheduled_executions table has a
+ * next_execute_at column (INTEGER, nullable) that is intentionally not
+ * operated on by this function, consistent with the prior upsertSchedule().
  *
  * @param worktreeId - The worktree ID to associate schedules with
- * @param entries - The schedule entries from CMATE.md
+ * @param entries - Schedule entries from CMATE.md (sanitized by parseSchedulesSection)
  * @returns Array of schedule IDs (existing or newly created), in the same order as entries
  */
 export function batchUpsertSchedules(
@@ -192,7 +225,9 @@ export function batchUpsertSchedules(
   const db = getLazyDbInstance();
   const now = Date.now();
 
-  // Bulk fetch existing schedules for this worktree
+  // Bulk fetch existing schedules for this worktree.
+  // better-sqlite3's prepare() is cached at the DB instance level (DR1-007),
+  // so calling it each invocation does not incur additional compilation cost.
   const existingRows = db.prepare(
     'SELECT id, name FROM scheduled_executions WHERE worktree_id = ?'
   ).all(worktreeId) as ScheduleIdNameRow[];
@@ -341,6 +376,11 @@ function disableStaleSchedules(
   try {
     const db = getLazyDbInstance();
     const now = Date.now();
+    // SEC4-002: Dynamic placeholder generation is SQL injection-safe because only
+    // '?' placeholders are interpolated into SQL; actual values are passed via
+    // prepared statement parameter binding. worktreeIds originates from
+    // getAllWorktrees() (bounded by MAX_CONCURRENT_SCHEDULES ~100), well within
+    // SQLite's SQLITE_MAX_VARIABLE_NUMBER (default 999).
     const placeholders = worktreeIds.map(() => '?').join(',');
 
     // Get enabled schedules for the scanned worktrees
@@ -449,10 +489,11 @@ function syncSchedules(): void {
       const cachedMtime = manager.cmateFileCache.get(worktree.path);
 
       if (mtime === null) {
-        // CMATE.md does not exist (or was deleted)
+        // CMATE.md does not exist (or was deleted).
+        // DR1-009: By not adding to activeScheduleIds, this worktree's
+        // schedules will be cleaned up in Step 4 (stale cron job removal)
+        // and disableStaleSchedules() (DB enabled=0 update).
         if (cachedMtime !== undefined) {
-          // Was previously cached - remove cache entry
-          // Do NOT add to activeScheduleIds so stale schedules are cleaned up
           manager.cmateFileCache.delete(worktree.path);
         }
         continue;
@@ -608,6 +649,8 @@ export function stopAllSchedules(): void {
     }
   }
   manager.schedules.clear();
+  // DR1-008: Clear mtime cache to prevent stale values from causing
+  // incorrect skip decisions on next initScheduleManager() call
   manager.cmateFileCache.clear();
 
   // Kill all active child processes (fire-and-forget SIGKILL)
