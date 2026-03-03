@@ -17,6 +17,14 @@ LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/server.log"
 PID_FILE="$LOG_DIR/server.pid"
 DATA_DIR="$PROJECT_DIR/data"
+# Support both CM_PORT and legacy MCBD_PORT
+PORT=${CM_PORT:-${MCBD_PORT:-3000}}
+
+# Port number validation (bash built-in pattern matching) [S4-001]
+if ! [[ "$PORT" =~ ^[0-9]+$ ]] || [ "$PORT" -lt 1 ] || [ "$PORT" -gt 65535 ]; then
+    echo 'ERROR: Invalid port number specified in CM_PORT or MCBD_PORT' >&2
+    exit 1
+fi
 
 # Show help
 show_help() {
@@ -65,14 +73,27 @@ echo ""
 if [ "$1" = "--daemon" ] || [ "$1" = "-d" ]; then
     echo "=== Starting in daemon mode ==="
 
-    # Check if already running
+    # Check if already running (PID file-based)
     if [ -f "$PID_FILE" ]; then
-        OLD_PID=$(cat "$PID_FILE")
-        if kill -0 "$OLD_PID" 2>/dev/null; then
+        # PID file validation: first line only, numeric only
+        OLD_PID=$(cat "$PID_FILE" 2>/dev/null | head -1 | grep -E '^[0-9]+$')
+        if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
             echo "Server is already running (PID: $OLD_PID)"
             echo "Use ./scripts/stop-server.sh to stop it first"
             exit 1
         fi
+        # PID file is invalid or process has exited -> remove stale PID file
+        rm -f "$PID_FILE"
+    fi
+
+    # Check if already running (port-based) [D1-004]
+    # Detects orphaned processes even when PID file is missing.
+    # stop-server.sh Step 1 (port-based stop) can handle this without a PID file.
+    PORT_PIDS=$(lsof -ti:$PORT 2>/dev/null | grep -E '^[0-9]+$' | sort -u || true)
+    if [ -n "$PORT_PIDS" ]; then
+        echo "Port $PORT is already in use by process(es): $(echo $PORT_PIDS | tr '\n' ' ')"
+        echo "Use ./scripts/stop-server.sh to stop it first"
+        exit 1
     fi
 
     # Build first (in foreground to see errors)
@@ -85,7 +106,7 @@ if [ "$1" = "--daemon" ] || [ "$1" = "-d" ]; then
     # Start server in background with nohup
     nohup npm start >> "$LOG_FILE" 2>&1 &
     SERVER_PID=$!
-    echo $SERVER_PID > "$PID_FILE"
+    echo $SERVER_PID > "$PID_FILE" && chmod 600 "$PID_FILE"  # [S4-003]
 
     # Wait a moment and check if server started
     sleep 3
