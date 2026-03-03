@@ -1863,7 +1863,15 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
     [state.terminal.output, state.terminal.isActive, state.terminal.isThinking, state.terminal.autoScroll, handleAutoScrollChange, disableAutoFollow]
   );
 
-  /** Memoized left pane to prevent re-render when terminal state changes */
+  /**
+   * Memoized left pane to prevent re-render when terminal state changes.
+   *
+   * MAINTENANCE NOTE (Issue #411, R3-007):
+   * The dependency array below lists every prop, state value, and callback
+   * referenced inside the JSX. When adding a new prop or state variable to
+   * the left pane content, you MUST also add it to this dependency array,
+   * otherwise the memoized output will be stale.
+   */
   const leftPaneMemo = useMemo(
     () => (
       <div className="h-full flex flex-col">

@@ -140,6 +140,12 @@ export const MessageInput = memo(function MessageInput({ worktreeId, onMessageSe
   /**
    * Handle free input mode (Issue #56, #288)
    * Closes selector and carries over filter text as the custom command prefix
+   *
+   * Empty dependency array rationale (R1-001):
+   * - setState functions (setShowCommandSelector, setIsFreeInputMode, setMessage)
+   *   are stable across renders (React guarantee).
+   * - textareaRef is a React ref (stable reference, never reassigned).
+   * - filterText is received as a callback argument, not captured from closure.
    */
   const handleFreeInput = useCallback((filterText: string) => {
     setShowCommandSelector(false);
