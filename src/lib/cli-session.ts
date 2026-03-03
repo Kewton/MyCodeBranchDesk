@@ -116,7 +116,7 @@ export async function captureSessionOutputFresh(
     const output = await capturePane(sessionName, { startLine: -lines });
 
     // Write back to cache if non-empty [SEC4-007]
-    if (output && output.length > 0) {
+    if (output.length > 0) {
       setCachedCapture(sessionName, output, lines);
     } else {
       invalidateCache(sessionName);

@@ -263,7 +263,7 @@ export async function getOrFetchCapture(
     const output = await fetchPromise;
 
     // Cache non-empty results only [SEC4-007]
-    if (output && output.length > 0) {
+    if (output.length > 0) {
       setCachedCapture(sessionName, output, CACHE_MAX_CAPTURE_LINES);
     }
 
