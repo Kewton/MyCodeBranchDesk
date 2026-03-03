@@ -9,19 +9,24 @@
  * 3. Checking for input prompts (ready for user input)
  * 4. Using time-based heuristics when patterns don't match
  *
- * Architecture note (SF-001 tradeoff):
- * This module returns StatusDetectionResult which intentionally does NOT include
- * PromptDetectionResult.promptData. Callers that need promptData (e.g.,
- * current-output/route.ts) must call detectPrompt() separately, resulting in
- * detectPrompt() being invoked twice: once inside detectSessionStatus() and once
- * by the caller. This controlled DRY violation is accepted because:
- *   - StatusDetectionResult maintains SRP (status + confidence, not prompt details)
- *   - Exposing promptData would couple status detection to prompt data shape changes
- *   - detectPrompt() is lightweight (regex-based, no I/O), so the cost is negligible
+ * Architecture note (Issue #408: SF-001 resolved):
+ * Previously, this module returned StatusDetectionResult without
+ * PromptDetectionResult (SF-001 tradeoff). Callers needing promptData
+ * had to call detectPrompt() separately, resulting in a controlled DRY violation.
+ *
+ * Issue #408 resolved this by adding a required promptDetection field to
+ * StatusDetectionResult. The SRP concern was mitigated by:
+ *   - Callers not needing promptData can simply ignore the field
+ *   - PromptDetectionResult being a stable type with low change frequency
+ *
+ * Future guideline (DR1-002): If PromptDetectionResult gains high-frequency
+ * changes or large structural modifications, consider re-evaluating this
+ * coupling via a minimal DTO/projection type.
  */
 
 import { stripAnsi, stripBoxDrawing, detectThinking, getCliToolPatterns, buildDetectPromptOptions, OPENCODE_RESPONSE_COMPLETE, OPENCODE_PROCESSING_INDICATOR } from './cli-patterns';
 import { detectPrompt } from './prompt-detector';
+import type { PromptDetectionResult } from './prompt-detector';
 import type { CLIToolType } from './cli-tools/types';
 
 /**
@@ -53,10 +58,27 @@ export interface StatusDetectionResult {
    * like AskUserQuestion format with option descriptions.
    *
    * Used by callers as the source of truth for isPromptWaiting (SF-004).
-   * Does NOT expose internal PromptDetectionResult details (encapsulation).
-   * Callers needing promptData must call detectPrompt() separately (SF-001).
    */
   hasActivePrompt: boolean;
+
+  /**
+   * Issue #408: Prompt detection result from internal detectPrompt() call.
+   * Required field (DR1-001) - callers that need promptData can access it
+   * directly without a second detectPrompt() call.
+   * Required so that future return path additions are caught by the compiler
+   * (defense-in-depth).
+   *
+   * Contains the full PromptDetectionResult including:
+   * - isPrompt: boolean (always matches hasActivePrompt)
+   * - promptData?: PromptData (question, options, type etc.)
+   * - cleanContent: string
+   * - rawContent?: string (truncated, Issue #235)
+   *
+   * Design guarantee: When status === 'running' && reason === 'thinking_indicator',
+   * promptDetection.isPrompt is always false (prompt detection has higher priority
+   * than thinking detection in the internal priority order).
+   */
+  promptDetection: PromptDetectionResult;
 }
 
 /**
@@ -149,6 +171,7 @@ export function detectSessionStatus(
       confidence: 'high',
       reason: 'prompt_detected',
       hasActivePrompt: true,
+      promptDetection,
     };
   }
 
@@ -160,6 +183,7 @@ export function detectSessionStatus(
       confidence: 'high',
       reason: 'thinking_indicator',
       hasActivePrompt: false,
+      promptDetection,
     };
   }
 
@@ -179,6 +203,7 @@ export function detectSessionStatus(
         confidence: 'high',
         reason: 'opencode_processing_indicator',
         hasActivePrompt: false,
+        promptDetection,
       };
     }
 
@@ -214,6 +239,7 @@ export function detectSessionStatus(
           confidence: 'high',
           reason: 'thinking_indicator',
           hasActivePrompt: false,
+          promptDetection,
         };
       }
 
@@ -227,6 +253,7 @@ export function detectSessionStatus(
           confidence: 'high',
           reason: 'opencode_response_complete',
           hasActivePrompt: false,
+          promptDetection,
         };
       }
     }
@@ -241,6 +268,7 @@ export function detectSessionStatus(
       confidence: 'high',
       reason: 'input_prompt',
       hasActivePrompt: false,
+      promptDetection,
     };
   }
 
@@ -254,6 +282,7 @@ export function detectSessionStatus(
         confidence: 'low',
         reason: 'no_recent_output',
         hasActivePrompt: false,
+        promptDetection,
       };
     }
   }
@@ -265,5 +294,6 @@ export function detectSessionStatus(
     confidence: 'low',
     reason: 'default',
     hasActivePrompt: false,
+    promptDetection,
   };
 }
