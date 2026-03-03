@@ -28,6 +28,11 @@ describe('HTTP Proxy Handler', () => {
     ...overrides,
   });
 
+  /** Extract the Headers object passed to the mocked global.fetch call */
+  function getForwardedRequestHeaders(): Headers {
+    return (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].headers as Headers;
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -110,7 +115,7 @@ describe('HTTP Proxy Handler', () => {
       );
 
       // Verify sensitive headers are NOT forwarded
-      const calledHeaders = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].headers as Headers;
+      const calledHeaders = getForwardedRequestHeaders();
       expect(calledHeaders.has('authorization')).toBe(false);
       // Verify safe headers ARE forwarded
       expect(calledHeaders.get('x-custom-header')).toBe('custom-value');
@@ -333,7 +338,7 @@ describe('HTTP Proxy Handler', () => {
 
       await proxyHttp(request, mockApp, '/api');
 
-      const calledHeaders = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].headers as Headers;
+      const calledHeaders = getForwardedRequestHeaders();
 
       // All 7 sensitive headers must be stripped
       for (const header of SENSITIVE_REQUEST_HEADERS) {
@@ -362,7 +367,7 @@ describe('HTTP Proxy Handler', () => {
 
       await proxyHttp(request, mockApp, '/api');
 
-      const calledHeaders = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].headers as Headers;
+      const calledHeaders = getForwardedRequestHeaders();
       expect(calledHeaders.has(headerName)).toBe(false);
     });
   });
@@ -386,7 +391,7 @@ describe('HTTP Proxy Handler', () => {
 
       await proxyHttp(request, mockApp, '/api');
 
-      const calledHeaders = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].headers as Headers;
+      const calledHeaders = getForwardedRequestHeaders();
       expect(calledHeaders.get('content-type')).toBe('application/json');
       expect(calledHeaders.get('accept')).toBe('application/json');
       expect(calledHeaders.get('user-agent')).toBe('Mozilla/5.0');
@@ -408,7 +413,7 @@ describe('HTTP Proxy Handler', () => {
 
       await proxyHttp(request, mockApp, '/api');
 
-      const calledHeaders = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].headers as Headers;
+      const calledHeaders = getForwardedRequestHeaders();
       expect(calledHeaders.get('x-request-id')).toBe('req-123');
       expect(calledHeaders.get('x-custom-header')).toBe('my-value');
     });

@@ -45,6 +45,32 @@ export function buildUpstreamUrl(app: ExternalApp, path: string): string {
 }
 
 /**
+ * Filter headers by removing entries that appear in any of the exclusion lists.
+ * Used to strip hop-by-hop and sensitive headers from both requests and responses.
+ *
+ * @param source - The source Headers to filter
+ * @param exclusionLists - One or more readonly string arrays of header names to exclude
+ * @returns A new Headers object with excluded headers removed
+ * @internal Exported for testing
+ */
+export function filterHeaders(
+  source: Headers,
+  ...exclusionLists: readonly (readonly string[])[]
+): Headers {
+  const filtered = new Headers();
+  source.forEach((value, key) => {
+    const lowerKey = key.toLowerCase();
+    const excluded = exclusionLists.some(
+      (list) => list.includes(lowerKey as never)
+    );
+    if (!excluded) {
+      filtered.set(key, value);
+    }
+  });
+  return filtered;
+}
+
+/**
  * Proxy an HTTP request to the upstream application
  *
  * @param request - The incoming request
@@ -59,19 +85,12 @@ export async function proxyHttp(
 ): Promise<Response> {
   const upstreamUrl = buildUpstreamUrl(app, path);
 
-  // Clone headers, removing hop-by-hop and sensitive headers (Issue #395)
-  const headers = new Headers();
-  request.headers.forEach((value, key) => {
-    const lowerKey = key.toLowerCase();
-    // Skip hop-by-hop headers (connection-specific headers that should not be forwarded)
-    // Skip sensitive headers (credentials and client identity that must not leak to upstream)
-    if (
-      !HOP_BY_HOP_REQUEST_HEADERS.includes(lowerKey as typeof HOP_BY_HOP_REQUEST_HEADERS[number]) &&
-      !SENSITIVE_REQUEST_HEADERS.includes(lowerKey as typeof SENSITIVE_REQUEST_HEADERS[number])
-    ) {
-      headers.set(key, value);
-    }
-  });
+  // Strip hop-by-hop and sensitive headers from the request (Issue #395)
+  const headers = filterHeaders(
+    request.headers,
+    HOP_BY_HOP_REQUEST_HEADERS,
+    SENSITIVE_REQUEST_HEADERS,
+  );
 
   try {
     // Create abort controller for timeout
@@ -89,19 +108,12 @@ export async function proxyHttp(
 
     clearTimeout(timeoutId);
 
-    // Clone response headers, removing hop-by-hop and sensitive headers (Issue #395)
-    const responseHeaders = new Headers();
-    response.headers.forEach((value, key) => {
-      const lowerKey = key.toLowerCase();
-      // Skip hop-by-hop headers (connection-specific headers that should not be forwarded)
-      // Skip sensitive headers (prevent upstream from setting cookies, overriding CSP, CORS, etc.)
-      if (
-        !HOP_BY_HOP_RESPONSE_HEADERS.includes(lowerKey as typeof HOP_BY_HOP_RESPONSE_HEADERS[number]) &&
-        !SENSITIVE_RESPONSE_HEADERS.includes(lowerKey as typeof SENSITIVE_RESPONSE_HEADERS[number])
-      ) {
-        responseHeaders.set(key, value);
-      }
-    });
+    // Strip hop-by-hop and sensitive headers from the response (Issue #395)
+    const responseHeaders = filterHeaders(
+      response.headers,
+      HOP_BY_HOP_RESPONSE_HEADERS,
+      SENSITIVE_RESPONSE_HEADERS,
+    );
 
     return new Response(response.body, {
       status: response.status,
