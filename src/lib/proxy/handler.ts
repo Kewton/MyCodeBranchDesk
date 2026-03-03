@@ -14,6 +14,8 @@ import {
   PROXY_TIMEOUT,
   HOP_BY_HOP_REQUEST_HEADERS,
   HOP_BY_HOP_RESPONSE_HEADERS,
+  SENSITIVE_REQUEST_HEADERS,
+  SENSITIVE_RESPONSE_HEADERS,
   PROXY_STATUS_CODES,
   PROXY_ERROR_MESSAGES,
 } from './config';
@@ -57,12 +59,16 @@ export async function proxyHttp(
 ): Promise<Response> {
   const upstreamUrl = buildUpstreamUrl(app, path);
 
-  // Clone headers, removing hop-by-hop headers
+  // Clone headers, removing hop-by-hop and sensitive headers (Issue #395)
   const headers = new Headers();
   request.headers.forEach((value, key) => {
     const lowerKey = key.toLowerCase();
     // Skip hop-by-hop headers (connection-specific headers that should not be forwarded)
-    if (!HOP_BY_HOP_REQUEST_HEADERS.includes(lowerKey as typeof HOP_BY_HOP_REQUEST_HEADERS[number])) {
+    // Skip sensitive headers (credentials and client identity that must not leak to upstream)
+    if (
+      !HOP_BY_HOP_REQUEST_HEADERS.includes(lowerKey as typeof HOP_BY_HOP_REQUEST_HEADERS[number]) &&
+      !SENSITIVE_REQUEST_HEADERS.includes(lowerKey as typeof SENSITIVE_REQUEST_HEADERS[number])
+    ) {
       headers.set(key, value);
     }
   });
@@ -83,12 +89,16 @@ export async function proxyHttp(
 
     clearTimeout(timeoutId);
 
-    // Clone response headers, removing hop-by-hop headers
+    // Clone response headers, removing hop-by-hop and sensitive headers (Issue #395)
     const responseHeaders = new Headers();
     response.headers.forEach((value, key) => {
       const lowerKey = key.toLowerCase();
       // Skip hop-by-hop headers (connection-specific headers that should not be forwarded)
-      if (!HOP_BY_HOP_RESPONSE_HEADERS.includes(lowerKey as typeof HOP_BY_HOP_RESPONSE_HEADERS[number])) {
+      // Skip sensitive headers (prevent upstream from setting cookies, overriding CSP, CORS, etc.)
+      if (
+        !HOP_BY_HOP_RESPONSE_HEADERS.includes(lowerKey as typeof HOP_BY_HOP_RESPONSE_HEADERS[number]) &&
+        !SENSITIVE_RESPONSE_HEADERS.includes(lowerKey as typeof SENSITIVE_RESPONSE_HEADERS[number])
+      ) {
         responseHeaders.set(key, value);
       }
     });
@@ -133,27 +143,24 @@ export async function proxyHttp(
  * Handle WebSocket upgrade request
  *
  * Note: Next.js Route Handlers do not support WebSocket upgrades directly.
- * This returns a 426 Upgrade Required response with instructions.
+ * This returns a 426 Upgrade Required response with a fixed error message.
  *
- * @param request - The incoming WebSocket upgrade request
- * @param app - The external app configuration
- * @param path - The full request path including proxy prefix (e.g., /proxy/{pathPrefix}/ws)
+ * Issue #395: Removed directUrl field and internal URL from message to prevent
+ * leaking upstream host/port information to the client.
+ *
+ * @param request - The incoming WebSocket upgrade request (unused after Issue #395)
+ * @param app - The external app configuration (unused, no longer exposed in response)
+ * @param path - The full request path (unused, no longer exposed in response)
  * @returns A 426 response indicating WebSocket is not supported
  */
-export async function proxyWebSocket(
-  request: Request,
-  app: ExternalApp,
-  path: string
-): Promise<Response> {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function proxyWebSocket(request: Request, app: ExternalApp, path: string): Promise<Response> {
   // Next.js Route Handlers cannot handle WebSocket upgrades
-  // Return a 426 response with instructions for direct WebSocket connection
-  const directWsUrl = `ws://${app.targetHost}:${app.targetPort}${path}`;
-
+  // Issue #395: Return fixed-string response only; do not expose internal URLs
   return new Response(
     JSON.stringify({
       error: 'Upgrade Required',
-      message: `${PROXY_ERROR_MESSAGES.UPGRADE_REQUIRED}. Configure your WebSocket client to connect directly to ${directWsUrl}`,
-      directUrl: directWsUrl,
+      message: PROXY_ERROR_MESSAGES.UPGRADE_REQUIRED,
     }),
     {
       status: PROXY_STATUS_CODES.UPGRADE_REQUIRED,
