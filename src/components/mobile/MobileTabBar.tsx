@@ -111,7 +111,7 @@ export function MobileTabBar({
       const isActive = tabId === activeTab;
       const baseStyles = 'flex flex-col items-center justify-center flex-1 py-2 px-1 transition-colors relative';
       const activeStyles = isActive
-        ? 'text-blue-600 bg-blue-50'
+        ? 'text-cyan-600 bg-cyan-50'
         : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50';
       return `${baseStyles} ${activeStyles}`;
     },
