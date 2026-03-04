@@ -11,6 +11,7 @@
 import { stopPolling as stopResponsePolling } from './response-poller';
 import { stopAutoYesPolling, deleteAutoYesState } from './auto-yes-manager';
 import { stopScheduleForWorktree } from './schedule-manager';
+import { clearAllCache } from './tmux-capture-cache';
 import { CLI_TOOL_IDS, type CLIToolType } from './cli-tools/types';
 import { getErrorMessage } from './errors';
 
@@ -75,6 +76,9 @@ export async function cleanupWorktreeSessions(
     pollersStopped: [],
     pollerErrors: [],
   };
+
+  // Issue #405: Clear all capture cache at shutdown start
+  clearAllCache();
 
   // 1. Kill sessions and stop response-pollers for each CLI tool
   for (const cliToolId of CLI_TOOL_IDS) {
