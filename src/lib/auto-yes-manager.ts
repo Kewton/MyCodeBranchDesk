@@ -17,6 +17,7 @@ import { CLIToolManager } from './cli-tools/manager';
 import { stripAnsi, stripBoxDrawing, detectThinking, buildDetectPromptOptions } from './cli-patterns';
 import { DEFAULT_AUTO_YES_DURATION, validateStopPattern, type AutoYesDuration, type AutoYesStopReason } from '@/config/auto-yes-config';
 import { generatePromptKey } from './prompt-key';
+import { invalidateCache } from './tmux-capture-cache';
 
 // Re-export from shared config for backward compatibility (Issue #314)
 export type { AutoYesStopReason } from '@/config/auto-yes-config';
@@ -607,12 +608,17 @@ export async function detectAndRespondToPrompt(
     const cliTool = manager.getTool(cliToolId);
     const sessionName = cliTool.getSessionName(worktreeId);
 
-    await sendPromptAnswer({
-      sessionName,
-      answer,
-      cliToolId,
-      promptData: promptDetection.promptData,
-    });
+    try {
+      await sendPromptAnswer({
+        sessionName,
+        answer,
+        cliToolId,
+        promptData: promptDetection.promptData,
+      });
+    } finally {
+      // Issue #405: Ensure cache invalidation even if sendPromptAnswer throws
+      invalidateCache(sessionName);
+    }
 
     // 5. Update timestamp and reset error count
     updateLastServerResponseTimestamp(worktreeId, Date.now());
