@@ -725,3 +725,19 @@ export function getActiveScheduleCount(): number {
 export function isScheduleManagerInitialized(): boolean {
   return getManagerState().initialized;
 }
+
+/**
+ * Get all unique worktree IDs that have active schedule entries.
+ * Used by periodic resource cleanup to detect orphaned entries.
+ *
+ * @internal Exported for resource-cleanup and testing purposes.
+ * @returns Array of unique worktree IDs present in the schedules Map
+ */
+export function getScheduleWorktreeIds(): string[] {
+  const manager = getManagerState();
+  const worktreeIds = new Set<string>();
+  for (const [, state] of manager.schedules) {
+    worktreeIds.add(state.worktreeId);
+  }
+  return Array.from(worktreeIds);
+}

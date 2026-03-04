@@ -17,6 +17,7 @@ import { CLIToolManager } from './cli-tools/manager';
 import { stripAnsi, stripBoxDrawing, detectThinking, buildDetectPromptOptions } from './cli-patterns';
 import { DEFAULT_AUTO_YES_DURATION, validateStopPattern, type AutoYesDuration, type AutoYesStopReason } from '@/config/auto-yes-config';
 import { generatePromptKey } from './prompt-key';
+import { getErrorMessage } from './errors';
 
 // Re-export from shared config for backward compatibility (Issue #314)
 export type { AutoYesStopReason } from '@/config/auto-yes-config';
@@ -93,17 +94,6 @@ export const THINKING_CHECK_LINE_COUNT = 50;
 
 /** Worktree ID validation pattern (security: prevent command injection) */
 const WORKTREE_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
-
-/**
- * Extract error message from unknown error type.
- * Provides consistent error message extraction across the module (DRY).
- *
- * @param error - Unknown error object
- * @returns Error message string, or 'Unknown error' for non-Error values
- */
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Unknown error';
-}
 
 // =============================================================================
 // In-memory State (globalThis for hot reload persistence - Issue #153)

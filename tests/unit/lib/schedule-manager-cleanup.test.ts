@@ -91,7 +91,7 @@ vi.mock('../../../src/config/cmate-constants', () => ({
   CMATE_FILENAME: 'CMATE.md',
 }));
 
-import { stopScheduleForWorktree } from '../../../src/lib/schedule-manager';
+import { stopScheduleForWorktree, getScheduleWorktreeIds } from '../../../src/lib/schedule-manager';
 
 describe('Schedule Manager Cleanup Functions (Issue #404)', () => {
   beforeEach(() => {
@@ -225,6 +225,66 @@ describe('Schedule Manager Cleanup Functions (Issue #404)', () => {
     it('should handle uninitialized manager state gracefully', () => {
       // getManagerState() will create a fresh state
       expect(() => stopScheduleForWorktree('wt-target')).not.toThrow();
+    });
+  });
+
+  describe('getScheduleWorktreeIds', () => {
+    it('should return unique worktree IDs from schedules', () => {
+      const cronJob = { stop: vi.fn(), schedule: vi.fn() };
+
+      globalThis.__scheduleManagerStates = {
+        timerId: null,
+        schedules: new Map([
+          ['sched-1', {
+            scheduleId: 'sched-1',
+            worktreeId: 'wt-a',
+            cronJob: cronJob as unknown as import('croner').Cron,
+            isExecuting: false,
+            entry: { name: 'task-1', message: 'msg', cronExpression: '* * * * *', cliToolId: 'claude', enabled: true, permission: 'default' },
+          }],
+          ['sched-2', {
+            scheduleId: 'sched-2',
+            worktreeId: 'wt-b',
+            cronJob: cronJob as unknown as import('croner').Cron,
+            isExecuting: false,
+            entry: { name: 'task-2', message: 'msg', cronExpression: '* * * * *', cliToolId: 'claude', enabled: true, permission: 'default' },
+          }],
+          ['sched-3', {
+            scheduleId: 'sched-3',
+            worktreeId: 'wt-a',
+            cronJob: cronJob as unknown as import('croner').Cron,
+            isExecuting: false,
+            entry: { name: 'task-3', message: 'msg', cronExpression: '* * * * *', cliToolId: 'claude', enabled: true, permission: 'default' },
+          }],
+        ]),
+        initialized: true,
+        cmateFileCache: new Map(),
+      };
+
+      const ids = getScheduleWorktreeIds();
+
+      expect(ids).toHaveLength(2);
+      expect(ids).toContain('wt-a');
+      expect(ids).toContain('wt-b');
+    });
+
+    it('should return empty array when no schedules exist', () => {
+      globalThis.__scheduleManagerStates = {
+        timerId: null,
+        schedules: new Map(),
+        initialized: true,
+        cmateFileCache: new Map(),
+      };
+
+      const ids = getScheduleWorktreeIds();
+
+      expect(ids).toHaveLength(0);
+    });
+
+    it('should return empty array when manager state is uninitialized', () => {
+      const ids = getScheduleWorktreeIds();
+
+      expect(ids).toHaveLength(0);
     });
   });
 });

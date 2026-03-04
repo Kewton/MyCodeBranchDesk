@@ -27,6 +27,7 @@ vi.mock('@/lib/auto-yes-manager', () => ({
 vi.mock('@/lib/schedule-manager', () => ({
   stopScheduleForWorktree: vi.fn(),
   getActiveScheduleCount: vi.fn().mockReturnValue(0),
+  getScheduleWorktreeIds: vi.fn().mockReturnValue([]),
 }));
 
 // Mock response-poller
@@ -55,7 +56,7 @@ import {
   MAX_PS_OUTPUT_BYTES,
 } from '@/lib/resource-cleanup';
 import { getAutoYesStateWorktreeIds, getAutoYesPollerWorktreeIds, deleteAutoYesState, stopAutoYesPolling } from '@/lib/auto-yes-manager';
-import { stopScheduleForWorktree } from '@/lib/schedule-manager';
+import { stopScheduleForWorktree, getScheduleWorktreeIds } from '@/lib/schedule-manager';
 import { execFile } from 'child_process';
 import { existsSync } from 'fs';
 
@@ -168,21 +169,8 @@ describe('Resource Cleanup (Issue #404)', () => {
       vi.mocked(getAutoYesPollerWorktreeIds).mockReturnValue([]);
       mockDbAll.mockReturnValue([{ id: 'wt-valid' }]);
 
-      // Set up globalThis schedule state with orphaned worktree
-      globalThis.__scheduleManagerStates = {
-        timerId: null,
-        schedules: new Map([
-          ['sched-orphan', {
-            scheduleId: 'sched-orphan',
-            worktreeId: 'wt-orphan-sched',
-            cronJob: { stop: vi.fn(), schedule: vi.fn() } as unknown as import('croner').Cron,
-            isExecuting: false,
-            entry: { name: 'task', message: 'msg', cronExpression: '* * * * *', cliToolId: 'claude', enabled: true, permission: 'default' },
-          }],
-        ]),
-        initialized: true,
-        cmateFileCache: new Map(),
-      };
+      // Mock getScheduleWorktreeIds to return an orphaned worktree ID
+      vi.mocked(getScheduleWorktreeIds).mockReturnValue(['wt-orphan-sched']);
 
       const result = cleanupOrphanedMapEntries();
 

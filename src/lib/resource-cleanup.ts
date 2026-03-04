@@ -21,7 +21,7 @@ import {
   deleteAutoYesState,
   stopAutoYesPolling,
 } from './auto-yes-manager';
-import { stopScheduleForWorktree } from './schedule-manager';
+import { stopScheduleForWorktree, getScheduleWorktreeIds } from './schedule-manager';
 import { getDbInstance } from './db-instance';
 
 // =============================================================================
@@ -240,18 +240,12 @@ export function cleanupOrphanedMapEntries(): CleanupMapResult {
     }
   }
 
-  // Cleanup schedule manager entries
-  const managerState = globalThis.__scheduleManagerStates;
-  if (managerState) {
-    const scheduleWorktreeIds = new Set<string>();
-    for (const [, state] of managerState.schedules) {
-      scheduleWorktreeIds.add(state.worktreeId);
-    }
-    for (const worktreeId of scheduleWorktreeIds) {
-      if (!validWorktreeIds.has(worktreeId)) {
-        stopScheduleForWorktree(worktreeId);
-        result.deletedScheduleWorktreeIds.push(worktreeId);
-      }
+  // Cleanup schedule manager entries (via encapsulated accessor)
+  const scheduleWorktreeIds = getScheduleWorktreeIds();
+  for (const worktreeId of scheduleWorktreeIds) {
+    if (!validWorktreeIds.has(worktreeId)) {
+      stopScheduleForWorktree(worktreeId);
+      result.deletedScheduleWorktreeIds.push(worktreeId);
     }
   }
 
