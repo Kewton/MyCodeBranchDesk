@@ -61,6 +61,8 @@ interface ManagerState {
   schedules: Map<string, ScheduleState>;
   /** Whether the manager is initialized */
   initialized: boolean;
+  /** Whether syncSchedules() is currently running (DJ-007: concurrent execution guard) */
+  isSyncing: boolean;
   /**
    * CMATE.md file mtime cache: worktree path -> mtimeMs
    *
@@ -117,6 +119,7 @@ function getManagerState(): ManagerState {
       timerId: null,
       schedules: new Map(),
       initialized: false,
+      isSyncing: false,
       cmateFileCache: new Map(),
     };
   }
@@ -472,122 +475,135 @@ async function executeSchedule(state: ScheduleState): Promise<void> {
  * Reads CMATE.md from each worktree, upserts schedules to DB,
  * creates/updates cron jobs, and removes stale schedules.
  *
+ * Issue #406: Async I/O for readCmateFile() to avoid event loop blocking.
  * Issue #409: Uses mtime caching to skip unchanged CMATE.md files
  * and batchUpsertSchedules() for efficient DB operations.
+ *
+ * DJ-007: isSyncing guard prevents concurrent execution when async
+ * operations exceed the 60-second polling interval.
  */
-function syncSchedules(): void {
+async function syncSchedules(): Promise<void> {
   const manager = getManagerState();
-  const worktrees = getAllWorktrees();
 
-  // Track which scheduleIds are still valid
-  const activeScheduleIds = new Set<string>();
+  // DJ-007: Prevent concurrent execution (SEC4-004)
+  if (manager.isSyncing) return;
+  manager.isSyncing = true;
 
-  for (const worktree of worktrees) {
-    try {
-      // Issue #409: Check CMATE.md mtime for change detection
-      const mtime = getCmateMtime(worktree.path);
-      const cachedMtime = manager.cmateFileCache.get(worktree.path);
+  try {
+    const worktrees = getAllWorktrees();
 
-      if (mtime === null) {
-        // CMATE.md does not exist (or was deleted).
-        // DR1-009: By not adding to activeScheduleIds, this worktree's
-        // schedules will be cleaned up in Step 4 (stale cron job removal)
-        // and disableStaleSchedules() (DB enabled=0 update).
-        if (cachedMtime !== undefined) {
-          manager.cmateFileCache.delete(worktree.path);
-        }
-        continue;
-      }
+    // Track which scheduleIds are still valid
+    const activeScheduleIds = new Set<string>();
 
-      // If mtime matches cached value, skip DB operations for this worktree
-      if (cachedMtime !== undefined && cachedMtime === mtime) {
-        // File unchanged - re-add existing schedule IDs to keep them active
-        for (const [scheduleId, state] of manager.schedules) {
-          if (state.worktreeId === worktree.id) {
-            activeScheduleIds.add(scheduleId);
+    for (const worktree of worktrees) {
+      try {
+        // Issue #409: Check CMATE.md mtime for change detection
+        const mtime = getCmateMtime(worktree.path);
+        const cachedMtime = manager.cmateFileCache.get(worktree.path);
+
+        if (mtime === null) {
+          // CMATE.md does not exist (or was deleted).
+          // DR1-009: By not adding to activeScheduleIds, this worktree's
+          // schedules will be cleaned up in Step 4 (stale cron job removal)
+          // and disableStaleSchedules() (DB enabled=0 update).
+          if (cachedMtime !== undefined) {
+            manager.cmateFileCache.delete(worktree.path);
           }
-        }
-        continue;
-      }
-
-      // Update mtime cache
-      manager.cmateFileCache.set(worktree.path, mtime);
-
-      const config = readCmateFile(worktree.path);
-      if (!config) continue;
-
-      const scheduleRows = config.get('Schedules');
-      if (!scheduleRows) continue;
-
-      const entries = parseSchedulesSection(scheduleRows);
-
-      // Issue #409: Batch upsert all entries for this worktree
-      const scheduleIds = batchUpsertSchedules(worktree.id, entries);
-
-      for (let i = 0; i < entries.length; i++) {
-        const entry = entries[i];
-        const scheduleId = scheduleIds[i];
-
-        if (manager.schedules.size >= MAX_CONCURRENT_SCHEDULES) {
-          console.warn(`[schedule-manager] MAX_CONCURRENT_SCHEDULES (${MAX_CONCURRENT_SCHEDULES}) reached`);
-          return;
-        }
-
-        activeScheduleIds.add(scheduleId);
-
-        // Check if this schedule already has a running cron job
-        const existingState = manager.schedules.get(scheduleId);
-        if (existingState) {
-          // Update entry if changed
-          existingState.entry = entry;
           continue;
         }
 
-        if (!entry.enabled || !entry.cronExpression) continue;
-
-        // Create new cron job
-        try {
-          const cronJob = new Cron(entry.cronExpression, {
-            paused: false,
-            protect: true, // Prevent overlapping
-          });
-
-          const state: ScheduleState = {
-            scheduleId,
-            worktreeId: worktree.id,
-            cronJob,
-            isExecuting: false,
-            entry,
-          };
-
-          // Schedule execution
-          cronJob.schedule(() => {
-            void executeSchedule(state);
-          });
-
-          manager.schedules.set(scheduleId, state);
-          console.log(`[schedule-manager] Scheduled ${entry.name} (${entry.cronExpression})`);
-        } catch (cronError) {
-          console.warn(`[schedule-manager] Invalid cron for ${entry.name}:`, cronError);
+        // If mtime matches cached value, skip DB operations for this worktree
+        if (cachedMtime !== undefined && cachedMtime === mtime) {
+          // File unchanged - re-add existing schedule IDs to keep them active
+          for (const [scheduleId, state] of manager.schedules) {
+            if (state.worktreeId === worktree.id) {
+              activeScheduleIds.add(scheduleId);
+            }
+          }
+          continue;
         }
+
+        // Update mtime cache
+        manager.cmateFileCache.set(worktree.path, mtime);
+
+        const config = await readCmateFile(worktree.path);
+        if (!config) continue;
+
+        const scheduleRows = config.get('Schedules');
+        if (!scheduleRows) continue;
+
+        const entries = parseSchedulesSection(scheduleRows);
+
+        // Issue #409: Batch upsert all entries for this worktree
+        const scheduleIds = batchUpsertSchedules(worktree.id, entries);
+
+        for (let i = 0; i < entries.length; i++) {
+          const entry = entries[i];
+          const scheduleId = scheduleIds[i];
+
+          if (manager.schedules.size >= MAX_CONCURRENT_SCHEDULES) {
+            console.warn(`[schedule-manager] MAX_CONCURRENT_SCHEDULES (${MAX_CONCURRENT_SCHEDULES}) reached`);
+            return;
+          }
+
+          activeScheduleIds.add(scheduleId);
+
+          // Check if this schedule already has a running cron job
+          const existingState = manager.schedules.get(scheduleId);
+          if (existingState) {
+            // Update entry if changed
+            existingState.entry = entry;
+            continue;
+          }
+
+          if (!entry.enabled || !entry.cronExpression) continue;
+
+          // Create new cron job
+          try {
+            const cronJob = new Cron(entry.cronExpression, {
+              paused: false,
+              protect: true, // Prevent overlapping
+            });
+
+            const state: ScheduleState = {
+              scheduleId,
+              worktreeId: worktree.id,
+              cronJob,
+              isExecuting: false,
+              entry,
+            };
+
+            // Schedule execution
+            cronJob.schedule(() => {
+              void executeSchedule(state);
+            });
+
+            manager.schedules.set(scheduleId, state);
+            console.log(`[schedule-manager] Scheduled ${entry.name} (${entry.cronExpression})`);
+          } catch (cronError) {
+            console.warn(`[schedule-manager] Invalid cron for ${entry.name}:`, cronError);
+          }
+        }
+      } catch (error) {
+        console.error(`[schedule-manager] Error syncing schedules for worktree ${worktree.id}:`, error);
       }
-    } catch (error) {
-      console.error(`[schedule-manager] Error syncing schedules for worktree ${worktree.id}:`, error);
     }
-  }
 
-  // Clean up schedules that no longer exist in CMATE.md
-  for (const [scheduleId, state] of manager.schedules) {
-    if (!activeScheduleIds.has(scheduleId)) {
-      state.cronJob.stop();
-      manager.schedules.delete(scheduleId);
-      console.log(`[schedule-manager] Removed stale schedule ${state.entry.name}`);
+    // Clean up schedules that no longer exist in CMATE.md
+    for (const [scheduleId, state] of manager.schedules) {
+      if (!activeScheduleIds.has(scheduleId)) {
+        state.cronJob.stop();
+        manager.schedules.delete(scheduleId);
+        console.log(`[schedule-manager] Removed stale schedule ${state.entry.name}`);
+      }
     }
-  }
 
-  // Disable DB records for schedules no longer in CMATE.md
-  const worktreeIds = worktrees.map(w => w.id);
-  disableStaleSchedules(activeScheduleIds, worktreeIds);
+    // Disable DB records for schedules no longer in CMATE.md
+    const worktreeIds = worktrees.map(w => w.id);
+    disableStaleSchedules(activeScheduleIds, worktreeIds);
+  } finally {
+    manager.isSyncing = false;
+  }
 }
 
 // =============================================================================
@@ -613,12 +629,14 @@ export function initScheduleManager(): void {
   // Recovery: mark stale running logs as failed
   recoverRunningLogs();
 
-  // Initial sync
-  syncSchedules();
+  // Initial sync (DJ-002: fire-and-forget, no .catch - fail-fast for fatal errors)
+  void syncSchedules();
 
-  // Start periodic sync timer
+  // Start periodic sync timer (DJ-003: .catch for repeated execution safety)
   manager.timerId = setInterval(() => {
-    syncSchedules();
+    void syncSchedules().catch(err =>
+      console.error('[schedule-manager] Unexpected sync error:', err)
+    );
   }, POLL_INTERVAL_MS);
 
   manager.initialized = true;

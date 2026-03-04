@@ -76,7 +76,7 @@ vi.mock('../../../src/lib/db-instance', () => {
 
 // Mock cmate-parser
 vi.mock('../../../src/lib/cmate-parser', () => ({
-  readCmateFile: vi.fn().mockReturnValue(null),
+  readCmateFile: vi.fn().mockResolvedValue(null),
   parseSchedulesSection: vi.fn().mockReturnValue([]),
 }));
 
@@ -135,6 +135,7 @@ describe('Schedule Manager Cleanup Functions (Issue #404)', () => {
           }],
         ]),
         initialized: true,
+        isSyncing: false,
         cmateFileCache: new Map(),
       };
 
@@ -167,6 +168,7 @@ describe('Schedule Manager Cleanup Functions (Issue #404)', () => {
           }],
         ]),
         initialized: true,
+        isSyncing: false,
         cmateFileCache: new Map(),
       };
 
@@ -194,6 +196,7 @@ describe('Schedule Manager Cleanup Functions (Issue #404)', () => {
           }],
         ]),
         initialized: true,
+        isSyncing: false,
         cmateFileCache: new Map([
           ['/path/to/wt-target', 12345],
         ]),
@@ -216,6 +219,7 @@ describe('Schedule Manager Cleanup Functions (Issue #404)', () => {
         timerId: null,
         schedules: new Map(),
         initialized: true,
+        isSyncing: false,
         cmateFileCache: new Map(),
       };
 
@@ -258,6 +262,7 @@ describe('Schedule Manager Cleanup Functions (Issue #404)', () => {
           }],
         ]),
         initialized: true,
+        isSyncing: false,
         cmateFileCache: new Map(),
       };
 
@@ -273,6 +278,7 @@ describe('Schedule Manager Cleanup Functions (Issue #404)', () => {
         timerId: null,
         schedules: new Map(),
         initialized: true,
+        isSyncing: false,
         cmateFileCache: new Map(),
       };
 
