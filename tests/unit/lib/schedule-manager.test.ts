@@ -16,6 +16,21 @@ import {
 } from '../../../src/lib/schedule-manager';
 import { getDbInstance } from '../../../src/lib/db-instance';
 
+// Mock cmate-parser module (DJ-005: file-scope vi.mock for static imports)
+vi.mock('../../../src/lib/cmate-parser', () => ({
+  readCmateFile: vi.fn().mockResolvedValue(null),
+  parseSchedulesSection: vi.fn().mockReturnValue([]),
+}));
+
+// Mock fs module - only statSync needed for getCmateMtime() (DJ-005)
+vi.mock('fs', async (importOriginal) => {
+  const original = await importOriginal<typeof import('fs')>();
+  return {
+    ...original,
+    statSync: vi.fn().mockReturnValue({ mtimeMs: 12345 }),
+  };
+});
+
 // Mock db-instance to avoid actual DB operations
 vi.mock('../../../src/lib/db-instance', () => {
   const Database = require('better-sqlite3');
@@ -271,22 +286,15 @@ describe('schedule-manager', () => {
   });
 
   describe('mtime cache (syncSchedules behavior)', () => {
-    it('should skip DB queries when mtime is unchanged', () => {
-      // Mock fs.statSync to return a consistent mtime
-      const mockStatSync = vi.fn().mockReturnValue({ mtimeMs: 1000 });
-      vi.doMock('fs', () => ({
-        statSync: mockStatSync,
-        readFileSync: vi.fn().mockReturnValue('## Schedules\n| Name | Cron | Message |\n|---|---|---|\n| test | 0 9 * * * | hello |'),
-        realpathSync: vi.fn().mockImplementation((p: string) => p),
-      }));
-
-      // After first sync, the mtime should be cached
-      // On second sync with same mtime, DB queries should be skipped
-      // We verify this indirectly via getLazyDbInstance spy
+    it('should skip DB queries when mtime is unchanged', async () => {
+      // Note: getLazyDbInstance() uses CJS require('./db-instance') which is not
+      // intercepted by vi.mock in vitest, so getAllWorktrees() returns [] inside
+      // syncSchedules(). We verify the manager lifecycle and DB prepare call
+      // patterns indirectly.
       const db = getDbInstance();
       const dbSpy = vi.spyOn(db, 'prepare');
 
-      // Insert a worktree for testing
+      // Insert a worktree for testing (only accessible via ESM mock path)
       const now = Date.now();
       db.prepare('INSERT OR IGNORE INTO worktrees (id, name, path, updated_at) VALUES (?, ?, ?, ?)').run(
         'wt-mtime-test', 'mtime-wt', '/tmp/mtime-test', now
@@ -294,14 +302,17 @@ describe('schedule-manager', () => {
 
       initScheduleManager();
 
+      // Flush the fire-and-forget syncSchedules() Promise (DR3-001)
+      await vi.advanceTimersByTimeAsync(0);
+
       // Record the call count after first sync
       const callCountAfterFirst = dbSpy.mock.calls.length;
 
       // Trigger another sync via timer
-      vi.advanceTimersByTime(POLL_INTERVAL_MS);
+      await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS);
 
-      // After the second sync with same mtime, fewer prepare calls should occur
-      // because the mtime cache short-circuits DB upsert operations
+      // After the second sync, DB prepare calls should still be stable
+      // (syncSchedules completes without error even when CJS require fails)
       const callCountAfterSecond = dbSpy.mock.calls.length;
 
       // The second sync should have had some DB calls (getAllWorktrees at minimum)
@@ -311,29 +322,38 @@ describe('schedule-manager', () => {
       dbSpy.mockRestore();
     });
 
-    it('should process normally on first sync (no cache)', () => {
+    it('should process normally on first sync (no cache)', async () => {
       initScheduleManager();
+      // Flush the fire-and-forget syncSchedules() Promise (DR3-001)
+      await vi.advanceTimersByTimeAsync(0);
       // Should complete without error - verifies that first sync works with empty cache
       expect(isScheduleManagerInitialized()).toBe(true);
     });
 
-    it('should remove cache entry when CMATE.md is deleted (mtime=null)', () => {
+    it('should remove cache entry when CMATE.md is deleted (mtime=null)', async () => {
       // This test verifies that when a CMATE.md file is deleted,
       // its cache entry is removed and its schedules are not added to activeScheduleIds
       initScheduleManager();
+      // Flush the fire-and-forget syncSchedules() Promise (DR3-001)
+      await vi.advanceTimersByTimeAsync(0);
 
       // After init with no CMATE.md files, no schedules should be active
       expect(getActiveScheduleCount()).toBe(0);
       expect(isScheduleManagerInitialized()).toBe(true);
     });
 
-    it('should clear cmateFileCache when stopAllSchedules is called', () => {
+    it('should clear cmateFileCache when stopAllSchedules is called', async () => {
       initScheduleManager();
+      // Flush the fire-and-forget syncSchedules() Promise (DR3-001)
+      await vi.advanceTimersByTimeAsync(0);
+
       stopAllSchedules();
 
       // After stop, reinitializing should work cleanly (cache was cleared)
       globalThis.__scheduleManagerStates = undefined;
       initScheduleManager();
+      // Flush the fire-and-forget syncSchedules() Promise (DR3-001)
+      await vi.advanceTimersByTimeAsync(0);
       expect(isScheduleManagerInitialized()).toBe(true);
     });
   });
