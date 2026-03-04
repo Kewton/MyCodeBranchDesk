@@ -9,9 +9,8 @@
 
 [English](./README.md) | [日本語](./docs/ja/README.md)
 
-<!-- TODO: Upload docs/images/demo-desktop.mp4 via GitHub UI and replace this URL -->
 <p align="center">
-  <video src="./docs/images/demo-desktop.mp4" width="600" controls></video>
+  <img src="./docs/images/demo-desktop.gif" width="600" alt="CommandMate Desktop Demo" />
 </p>
 
 > **Move issues forward, not terminal tabs.**
@@ -30,9 +29,8 @@ Instead of jumping straight into implementation, you define an issue, refine it 
 
 If your workflow is shifting from "writing code yourself" to "defining issues, reviewing direction, and accepting outcomes," CommandMate can become the center of your development workflow.
 
-<!-- TODO: Upload docs/images/demo-mobile.mp4 via GitHub UI and replace this URL -->
 <p align="center">
-  <video src="./docs/images/demo-mobile.mp4" width="300" controls></video>
+  <img src="./docs/images/demo-mobile.gif" width="300" alt="CommandMate Mobile Demo" />
 </p>
 
 Works on desktop and mobile — monitor and steer sessions from any browser, including your phone.
@@ -68,7 +66,6 @@ For details, see the [issues](https://github.com/Kewton/CommandMate/issues), [de
 
 | Feature | What it does | Why it matters |
 |---------|-------------|----------------|
-| **Issue-Driven Commands** | Slash commands that follow the define → plan → execute cycle | Development stays structured around issues, not ad-hoc prompts |
 | **Git Worktree Sessions** | One session per worktree, parallel execution | Multiple issues progress simultaneously without interference |
 | **Multi-Agent Support** | Choose Claude Code, Codex, Gemini, or local models per issue | Pick the right agent for each task |
 | **Auto Yes Mode** | Agent runs without stopping for confirmations | No babysitting — the agent keeps working while you're away |
@@ -94,9 +91,12 @@ For details, see the [issues](https://github.com/Kewton/CommandMate/issues), [de
 
 ## Screenshots
 
-<!-- TODO: Upload docs/images/demo-desktop.mp4 via GitHub UI and replace this URL -->
 <p align="center">
-  <video src="./docs/images/demo-desktop.mp4" width="600" controls></video>
+  <img src="./docs/images/demo-desktop.gif" width="600" alt="CommandMate Desktop Screenshot" />
+</p>
+
+<p align="center">
+  <img src="./docs/images/demo-mobile.gif" width="300" alt="CommandMate Mobile Screenshot" />
 </p>
 
 ---
