@@ -1,8 +1,8 @@
 /**
  * MARP Render API Route
  *
- * Renders MARP markdown content to HTML slides.
- * Currently returns markdown wrapped in basic HTML (MARP core integration deferred).
+ * Renders MARP markdown content to HTML slides using @marp-team/marp-core.
+ * Each slide is returned as a self-contained HTML string with embedded CSS.
  *
  * Issue #438: MARP slide preview in file panel
  *
@@ -14,7 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getWorktreeById } from '@/lib/db';
 import { getDbInstance } from '@/lib/db-instance';
-import { escapeHtml } from '@/lib/utils';
+import Marp from '@marp-team/marp-core';
 
 // ============================================================================
 // Constants
@@ -63,24 +63,31 @@ export async function POST(
       );
     }
 
-    // Simple HTML wrapper (MARP core integration deferred)
-    // Split on --- slide separators (common MARP pattern)
-    const slideTexts = markdownContent
-      .split(/^---$/m)
-      .filter((s) => s.trim().length > 0)
-      // Remove MARP frontmatter from first slide
-      .map((s, i) => {
-        if (i === 0) {
-          return s.replace(/^---\s*\nmarp:\s*true\s*\n/m, '').trim();
-        }
-        return s.trim();
-      })
-      .filter((s) => s.length > 0);
+    // Render with Marp Core
+    const marp = new Marp({
+      html: false,
+      math: true,
+    });
 
-    const slides = slideTexts.map(
-      (text) =>
-        `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:system-ui,sans-serif;padding:2rem;margin:0;}</style></head><body><pre style="white-space:pre-wrap;word-wrap:break-word;">${escapeHtml(text)}</pre></body></html>`,
+    const { html, css } = marp.render(markdownContent);
+
+    // Extract individual slide sections from the rendered HTML
+    // Marp renders each slide as a <section> element
+    const sectionRegex = /<section[^>]*>[\s\S]*?<\/section>/g;
+    const sections = html.match(sectionRegex) || [];
+
+    // Wrap each slide with full HTML document including Marp CSS
+    const slides = sections.map(
+      (section) =>
+        `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}</style><style>body{margin:0;overflow:hidden;}section{position:relative;width:100%;height:100vh;display:flex;flex-direction:column;justify-content:center;}</style></head><body>${section}</body></html>`,
     );
+
+    // Fallback: if no sections found, return the whole HTML as one slide
+    if (slides.length === 0 && html.trim().length > 0) {
+      slides.push(
+        `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${html}</body></html>`,
+      );
+    }
 
     return NextResponse.json({ slides });
   } catch {
