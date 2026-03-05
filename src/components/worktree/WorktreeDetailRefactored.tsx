@@ -38,6 +38,8 @@ import { SearchBar } from '@/components/worktree/SearchBar';
 import { useFileSearch } from '@/hooks/useFileSearch';
 import { LeftPaneTabSwitcher, type LeftPaneTab } from '@/components/worktree/LeftPaneTabSwitcher';
 import { FileViewer } from '@/components/worktree/FileViewer';
+import { FilePanelSplit } from '@/components/worktree/FilePanelSplit';
+import { useFileTabs } from '@/hooks/useFileTabs';
 import { EDITABLE_EXTENSIONS } from '@/config/editable-extensions';
 
 /**
@@ -76,7 +78,7 @@ import { AutoYesToggle, type AutoYesToggleParams } from '@/components/worktree/A
 import type { AutoYesStopReason } from '@/config/auto-yes-config';
 import { NotificationDot } from '@/components/common/NotificationDot';
 import { BranchMismatchAlert } from '@/components/worktree/BranchMismatchAlert';
-import type { Worktree, ChatMessage, PromptData, GitStatus } from '@/types/models';
+import type { Worktree, ChatMessage, PromptData, GitStatus, FileContent } from '@/types/models';
 import { getCliToolDisplayName, type CLIToolType } from '@/lib/cli-tools/types';
 import { DEFAULT_SELECTED_AGENTS } from '@/lib/selected-agents-validator';
 import { deriveCliStatus } from '@/types/sidebar';
@@ -992,7 +994,10 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
-  const [fileViewerPath, setFileViewerPath] = useState<string | null>(null);
+  // Issue #438: File tabs state (replaces fileViewerPath for desktop)
+  const fileTabs = useFileTabs();
+  // Mobile-only: file viewer path for modal display (desktop uses fileTabs)
+  const [mobileFileViewerPath, setMobileFileViewerPath] = useState<string | null>(null);
   const [editorFilePath, setEditorFilePath] = useState<string | null>(null);
   // Issue #104: Track editor maximized state to disable Modal close handlers
   const [isEditorMaximized, setIsEditorMaximized] = useState(false);
@@ -1185,19 +1190,30 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
     }
   }, [activeCliTab, actions, fetchMessages, fetchCurrentOutput]);
 
+  // Toast state for notifications (moved before event handlers that reference showToast)
+  const { toasts, showToast, removeToast } = useToast();
+
   // ========================================================================
   // Event Handlers
   // ========================================================================
 
-  /** Handle file path click in history pane - opens file viewer */
+  /** Handle file path click in history pane */
   const handleFilePathClick = useCallback((path: string) => {
-    setFileViewerPath(path);
-  }, []);
+    if (isMobile) {
+      setMobileFileViewerPath(path);
+    } else {
+      const result = fileTabs.openFile(path);
+      if (result === 'limit_reached') {
+        showToast('Maximum 5 file tabs. Close a tab first.', 'info');
+      }
+    }
+  }, [isMobile, fileTabs, showToast]);
 
   /**
    * Handle file select from FileTreeView
-   * Opens MarkdownEditor for .md files, FileViewer for others
-   * [Stage 3 SF-004] Separate editorFilePath state to avoid FileViewer conflict
+   * Opens MarkdownEditor for .md files, file tab panel (desktop) or modal (mobile) for others
+   * [Stage 3 SF-004] Separate editorFilePath state to avoid conflict
+   * Issue #438: Uses file tabs instead of modal for non-editable files on desktop
    */
   const handleFileSelect = useCallback((path: string) => {
     const extension = path.split('.').pop()?.toLowerCase();
@@ -1206,15 +1222,26 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
     if (EDITABLE_EXTENSIONS.includes(extWithDot)) {
       // Open in MarkdownEditor
       setEditorFilePath(path);
+    } else if (isMobile) {
+      // Mobile: open in modal
+      setMobileFileViewerPath(path);
     } else {
-      // Open in FileViewer
-      setFileViewerPath(path);
+      // Desktop: open in file tab panel
+      const result = fileTabs.openFile(path);
+      if (result === 'limit_reached') {
+        showToast('Maximum 5 file tabs. Close a tab first.', 'info');
+      }
     }
+  }, [isMobile, fileTabs, showToast]);
+
+  /** Handle closing mobile FileViewer modal */
+  const handleMobileFileViewerClose = useCallback(() => {
+    setMobileFileViewerPath(null);
   }, []);
 
-  /** Handle FileViewer close */
-  const handleFileViewerClose = useCallback(() => {
-    setFileViewerPath(null);
+  /** Handle opening markdown editor from file tab panel */
+  const handleEditorFileSelect = useCallback((path: string) => {
+    setEditorFilePath(path);
   }, []);
 
   /** Handle MarkdownEditor close */
@@ -1446,13 +1473,16 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
       if (!response.ok) {
         throw new Error('Failed to rename');
       }
-      // Renamed successfully - trigger FileTreeView refresh
+      // Renamed successfully - update file tab if the renamed file was open
+      const parentDir = path.includes('/') ? path.substring(0, path.lastIndexOf('/') + 1) : '';
+      fileTabs.onFileRenamed(path, `${parentDir}${newName}`);
+      // Trigger FileTreeView refresh
       setFileTreeRefresh(prev => prev + 1);
     } catch (err) {
       console.error('[WorktreeDetailRefactored] Failed to rename:', err);
       window.alert(tError('fileOps.failedToRename'));
     }
-  }, [worktreeId, tError]);
+  }, [worktreeId, fileTabs, tError]);
 
   /** Handle file/directory delete in FileTreeView */
   const handleDelete = useCallback(async (path: string) => {
@@ -1473,16 +1503,15 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
       if (editorFilePath === path || editorFilePath?.startsWith(`${path}/`)) {
         setEditorFilePath(null);
       }
+      // Issue #438: Close file tab if the deleted file was open
+      fileTabs.onFileDeleted(path);
       // Trigger FileTreeView refresh
       setFileTreeRefresh(prev => prev + 1);
     } catch (err) {
       console.error('[WorktreeDetailRefactored] Failed to delete:', err);
       window.alert(tError('fileOps.failedToDelete'));
     }
-  }, [worktreeId, editorFilePath, tCommon, tError]);
-
-  // Toast state for upload notifications
-  const { toasts, showToast, removeToast } = useToast();
+  }, [worktreeId, editorFilePath, fileTabs, tCommon, tError]);
 
   // Issue #314: Show stop reason toast when pending (deferred from fetchCurrentOutput)
   useEffect(() => {
@@ -1867,22 +1896,50 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
   const worktreeName = worktree?.name ?? DEFAULT_WORKTREE_NAME;
 
   // ========================================================================
+  // Issue #438: File panel loading callbacks (memoized for FilePanelSplit)
+  // ========================================================================
+
+  const handleLoadContent = useCallback((path: string, content: FileContent) => {
+    fileTabs.dispatch({ type: 'SET_CONTENT', path, content });
+  }, [fileTabs]);
+
+  const handleLoadError = useCallback((path: string, errorMsg: string) => {
+    fileTabs.dispatch({ type: 'SET_ERROR', path, error: errorMsg });
+  }, [fileTabs]);
+
+  const handleSetLoading = useCallback((path: string, isLoading: boolean) => {
+    fileTabs.dispatch({ type: 'SET_LOADING', path, loading: isLoading });
+  }, [fileTabs]);
+
+  // ========================================================================
   // Memoized Panes (Issue #411: avoid re-render on polling)
   // ========================================================================
 
-  /** Memoized right pane (terminal) to prevent re-render when left pane state changes */
+  /** Memoized right pane (terminal + file panel) to prevent re-render when left pane state changes */
   const rightPaneMemo = useMemo(
     () => (
-      <TerminalDisplay
-        output={state.terminal.output}
-        isActive={state.terminal.isActive}
-        isThinking={state.terminal.isThinking}
-        autoScroll={state.terminal.autoScroll}
-        onScrollChange={handleAutoScrollChange}
-        disableAutoFollow={disableAutoFollow}
+      <FilePanelSplit
+        terminal={
+          <TerminalDisplay
+            output={state.terminal.output}
+            isActive={state.terminal.isActive}
+            isThinking={state.terminal.isThinking}
+            autoScroll={state.terminal.autoScroll}
+            onScrollChange={handleAutoScrollChange}
+            disableAutoFollow={disableAutoFollow}
+          />
+        }
+        fileTabs={fileTabs.state}
+        worktreeId={worktreeId}
+        onCloseTab={fileTabs.closeTab}
+        onActivateTab={fileTabs.activateTab}
+        onLoadContent={handleLoadContent}
+        onLoadError={handleLoadError}
+        onSetLoading={handleSetLoading}
+        onEditMarkdown={handleEditorFileSelect}
       />
     ),
-    [state.terminal.output, state.terminal.isActive, state.terminal.isThinking, state.terminal.autoScroll, handleAutoScrollChange, disableAutoFollow]
+    [state.terminal.output, state.terminal.isActive, state.terminal.isThinking, state.terminal.autoScroll, handleAutoScrollChange, disableAutoFollow, fileTabs.state, fileTabs.closeTab, fileTabs.activateTab, worktreeId, handleLoadContent, handleLoadError, handleSetLoading, handleEditorFileSelect]
   );
 
   /**
@@ -2096,13 +2153,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
             onClose={handleInfoModalClose}
             onWorktreeUpdate={setWorktree}
           />
-          {/* File Viewer Modal */}
-          <FileViewer
-            isOpen={fileViewerPath !== null}
-            onClose={handleFileViewerClose}
-            worktreeId={worktreeId}
-            filePath={fileViewerPath ?? ''}
-          />
+          {/* Issue #438: Desktop FileViewer modal replaced by FilePanelSplit in rightPaneMemo */}
           {/* Markdown Editor Modal - Issue #104: disableClose when editor is maximized */}
           {editorFilePath && (
             <Modal
@@ -2335,12 +2386,12 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
           />
         )}
 
-        {/* File Viewer Modal */}
+        {/* File Viewer Modal (Mobile only) */}
         <FileViewer
-          isOpen={fileViewerPath !== null}
-          onClose={handleFileViewerClose}
+          isOpen={mobileFileViewerPath !== null}
+          onClose={handleMobileFileViewerClose}
           worktreeId={worktreeId}
-          filePath={fileViewerPath ?? ''}
+          filePath={mobileFileViewerPath ?? ''}
         />
         {/* Markdown Editor Modal (Mobile) - Issue #104: disableClose when editor is maximized */}
         {editorFilePath && (
