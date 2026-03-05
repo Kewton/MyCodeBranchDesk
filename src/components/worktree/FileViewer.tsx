@@ -229,7 +229,7 @@ export const FileViewer = memo(function FileViewer({ isOpen, onClose, worktreeId
           </div>
           <iframe
             srcDoc={marpSlides[marpCurrentSlide]}
-            sandbox="allow-same-origin"
+            sandbox=""
             title={`${filePath} - Slide ${marpCurrentSlide + 1}`}
             className="w-full border-0"
             style={{ height: isFullscreen ? 'calc(100vh - 100px)' : '50vh' }}
@@ -250,7 +250,7 @@ export const FileViewer = memo(function FileViewer({ isOpen, onClose, worktreeId
             <code
               className={`language-${content.extension} hljs`}
               style={{ lineHeight: '1.5rem' }}
-              dangerouslySetInnerHTML={{ __html: hljs.highlightAuto(content.content).value }}
+              dangerouslySetInnerHTML={{ __html: (() => { try { return hljs.highlight(content.content, { language: content.extension, ignoreIllegals: true }).value; } catch { return hljs.highlightAuto(content.content).value; } })() }}
             />
           </pre>
         </div>

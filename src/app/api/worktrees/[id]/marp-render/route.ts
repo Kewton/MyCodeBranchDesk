@@ -45,8 +45,17 @@ export async function POST(
     }
 
     // Parse request body
-    const body = await request.json();
-    const { markdownContent } = body;
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid JSON body' },
+        { status: 400 },
+      );
+    }
+
+    const { markdownContent } = body as Record<string, unknown>;
 
     // Validate markdownContent
     if (typeof markdownContent !== 'string') {

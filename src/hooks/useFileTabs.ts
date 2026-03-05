@@ -290,9 +290,15 @@ function writePersistedTabs(worktreeId: string, state: FileTabsState): void {
 export function useFileTabs(worktreeId: string): UseFileTabsReturn {
   const [state, dispatch] = useReducer(fileTabsReducer, initialState);
   const restoredRef = useRef(false);
+  const lastWorktreeIdRef = useRef(worktreeId);
 
-  // Restore tabs from localStorage on mount
+  // Restore tabs from localStorage on mount or when worktreeId changes
   useEffect(() => {
+    // Reset restoration flag when worktreeId changes
+    if (lastWorktreeIdRef.current !== worktreeId) {
+      lastWorktreeIdRef.current = worktreeId;
+      restoredRef.current = false;
+    }
     if (restoredRef.current) return;
     restoredRef.current = true;
     const persisted = readPersistedTabs(worktreeId);
@@ -307,22 +313,26 @@ export function useFileTabs(worktreeId: string): UseFileTabsReturn {
     writePersistedTabs(worktreeId, state);
   }, [worktreeId, state]);
 
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
   const openFile = useCallback(
     (path: string): 'opened' | 'activated' | 'limit_reached' => {
+      const currentTabs = stateRef.current.tabs;
       // Check if already open
-      const existingIndex = state.tabs.findIndex((t) => t.path === path);
+      const existingIndex = currentTabs.findIndex((t) => t.path === path);
       if (existingIndex !== -1) {
         dispatch({ type: 'OPEN_FILE', path });
         return 'activated';
       }
       // Check limit
-      if (state.tabs.length >= MAX_FILE_TABS) {
+      if (currentTabs.length >= MAX_FILE_TABS) {
         return 'limit_reached';
       }
       dispatch({ type: 'OPEN_FILE', path });
       return 'opened';
     },
-    [state.tabs],
+    [],
   );
 
   const closeTab = useCallback((path: string) => {

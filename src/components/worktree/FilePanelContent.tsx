@@ -109,12 +109,23 @@ function ErrorDisplay({ error }: { error: string }) {
 function FileToolbar({ filePath, isMaximized, onToggleMaximize, copyableContent }: { filePath: string; isMaximized: boolean; onToggleMaximize: () => void; copyableContent?: string }) {
   const [pathCopied, setPathCopied] = useState(false);
   const [contentCopied, setContentCopied] = useState(false);
+  const pathTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const contentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (pathTimerRef.current) clearTimeout(pathTimerRef.current);
+      if (contentTimerRef.current) clearTimeout(contentTimerRef.current);
+    };
+  }, []);
 
   const handleCopyPath = async () => {
     try {
       await copyToClipboard(filePath);
       setPathCopied(true);
-      setTimeout(() => setPathCopied(false), 2000);
+      if (pathTimerRef.current) clearTimeout(pathTimerRef.current);
+      pathTimerRef.current = setTimeout(() => setPathCopied(false), 2000);
     } catch {
       // Silent failure
     }
@@ -125,7 +136,8 @@ function FileToolbar({ filePath, isMaximized, onToggleMaximize, copyableContent 
     try {
       await copyToClipboard(copyableContent);
       setContentCopied(true);
-      setTimeout(() => setContentCopied(false), 2000);
+      if (contentTimerRef.current) clearTimeout(contentTimerRef.current);
+      contentTimerRef.current = setTimeout(() => setContentCopied(false), 2000);
     } catch {
       // Silent failure
     }
@@ -173,7 +185,13 @@ function FileToolbar({ filePath, isMaximized, onToggleMaximize, copyableContent 
 
 /** Syntax-highlighted code viewer with line numbers */
 function CodeViewer({ content, extension }: { content: string; extension: string }) {
-  const highlighted = hljs.highlightAuto(content);
+  let highlighted: { value: string };
+  try {
+    highlighted = hljs.highlight(content, { language: extension, ignoreIllegals: true });
+  } catch {
+    // Unknown language — fall back to auto-detection
+    highlighted = hljs.highlightAuto(content);
+  }
   const lineCount = content.split('\n').length;
   return (
     <div className="overflow-auto h-full">
@@ -244,7 +262,7 @@ function MarpPreview({
       <div className="flex-1 overflow-hidden">
         <iframe
           srcDoc={slides[currentSlide]}
-          sandbox="allow-same-origin"
+          sandbox=""
           title={`${fileName} - Slide ${currentSlide + 1}`}
           className="w-full h-full border-0"
         />
