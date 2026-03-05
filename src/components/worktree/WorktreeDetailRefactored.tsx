@@ -2114,8 +2114,8 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
             <WorktreeDesktopLayout
               leftPane={leftPaneMemo}
               rightPane={rightPaneMemo}
-              initialLeftWidth={40}
-              minLeftWidth={20}
+              initialLeftWidth={20}
+              minLeftWidth={15}
               maxLeftWidth={60}
             />
           </div>
