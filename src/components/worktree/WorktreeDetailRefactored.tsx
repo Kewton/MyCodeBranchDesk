@@ -2048,7 +2048,16 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
           />
           {/* Issue #4/#368: CLI Tool Tab Switcher (dynamic from selectedAgents) */}
           <div className="px-4 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-            <nav className="flex gap-4" aria-label="CLI Tool Selection">
+            <nav className="flex items-center gap-4" aria-label="CLI Tool Selection">
+              <AutoYesToggle
+                enabled={autoYesEnabled}
+                expiresAt={autoYesExpiresAt}
+                onToggle={handleAutoYesToggle}
+                lastAutoResponse={lastAutoResponse}
+                cliToolName={activeCliTab}
+                inline
+              />
+              <div className="w-px h-5 bg-gray-300 dark:bg-gray-600" />
               {selectedAgents.map((tool) => {
                 const toolStatus = deriveCliStatus(worktree?.sessionStatusByCli?.[tool]);
                 const statusConfig = SIDEBAR_STATUS_CONFIG[toolStatus];
@@ -2118,14 +2127,6 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
               isSessionRunning={state.terminal.isActive}
             />
           </div>
-          {/* Auto Yes Toggle */}
-          <AutoYesToggle
-            enabled={autoYesEnabled}
-            expiresAt={autoYesExpiresAt}
-            onToggle={handleAutoYesToggle}
-            lastAutoResponse={lastAutoResponse}
-            cliToolName={activeCliTab}
-          />
           {/* Prompt Panel - fixed overlay at bottom */}
           {state.prompt.visible && !autoYesEnabled && (
             <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-2xl px-4">
