@@ -10,7 +10,7 @@
 
 'use client';
 
-import React, { useEffect, useRef, memo, useState, useCallback } from 'react';
+import React, { useEffect, useRef, memo, useState, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { Maximize2, Minimize2, ClipboardCopy, Check, Copy } from 'lucide-react';
 import type { FileTab } from '@/hooks/useFileTabs';
@@ -186,20 +186,25 @@ function FileToolbar({ filePath, isMaximized, onToggleMaximize, copyableContent 
 
 /** Syntax-highlighted code viewer with line numbers */
 function CodeViewer({ content, extension }: { content: string; extension: string }) {
-  let highlighted: { value: string };
-  try {
-    highlighted = hljs.highlight(content, { language: extension, ignoreIllegals: true });
-  } catch {
-    // Unknown language — fall back to auto-detection
-    highlighted = hljs.highlightAuto(content);
-  }
-  const lineCount = content.split('\n').length;
+  const highlightedHtml = useMemo(() => {
+    try {
+      return hljs.highlight(content, { language: extension, ignoreIllegals: true }).value;
+    } catch {
+      // Unknown language — fall back to auto-detection
+      return hljs.highlightAuto(content).value;
+    }
+  }, [content, extension]);
+  const lineNumbers = useMemo(
+    () => Array.from({ length: content.split('\n').length }, (_, i) => i + 1),
+    [content],
+  );
+
   return (
     <div className="overflow-auto h-full">
       <div className="flex text-sm">
         <div className="flex-shrink-0 py-4 pl-3 pr-2 text-right select-none text-gray-400 dark:text-gray-600 font-mono border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 sticky left-0">
-          {Array.from({ length: lineCount }, (_, i) => (
-            <div key={i + 1} className="leading-[1.5rem]">{i + 1}</div>
+          {lineNumbers.map((lineNumber) => (
+            <div key={lineNumber} className="leading-[1.5rem]">{lineNumber}</div>
           ))}
         </div>
         <pre className="flex-1 p-4 overflow-x-auto text-gray-900 dark:text-gray-100 m-0">
@@ -207,7 +212,7 @@ function CodeViewer({ content, extension }: { content: string; extension: string
             data-testid="file-content-code"
             className={`language-${extension} hljs`}
             style={{ lineHeight: '1.5rem' }}
-            dangerouslySetInnerHTML={{ __html: highlighted.value }}
+            dangerouslySetInnerHTML={{ __html: highlightedHtml }}
           />
         </pre>
       </div>
