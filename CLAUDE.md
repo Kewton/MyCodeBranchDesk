@@ -28,6 +28,8 @@
 ```
 main (本番) ← PRマージのみ
   │
+develop (受け入れ・動作確認)
+  │
 feature/*, fix/*, hotfix/* (作業ブランチ)
 ```
 
@@ -45,9 +47,9 @@ feature/*, fix/*, hotfix/* (作業ブランチ)
 
 ### 通常フロー
 ```
-feature/* ──PR──> main
-fix/*     ──PR──> main
-hotfix/*  ──PR──> main
+feature/* ──PR──> develop ──PR──> main
+fix/*     ──PR──> develop ──PR──> main
+hotfix/*  ──PR──> main (緊急時のみ)
 ```
 
 ### PRルール
