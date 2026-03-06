@@ -822,9 +822,9 @@ interface MobileContentProps {
   /** [Issue #294] CMATE setup callback */
   onCmateSetup?: () => void;
   /** [Issue #368] Selected agents for Agent tab */
-  selectedAgents: [CLIToolType, CLIToolType];
+  selectedAgents: CLIToolType[];
   /** [Issue #368] Callback when selected agents change */
-  onSelectedAgentsChange: (agents: [CLIToolType, CLIToolType]) => void;
+  onSelectedAgentsChange: (agents: CLIToolType[]) => void;
   /** [Issue #368] Current vibe-local model selection */
   vibeLocalModel: string | null;
   /** [Issue #368] Callback when vibe-local model changes */
@@ -1008,7 +1008,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
   // Issue #314: Pending stop reason toast (deferred until showToast is available)
   const [stopReasonPending, setStopReasonPending] = useState(false);
   // Issue #368: Selected agents state (initialized from API, drives terminal header tabs)
-  const [selectedAgents, setSelectedAgents] = useState<[CLIToolType, CLIToolType]>(DEFAULT_SELECTED_AGENTS);
+  const [selectedAgents, setSelectedAgents] = useState<CLIToolType[]>(DEFAULT_SELECTED_AGENTS);
   // Ref to access latest selectedAgents inside fetchWorktree without adding to useCallback deps
   const selectedAgentsRef = useRef(selectedAgents);
   selectedAgentsRef.current = selectedAgents;
@@ -1162,7 +1162,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
   const disableAutoFollow = activeCliTab === 'opencode';
 
   /** Issue #368: Callback for AgentSettingsPane to update selectedAgents */
-  const handleSelectedAgentsChange = useCallback((agents: [CLIToolType, CLIToolType]) => {
+  const handleSelectedAgentsChange = useCallback((agents: CLIToolType[]) => {
     setSelectedAgents(agents);
   }, []);
 
@@ -2068,6 +2068,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
                 onVibeLocalModelChange={handleVibeLocalModelChange}
                 vibeLocalContextWindow={vibeLocalContextWindow}
                 onVibeLocalContextWindowChange={handleVibeLocalContextWindowChange}
+                maxAgents={4}
               />
             </ErrorBoundary>
           )}
