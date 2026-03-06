@@ -38,7 +38,7 @@ export const MIN_SELECTED_AGENTS = 2;
 export const MAX_SELECTED_AGENTS = 4;
 
 /** Default selected agents when DB value is missing or invalid */
-export const DEFAULT_SELECTED_AGENTS: CLIToolType[] = ['claude', 'codex'];
+export const DEFAULT_SELECTED_AGENTS: CLIToolType[] = ['claude', 'codex', 'gemini'];
 
 /**
  * Core validation function for CLI tool ID arrays (R1-001)
