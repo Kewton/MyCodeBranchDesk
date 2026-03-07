@@ -327,38 +327,35 @@ export const FileViewer = memo(function FileViewer({ isOpen, onClose, worktreeId
     const matchSet = new Set(searchMatches);
     const currentMatchLine = searchMatches.length > 0 ? searchMatches[searchCurrentIdx] : -1;
 
+    const highlightedLines = codeViewData.highlightedHtml.split('\n');
+
     return (
       <div ref={codeContainerRef}>
-        <div className="flex text-sm">
-          <div className="flex-shrink-0 py-4 pl-3 pr-2 text-right select-none text-gray-400 dark:text-gray-600 font-mono border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 sticky left-0">
-            {codeViewData.lineNumbers.map((lineNumber) => (
-              <div
-                key={lineNumber}
-                data-line={lineNumber}
-                className={`leading-[1.5rem] ${lineNumber === currentMatchLine ? 'bg-orange-400/30 text-orange-300' : matchSet.has(lineNumber) ? 'bg-yellow-400/20 text-yellow-300' : ''}`}
-              >
-                {lineNumber}
-              </div>
-            ))}
-          </div>
-          <pre className="flex-1 p-4 overflow-x-auto text-gray-900 dark:text-gray-100 m-0">
-            {content.content.split('\n').map((line, idx) => {
-              const lineNum = idx + 1;
-              const isCurrent = lineNum === currentMatchLine;
-              const isMatch = matchSet.has(lineNum);
+        <table className="text-sm w-full border-collapse">
+          <tbody>
+            {codeViewData.lineNumbers.map((lineNumber) => {
+              const idx = lineNumber - 1;
+              const isCurrent = lineNumber === currentMatchLine;
+              const isMatch = matchSet.has(lineNumber);
+              const rowBg = isCurrent ? 'bg-orange-400/30' : isMatch ? 'bg-yellow-400/15' : '';
               return (
-                <div
-                  key={lineNum}
-                  data-line={lineNum}
-                  className={`leading-[1.5rem] ${isCurrent ? 'bg-orange-400/30' : isMatch ? 'bg-yellow-400/15' : ''}`}
-                  dangerouslySetInnerHTML={{
-                    __html: codeViewData.highlightedHtml.split('\n')[idx] ?? ''
-                  }}
-                />
+                <tr key={lineNumber} data-line={lineNumber} className={rowBg}>
+                  <td className={`pl-3 pr-2 text-right select-none font-mono border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 sticky left-0 align-top whitespace-nowrap ${isCurrent ? 'text-orange-300' : isMatch ? 'text-yellow-300' : 'text-gray-400 dark:text-gray-600'}`}>
+                    {lineNumber}
+                  </td>
+                  <td className="px-4 text-gray-900 dark:text-gray-100 align-top">
+                    <pre className="m-0 whitespace-pre-wrap break-words font-mono">
+                      <code
+                        className="hljs"
+                        dangerouslySetInnerHTML={{ __html: highlightedLines[idx] ?? '' }}
+                      />
+                    </pre>
+                  </td>
+                </tr>
               );
             })}
-          </pre>
-        </div>
+          </tbody>
+        </table>
       </div>
     );
   };
