@@ -111,6 +111,13 @@ export const TerminalDisplay = memo(function TerminalDisplay({
     [openSearch]
   );
 
+  // [Issue #47] Listen for custom event from terminal header search button
+  useEffect(() => {
+    const handler = () => openSearch();
+    window.addEventListener('terminal-search-open', handler);
+    return () => window.removeEventListener('terminal-search-open', handler);
+  }, [openSearch]);
+
   // Sanitize the output for safe rendering
   const sanitizedOutput = sanitizeTerminalOutput(output || '');
 
@@ -194,18 +201,6 @@ export const TerminalDisplay = memo(function TerminalDisplay({
             isAtMaxMatches={isAtMaxMatches}
           />
         </div>
-      )}
-
-      {/* [Issue #47] Mobile search button */}
-      {showSearchButton && !isSearchOpen && (
-        <button
-          onClick={openSearch}
-          aria-label="ターミナル内を検索"
-          data-testid="terminal-search-button"
-          className="absolute top-2 right-2 z-10 text-gray-400 hover:text-white p-1"
-        >
-          🔍
-        </button>
       )}
 
       <div

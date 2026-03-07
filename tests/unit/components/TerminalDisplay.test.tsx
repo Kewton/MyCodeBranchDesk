@@ -298,19 +298,11 @@ describe('TerminalDisplay', () => {
       expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
     });
 
-    it('should show search button when showSearchButton=true', () => {
-      render(<TerminalDisplay output="Test" isActive={false} showSearchButton={true} />);
-      expect(screen.getByTestId('terminal-search-button')).toBeInTheDocument();
-    });
-
-    it('should not show search button when showSearchButton=false', () => {
-      render(<TerminalDisplay output="Test" isActive={false} showSearchButton={false} />);
-      expect(screen.queryByTestId('terminal-search-button')).not.toBeInTheDocument();
-    });
-
-    it('should open search bar when search button is clicked', () => {
-      render(<TerminalDisplay output="Test" isActive={false} showSearchButton={true} />);
-      fireEvent.click(screen.getByTestId('terminal-search-button'));
+    it('should open search bar when terminal-search-open custom event is dispatched', () => {
+      render(<TerminalDisplay output="Test" isActive={false} />);
+      act(() => {
+        window.dispatchEvent(new CustomEvent('terminal-search-open'));
+      });
       expect(screen.getByRole('textbox')).toBeInTheDocument();
     });
   });

@@ -93,8 +93,12 @@ export function TerminalSearchBar({
         onChange={handleChange}
         onKeyDown={handleKeyDown}
         placeholder="検索..."
-        className="bg-transparent text-gray-200 text-sm outline-none w-40 placeholder-gray-500"
+        className="bg-transparent text-gray-200 text-sm outline-none w-32 sm:w-40 placeholder-gray-500"
         aria-label="検索キーワード"
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
       />
 
       {/* Match count - aria-live for screen reader updates */}
@@ -112,7 +116,7 @@ export function TerminalSearchBar({
         onClick={onPrev}
         disabled={matchCount === 0}
         aria-label="前の結果"
-        className="text-gray-300 hover:text-white disabled:text-gray-600 px-1 text-sm"
+        className="text-gray-300 hover:text-white disabled:text-gray-600 min-w-[36px] min-h-[36px] flex items-center justify-center text-base"
       >
         ▲
       </button>
@@ -122,7 +126,7 @@ export function TerminalSearchBar({
         onClick={onNext}
         disabled={matchCount === 0}
         aria-label="次の結果"
-        className="text-gray-300 hover:text-white disabled:text-gray-600 px-1 text-sm"
+        className="text-gray-300 hover:text-white disabled:text-gray-600 min-w-[36px] min-h-[36px] flex items-center justify-center text-base"
       >
         ▼
       </button>
@@ -131,7 +135,7 @@ export function TerminalSearchBar({
       <button
         onClick={onClose}
         aria-label="検索を閉じる"
-        className="text-gray-400 hover:text-white px-1 text-sm ml-1"
+        className="text-gray-400 hover:text-white min-w-[36px] min-h-[36px] flex items-center justify-center text-base ml-1"
       >
         ✕
       </button>
