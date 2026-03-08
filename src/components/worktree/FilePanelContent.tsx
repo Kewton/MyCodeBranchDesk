@@ -197,7 +197,7 @@ function FileToolbar({ filePath, isMaximized, onToggleMaximize, copyableContent,
 }
 
 /** Syntax-highlighted code viewer with line numbers and search support */
-function CodeViewer({ content, extension, searchQuery, searchMatches, searchCurrentIdx }: { content: string; extension: string; searchQuery?: string; searchMatches?: number[]; searchCurrentIdx?: number }) {
+function CodeViewer({ content, extension, searchMatches, searchCurrentIdx }: { content: string; extension: string; searchMatches?: number[]; searchCurrentIdx?: number }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const highlightedHtml = useMemo(() => {
     try {
@@ -495,7 +495,6 @@ function MarkdownWithSearch({ tab, content, worktreeId, isMaximized, onToggleMax
           <CodeViewer
             content={content.content}
             extension="md"
-            searchQuery={searchQuery}
             searchMatches={searchMatches}
             searchCurrentIdx={searchCurrentIdx}
           />
@@ -594,7 +593,6 @@ function CodeViewerWithSearch({ tab, content, isMaximized, onToggleMaximize }: {
         <CodeViewer
           content={content.content}
           extension={content.extension}
-          searchQuery={searchOpen ? searchQuery : undefined}
           searchMatches={searchOpen ? searchMatches : undefined}
           searchCurrentIdx={searchOpen ? searchCurrentIdx : undefined}
         />
