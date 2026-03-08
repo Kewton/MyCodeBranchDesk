@@ -244,6 +244,7 @@ function CodeViewer({ content, extension, searchMatches, searchCurrentIdx }: { c
                   <pre className="m-0 whitespace-pre-wrap break-words font-mono" style={{ lineHeight: '1.5rem' }}>
                     <code
                       className="hljs"
+                      style={{ padding: 0, background: 'transparent' }}
                       dangerouslySetInnerHTML={{ __html: highlightedLines[idx] ?? '' }}
                     />
                   </pre>
