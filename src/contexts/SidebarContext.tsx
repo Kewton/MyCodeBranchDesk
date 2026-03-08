@@ -15,9 +15,11 @@ import React, {
   useReducer,
   useCallback,
   useEffect,
+  useRef,
+  useMemo,
   type ReactNode,
 } from 'react';
-import type { SortKey, SortDirection } from '@/lib/sidebar-utils';
+import type { SortKey, SortDirection, ViewMode } from '@/lib/sidebar-utils';
 
 // ============================================================================
 // Constants
@@ -35,6 +37,12 @@ export const DEFAULT_SORT_KEY: SortKey = 'updatedAt';
 /** Default sort direction */
 export const DEFAULT_SORT_DIRECTION: SortDirection = 'desc';
 
+/** LocalStorage key for view mode */
+export const SIDEBAR_VIEW_MODE_STORAGE_KEY = 'mcbd-sidebar-view-mode';
+
+/** Default view mode */
+export const DEFAULT_VIEW_MODE: ViewMode = 'grouped';
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -51,6 +59,8 @@ interface SidebarState {
   sortKey: SortKey;
   /** Current sort direction */
   sortDirection: SortDirection;
+  /** Current view mode */
+  viewMode: ViewMode;
 }
 
 /** Sidebar context value */
@@ -77,6 +87,10 @@ interface SidebarContextValue {
   setSortKey: (key: SortKey) => void;
   /** Set sort direction */
   setSortDirection: (direction: SortDirection) => void;
+  /** Current view mode */
+  viewMode: ViewMode;
+  /** Set view mode */
+  setViewMode: (viewMode: ViewMode) => void;
 }
 
 /** Sidebar provider props */
@@ -96,13 +110,62 @@ type SidebarAction =
   | { type: 'CLOSE_MOBILE_DRAWER' }
   | { type: 'SET_SORT_KEY'; sortKey: SortKey }
   | { type: 'SET_SORT_DIRECTION'; sortDirection: SortDirection }
-  | { type: 'LOAD_SORT_SETTINGS'; sortKey: SortKey; sortDirection: SortDirection };
+  | { type: 'LOAD_SORT_SETTINGS'; sortKey: SortKey; sortDirection: SortDirection }
+  | { type: 'SET_VIEW_MODE'; viewMode: ViewMode };
 
 // ============================================================================
 // Context
 // ============================================================================
 
 const SidebarContext = createContext<SidebarContextValue | null>(null);
+
+// ============================================================================
+// Hooks
+// ============================================================================
+
+/**
+ * Load a value from localStorage on mount, then persist whenever the value changes.
+ *
+ * @param storageKey - localStorage key
+ * @param value - Current value to persist
+ * @param serialize - Convert value to string for storage
+ * @param onLoad - Called once on mount with the stored string (if any)
+ */
+function useLocalStorageSync(
+  storageKey: string,
+  value: unknown,
+  serialize: () => string,
+  onLoad: (stored: string) => void,
+): void {
+  const isInitialMount = useRef(true);
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) onLoad(stored);
+    } catch {
+      // Ignore localStorage errors
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist to localStorage on change (skip initial mount to avoid overwriting)
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(storageKey, serialize());
+    } catch {
+      // Ignore localStorage errors
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+}
 
 // ============================================================================
 // Reducer
@@ -124,6 +187,8 @@ function sidebarReducer(state: SidebarState, action: SidebarAction): SidebarStat
       return { ...state, sortDirection: action.sortDirection };
     case 'LOAD_SORT_SETTINGS':
       return { ...state, sortKey: action.sortKey, sortDirection: action.sortDirection };
+    case 'SET_VIEW_MODE':
+      return { ...state, viewMode: action.viewMode };
     default:
       return state;
   }
@@ -158,45 +223,35 @@ export function SidebarProvider({
     isMobileDrawerOpen: false,
     sortKey: DEFAULT_SORT_KEY,
     sortDirection: DEFAULT_SORT_DIRECTION,
+    viewMode: DEFAULT_VIEW_MODE,
   });
 
-  // Load sort settings from localStorage on mount
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    try {
-      const stored = localStorage.getItem(SIDEBAR_SORT_STORAGE_KEY);
-      if (stored) {
+  // Sync sort settings with localStorage (load on mount, persist on change)
+  useLocalStorageSync(
+    SIDEBAR_SORT_STORAGE_KEY,
+    `${state.sortKey}:${state.sortDirection}`,
+    () => JSON.stringify({ sortKey: state.sortKey, sortDirection: state.sortDirection }),
+    (stored) => {
+      try {
         const { sortKey, sortDirection } = JSON.parse(stored);
         if (sortKey && sortDirection) {
-          dispatch({
-            type: 'LOAD_SORT_SETTINGS',
-            sortKey,
-            sortDirection,
-          });
+          dispatch({ type: 'LOAD_SORT_SETTINGS', sortKey, sortDirection });
         }
+      } catch { /* ignore parse errors */ }
+    },
+  );
+
+  // Sync viewMode with localStorage (load on mount, persist on change)
+  useLocalStorageSync(
+    SIDEBAR_VIEW_MODE_STORAGE_KEY,
+    state.viewMode,
+    () => state.viewMode,
+    (stored) => {
+      if (stored === 'grouped' || stored === 'flat') {
+        dispatch({ type: 'SET_VIEW_MODE', viewMode: stored });
       }
-    } catch {
-      // Ignore localStorage errors
-    }
-  }, []);
-
-  // Persist sort settings to localStorage
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    try {
-      localStorage.setItem(
-        SIDEBAR_SORT_STORAGE_KEY,
-        JSON.stringify({
-          sortKey: state.sortKey,
-          sortDirection: state.sortDirection,
-        })
-      );
-    } catch {
-      // Ignore localStorage errors
-    }
-  }, [state.sortKey, state.sortDirection]);
+    },
+  );
 
   const toggle = useCallback(() => {
     dispatch({ type: 'TOGGLE' });
@@ -222,7 +277,11 @@ export function SidebarProvider({
     dispatch({ type: 'SET_SORT_DIRECTION', sortDirection });
   }, []);
 
-  const value: SidebarContextValue = {
+  const setViewMode = useCallback((viewMode: ViewMode) => {
+    dispatch({ type: 'SET_VIEW_MODE', viewMode });
+  }, []);
+
+  const value: SidebarContextValue = useMemo(() => ({
     isOpen: state.isOpen,
     width: state.width,
     isMobileDrawerOpen: state.isMobileDrawerOpen,
@@ -234,7 +293,23 @@ export function SidebarProvider({
     closeMobileDrawer,
     setSortKey,
     setSortDirection,
-  };
+    viewMode: state.viewMode,
+    setViewMode,
+  }), [
+    state.isOpen,
+    state.width,
+    state.isMobileDrawerOpen,
+    state.sortKey,
+    state.sortDirection,
+    state.viewMode,
+    toggle,
+    setWidth,
+    openMobileDrawer,
+    closeMobileDrawer,
+    setSortKey,
+    setSortDirection,
+    setViewMode,
+  ]);
 
   return (
     <SidebarContext.Provider value={value}>
