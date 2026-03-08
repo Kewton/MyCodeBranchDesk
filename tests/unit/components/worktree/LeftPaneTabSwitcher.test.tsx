@@ -222,6 +222,16 @@ describe('LeftPaneTabSwitcher', () => {
     });
   });
 
+  describe('Tab count', () => {
+    it('should render 3 tabs (history, files, cmate) without standalone git tab', () => {
+      const onTabChange = vi.fn();
+      render(<LeftPaneTabSwitcher activeTab="history" onTabChange={onTabChange} />);
+
+      const tabs = screen.getAllByRole('tab');
+      expect(tabs).toHaveLength(3);
+    });
+  });
+
   describe('Styling', () => {
     it('should have border styling', () => {
       const onTabChange = vi.fn();

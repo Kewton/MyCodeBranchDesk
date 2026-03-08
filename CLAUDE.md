@@ -176,8 +176,12 @@ tests/
 | `src/lib/slash-commands.ts` | スラッシュコマンドローダー |
 | `src/lib/url-path-encoder.ts` | ファイルパスURLエンコード |
 | `src/lib/file-search.ts` | ファイル内容検索 |
+| `src/lib/terminal-highlight.ts` | CSS Custom Highlight API ラッパー（Issue #47）XSS安全なターミナルハイライト |
 | `src/lib/file-tree.ts` | ディレクトリツリー構造生成 |
-| `src/lib/git-utils.ts` | Git情報取得 |
+| `src/lib/git-utils.ts` | Git情報取得・コミット履歴/diff取得（Issue #447） |
+| `src/types/git.ts` | Git関連型定義（CommitInfo, ChangedFile, GitLogResponse等）（Issue #447） |
+| `src/lib/sidebar-utils.ts` | サイドバーソート・グループ化ユーティリティ（SortKey, SortDirection, ViewMode型, BranchGroup型, sortBranches(), groupBranches()）（Issue #449） |
+| `src/contexts/SidebarContext.tsx` | サイドバー状態管理Context（isOpen, sortKey, viewMode, localStorageパターン）（Issue #449） |
 | `src/lib/utils.ts` | 汎用ユーティリティ |
 | `src/lib/date-utils.ts` | 相対時刻フォーマット |
 | `src/lib/clipboard-utils.ts` | クリップボードコピー |
@@ -191,18 +195,24 @@ tests/
 | `src/components/worktree/AgentSettingsPane.tsx` | エージェント選択UI |
 | `src/components/worktree/MessageInput.tsx` | メッセージ入力（下書き永続化対応） |
 | `src/components/worktree/MarkdownEditor.tsx` | マークダウンエディタ（auto-save対応） |
+| `src/components/worktree/TerminalSearchBar.tsx` | ターミナル内テキスト検索バーUI（Issue #47）件数表示・前/次ナビ・Esc閉じ |
 | `src/components/worktree/FilePanelSplit.tsx` | ターミナル+ファイルパネル分割 |
 | `src/components/worktree/FilePanelTabs.tsx` | ファイルタブバーUI |
 | `src/components/worktree/FilePanelContent.tsx` | ファイルコンテンツ表示 |
 | `src/components/worktree/FileViewer.tsx` | ファイルビューア |
 | `src/components/worktree/FileTreeView.tsx` | ファイルツリー表示 |
+| `src/components/worktree/GitPane.tsx` | Gitタブ（コミット履歴・diff表示）（Issue #447） |
 | `src/hooks/useFileTabs.ts` | タブ状態管理フック |
 | `src/hooks/useAutoYes.ts` | Auto-Yesクライアント側フック |
 | `src/hooks/useFileSearch.ts` | 検索状態管理フック |
+| `src/hooks/useTerminalSearch.ts` | ターミナル内テキスト検索フック（Issue #47）debounce 300ms、最大500件、最小2文字 |
 | `src/hooks/useFragmentLogin.ts` | フラグメントベース自動ログイン |
 | `src/app/api/worktrees/[id]/terminal/route.ts` | ターミナルコマンド送信API |
 | `src/app/api/worktrees/[id]/capture/route.ts` | ターミナル出力キャプチャAPI |
 | `src/app/api/worktrees/[id]/marp-render/route.ts` | MARPスライドレンダリングAPI |
+| `src/app/api/worktrees/[id]/git/log/route.ts` | Gitコミット履歴取得API（Issue #447） |
+| `src/app/api/worktrees/[id]/git/show/[commitHash]/route.ts` | Gitコミット変更ファイル一覧API（Issue #447） |
+| `src/app/api/worktrees/[id]/git/diff/route.ts` | Gitファイルdiff取得API（Issue #447） |
 
 ### CLIモジュール
 
