@@ -227,7 +227,7 @@ function CodeViewer({ content, extension, searchMatches, searchCurrentIdx }: { c
   }, [searchCurrentIdx, searchMatches]);
 
   return (
-    <div className="overflow-auto h-full" ref={containerRef}>
+    <div className="overflow-auto h-full" ref={containerRef} data-testid="file-content-code">
       <table className="text-sm w-full border-collapse">
         <tbody>
           {lineNumbers.map((lineNumber) => {
