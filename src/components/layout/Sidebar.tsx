@@ -105,11 +105,11 @@ export const Sidebar = memo(function Sidebar() {
   }, []);
 
   // Handle branch selection
-  const handleBranchClick = (branchId: string) => {
+  const handleBranchClick = useCallback((branchId: string) => {
     selectWorktree(branchId);
     router.push(`/worktrees/${branchId}`);
     closeMobileDrawer();
-  };
+  }, [selectWorktree, router, closeMobileDrawer]);
 
   // Check if list is empty (for both modes)
   const isEmpty = viewMode === 'flat'

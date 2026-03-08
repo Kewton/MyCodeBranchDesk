@@ -15,6 +15,7 @@ import React, {
   useReducer,
   useCallback,
   useEffect,
+  useRef,
   useMemo,
   type ReactNode,
 } from 'react';
@@ -119,6 +120,54 @@ type SidebarAction =
 const SidebarContext = createContext<SidebarContextValue | null>(null);
 
 // ============================================================================
+// Hooks
+// ============================================================================
+
+/**
+ * Load a value from localStorage on mount, then persist whenever the value changes.
+ *
+ * @param storageKey - localStorage key
+ * @param value - Current value to persist
+ * @param serialize - Convert value to string for storage
+ * @param onLoad - Called once on mount with the stored string (if any)
+ */
+function useLocalStorageSync(
+  storageKey: string,
+  value: unknown,
+  serialize: () => string,
+  onLoad: (stored: string) => void,
+): void {
+  const isInitialMount = useRef(true);
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) onLoad(stored);
+    } catch {
+      // Ignore localStorage errors
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist to localStorage on change (skip initial mount to avoid overwriting)
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(storageKey, serialize());
+    } catch {
+      // Ignore localStorage errors
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+}
+
+// ============================================================================
 // Reducer
 // ============================================================================
 
@@ -177,68 +226,32 @@ export function SidebarProvider({
     viewMode: DEFAULT_VIEW_MODE,
   });
 
-  // Load sort settings from localStorage on mount
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    try {
-      const stored = localStorage.getItem(SIDEBAR_SORT_STORAGE_KEY);
-      if (stored) {
+  // Sync sort settings with localStorage (load on mount, persist on change)
+  useLocalStorageSync(
+    SIDEBAR_SORT_STORAGE_KEY,
+    `${state.sortKey}:${state.sortDirection}`,
+    () => JSON.stringify({ sortKey: state.sortKey, sortDirection: state.sortDirection }),
+    (stored) => {
+      try {
         const { sortKey, sortDirection } = JSON.parse(stored);
         if (sortKey && sortDirection) {
-          dispatch({
-            type: 'LOAD_SORT_SETTINGS',
-            sortKey,
-            sortDirection,
-          });
+          dispatch({ type: 'LOAD_SORT_SETTINGS', sortKey, sortDirection });
         }
-      }
-    } catch {
-      // Ignore localStorage errors
-    }
-  }, []);
+      } catch { /* ignore parse errors */ }
+    },
+  );
 
-  // Persist sort settings to localStorage
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    try {
-      localStorage.setItem(
-        SIDEBAR_SORT_STORAGE_KEY,
-        JSON.stringify({
-          sortKey: state.sortKey,
-          sortDirection: state.sortDirection,
-        })
-      );
-    } catch {
-      // Ignore localStorage errors
-    }
-  }, [state.sortKey, state.sortDirection]);
-
-  // Load viewMode from localStorage on mount
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    try {
-      const stored = localStorage.getItem(SIDEBAR_VIEW_MODE_STORAGE_KEY);
+  // Sync viewMode with localStorage (load on mount, persist on change)
+  useLocalStorageSync(
+    SIDEBAR_VIEW_MODE_STORAGE_KEY,
+    state.viewMode,
+    () => state.viewMode,
+    (stored) => {
       if (stored === 'grouped' || stored === 'flat') {
         dispatch({ type: 'SET_VIEW_MODE', viewMode: stored });
       }
-    } catch {
-      // Ignore localStorage errors
-    }
-  }, []);
-
-  // Persist viewMode to localStorage
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    try {
-      localStorage.setItem(SIDEBAR_VIEW_MODE_STORAGE_KEY, state.viewMode);
-    } catch {
-      // Ignore localStorage errors
-    }
-  }, [state.viewMode]);
+    },
+  );
 
   const toggle = useCallback(() => {
     dispatch({ type: 'TOGGLE' });
