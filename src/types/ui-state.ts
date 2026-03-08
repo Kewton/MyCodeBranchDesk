@@ -62,6 +62,11 @@ export type MobileActivePane = 'history' | 'terminal' | 'files' | 'memo' | 'info
 export type LeftPaneTab = 'history' | 'files' | 'memo';
 
 /**
+ * Sub-tab type within the History tab (Issue #447)
+ */
+export type HistorySubTab = 'message' | 'git';
+
+/**
  * Layout State
  * Manages responsive layout settings
  */
