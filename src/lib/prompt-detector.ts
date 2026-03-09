@@ -737,20 +737,28 @@ function detectMultipleChoicePrompt(output: string, options?: DetectPromptOption
     const defaultMatch = line.match(DEFAULT_OPTION_PATTERN);
     if (defaultMatch) {
       const number = parseInt(defaultMatch[1], 10);
-      const label = defaultMatch[2].trim();
-      collectedOptions.unshift({ number, label, isDefault: true });
-      continuationLineCount = 0;
-      continue;
+      if (number <= 20) {
+        const label = defaultMatch[2].trim();
+        collectedOptions.unshift({ number, label, isDefault: true });
+        continuationLineCount = 0;
+        continue;
+      }
     }
 
     // Try NORMAL_OPTION_PATTERN (no ❯ indicator)
     const normalMatch = line.match(NORMAL_OPTION_PATTERN);
     if (normalMatch) {
       const number = parseInt(normalMatch[1], 10);
-      const label = normalMatch[2].trim();
-      collectedOptions.unshift({ number, label, isDefault: false });
-      continuationLineCount = 0;
-      continue;
+      // Skip unreasonably large option numbers (e.g., "[… 373 lines]" from Codex
+      // collapsed output matches as option 373). CLI prompts never exceed 20 options.
+      if (number > 20) {
+        // Treat as non-option line
+      } else {
+        const label = normalMatch[2].trim();
+        collectedOptions.unshift({ number, label, isDefault: false });
+        continuationLineCount = 0;
+        continue;
+      }
     }
 
     // [Issue #287 Bug3] User input prompt barrier:
