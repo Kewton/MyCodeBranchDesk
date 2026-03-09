@@ -111,7 +111,10 @@ export class GeminiTool extends BaseCLITool {
   /**
    * Handle Gemini "Do you trust this folder?" dialog
    * On first run in a new directory, Gemini shows a trust confirmation.
-   * Auto-selects "1. Trust folder" to allow execution.
+   * Option "1. Trust folder" is pre-selected (marked with a bullet indicator);
+   * this method sends Enter to confirm the pre-selected option.
+   * Polls up to TRUST_DIALOG_MAX_ATTEMPTS times, exiting early if the
+   * interactive prompt appears (no dialog needed).
    */
   private async handleTrustDialog(sessionName: string): Promise<void> {
     for (let i = 0; i < TRUST_DIALOG_MAX_ATTEMPTS; i++) {
