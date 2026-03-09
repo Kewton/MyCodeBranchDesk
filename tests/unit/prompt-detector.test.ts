@@ -546,9 +546,18 @@ Are you sure you want to continue? (yes/no)
       expect(result.isPrompt).toBe(false);
     });
 
-    it('should NOT detect non-consecutive numbered options (Test #3)', () => {
-      // Layer 3 protection: consecutive number validation
+    it('should detect options with single gap due to rendering artifact (Test #3)', () => {
+      // Layer 3 relaxation: allow at most 1 gap of 1 for tmux rendering artifacts
       const output = '❯ 1. Option A\n  3. Option B';
+      const result = detectPrompt(output);
+
+      expect(result.isPrompt).toBe(true);
+      expect(result.promptData?.type).toBe('multiple_choice');
+    });
+
+    it('should NOT detect options with multiple gaps (e.g. [1,3,5]) (Test #3b)', () => {
+      // Layer 3 protection: more than 1 gap is still rejected
+      const output = '❯ 1. Option A\n  3. Option C\n  5. Option E';
       const result = detectPrompt(output);
 
       expect(result.isPrompt).toBe(false);
@@ -597,11 +606,19 @@ Are you sure you want to continue? (yes/no)
       expect(result.isPrompt).toBe(false);
     });
 
-    it('Layer 3: cursor present but non-consecutive numbers should not be detected (Test #3)', () => {
+    it('Layer 3: single gap allowed but multiple gaps rejected (Test #3)', () => {
+      // [1, 3, 5] has 2 gaps → rejected
       const output = '❯ 1. Option A\n  3. Option C\n  5. Option E';
       const result = detectPrompt(output);
 
       expect(result.isPrompt).toBe(false);
+    });
+
+    it('Layer 3: single gap [1, 3] should be allowed for rendering artifact tolerance', () => {
+      const output = '❯ 1. Option A\n  3. Option C';
+      const result = detectPrompt(output);
+
+      expect(result.isPrompt).toBe(true);
     });
 
     it('Layer 4: cursor present, consecutive but only 1 option should not be detected (Test #4)', () => {
@@ -909,11 +926,25 @@ Are you sure you want to continue? (yes/no)
     });
 
     describe('requireDefaultIndicator: false - defense layers', () => {
-      it('should still reject non-consecutive numbers (Layer 3 maintained)', () => {
+      it('should allow single gap [1, 3] for rendering artifact tolerance (Layer 3 relaxed)', () => {
         const output = [
           'Select one:',
           '  1. Option A',
           '  3. Option C',
+        ].join('\n');
+
+        const options: DetectPromptOptions = { requireDefaultIndicator: false };
+        const result = detectPrompt(output, options);
+
+        expect(result.isPrompt).toBe(true);
+      });
+
+      it('should still reject multiple gaps [1, 3, 5] (Layer 3 maintained)', () => {
+        const output = [
+          'Select one:',
+          '  1. Option A',
+          '  3. Option C',
+          '  5. Option E',
         ].join('\n');
 
         const options: DetectPromptOptions = { requireDefaultIndicator: false };
@@ -2485,6 +2516,53 @@ Are you sure you want to continue? (yes/no)
       if (isMultipleChoicePrompt(result.promptData)) {
         expect(result.promptData.options).toHaveLength(2);
         expect(result.promptData.options[0].isDefault).toBe(true);
+      } else {
+        expect.fail('Expected multiple_choice prompt');
+      }
+    });
+
+    it('should detect with garbage prefix before option number in NORMAL lines', () => {
+      // "Es2" from "Esc to cancel" overlapping with option 2 line
+      const output = [
+        ' Do you want to proceed?',
+        ' \u276F 1  Yes',
+        ' Es2 tYes,nand don\'t askaagain\u00B7for:lgh api:*plain',
+        '   3. No',
+        '',
+        ' Esc to cancel \u00B7 Tab to amend \u00B7 ctrl+e to explain',
+      ].join('\n');
+
+      const options: DetectPromptOptions = { requireDefaultIndicator: false };
+      const result = detectPrompt(output, options);
+
+      expect(result.isPrompt).toBe(true);
+      if (isMultipleChoicePrompt(result.promptData)) {
+        expect(result.promptData.options).toHaveLength(3);
+        expect(result.promptData.options[0].number).toBe(1);
+        expect(result.promptData.options[1].number).toBe(2);
+        expect(result.promptData.options[2].number).toBe(3);
+      } else {
+        expect.fail('Expected multiple_choice prompt');
+      }
+    });
+
+    it('should detect with gap when garbled option is completely unparseable', () => {
+      // Option 2 is so garbled that neither pattern matches → [1, 3] with gap
+      const output = [
+        ' Do you want to proceed?',
+        ' \u276F 1  Yes',
+        '   some completely garbled line without any number',
+        '   3. No',
+      ].join('\n');
+
+      const options: DetectPromptOptions = { requireDefaultIndicator: false };
+      const result = detectPrompt(output, options);
+
+      expect(result.isPrompt).toBe(true);
+      if (isMultipleChoicePrompt(result.promptData)) {
+        expect(result.promptData.options).toHaveLength(2);
+        expect(result.promptData.options[0].number).toBe(1);
+        expect(result.promptData.options[1].number).toBe(3);
       } else {
         expect.fail('Expected multiple_choice prompt');
       }
