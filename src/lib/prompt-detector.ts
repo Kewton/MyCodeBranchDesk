@@ -273,8 +273,16 @@ const TEXT_INPUT_PATTERNS: RegExp[] = [
  * Claude CLI uses ❯, Gemini CLI uses ●, Codex CLI uses › (Issue #372).
  * Used in Pass 1 (existence check) and Pass 2 (option collection) of the 2-pass detection.
  * Anchored at both ends -- ReDoS safe (S4-001).
+ *
+ * Uses [^\d]* between indicator and number to tolerate tmux capture-pane
+ * rendering artifacts where garbage characters appear between ❯ and the
+ * option number (e.g. "❯s1." instead of "❯ 1."). [^\d]* before (\d+) is
+ * ReDoS safe because [^\d] cannot match digits, eliminating backtrack ambiguity.
+ *
+ * Uses (?:\.|\s{2,}) after the number to handle missing periods (same as
+ * NORMAL_OPTION_PATTERN artifact tolerance).
  */
-const DEFAULT_OPTION_PATTERN = /^\s*[\u276F\u25CF\u203A]\s*(\d+)\.\s*(.+)$/;
+const DEFAULT_OPTION_PATTERN = /^\s*[\u276F\u25CF\u203A][^\d]*(\d+)(?:\.|\s{2,})\s*(.+)$/;
 
 /**
  * Pattern for normal option lines (no ❯ indicator, just leading whitespace + number).

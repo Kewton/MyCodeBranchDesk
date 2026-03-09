@@ -2442,5 +2442,52 @@ Are you sure you want to continue? (yes/no)
         expect.fail('Expected multiple_choice prompt');
       }
     });
+
+    it('should detect when garbage chars appear between ❯ and option number', () => {
+      // Actual tmux capture-pane output: "❯s1." instead of "❯ 1."
+      // Claude CLI redraws the interactive menu, and capture-pane picks up
+      // overlapping characters between the indicator and the number.
+      const output = [
+        ' Do you want to proceed?',
+        ' \u276Fs1. Yesancel \u00B7 Tab to amend \u00B7 ctrl+e to explain',
+        '   2. Yes, and don\'t ask again for: gh api:*',
+        '   3. No',
+        '',
+        ' Esc to cancel \u00B7 Tab to amend \u00B7 ctrl+e to explain',
+      ].join('\n');
+
+      const options: DetectPromptOptions = { requireDefaultIndicator: false };
+      const result = detectPrompt(output, options);
+
+      expect(result.isPrompt).toBe(true);
+      if (isMultipleChoicePrompt(result.promptData)) {
+        expect(result.promptData.options).toHaveLength(3);
+        expect(result.promptData.options[0].number).toBe(1);
+        expect(result.promptData.options[0].isDefault).toBe(true);
+        expect(result.promptData.options[1].number).toBe(2);
+        expect(result.promptData.options[2].number).toBe(3);
+      } else {
+        expect.fail('Expected multiple_choice prompt');
+      }
+    });
+
+    it('should detect when garbage chars appear between ❯ and number with requireDefault=true', () => {
+      // Same artifact pattern but with requireDefaultIndicator=true (default)
+      const output = [
+        ' Do you want to proceed?',
+        ' \u276Fx1. Yes',
+        '   2. No',
+      ].join('\n');
+
+      const result = detectPrompt(output);
+
+      expect(result.isPrompt).toBe(true);
+      if (isMultipleChoicePrompt(result.promptData)) {
+        expect(result.promptData.options).toHaveLength(2);
+        expect(result.promptData.options[0].isDefault).toBe(true);
+      } else {
+        expect.fail('Expected multiple_choice prompt');
+      }
+    });
   });
 });
