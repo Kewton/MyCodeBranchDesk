@@ -773,6 +773,23 @@ function detectMultipleChoicePrompt(output: string, options?: DetectPromptOption
 
     // Non-option line handling
     if (collectedOptions.length > 0 && line && !SEPARATOR_LINE_PATTERN.test(line)) {
+      const rawLine = lines[i]; // Original line with indentation preserved
+
+      // [Issue #460] For deeply indented lines (4+ leading spaces), check
+      // continuation BEFORE question keywords. These are option description
+      // lines (e.g., "     Let Gemini CLI decide the best model...") that may
+      // contain keywords like "decide" or "select" but are NOT question lines.
+      // The 2-space "  Select model" case (Issue #256) is excluded by the 4+ threshold.
+      const isDeepIndent = /^\s{4,}/.test(rawLine);
+      if (isDeepIndent && isContinuationLine(rawLine, line)) {
+        continuationLineCount++;
+        if (continuationLineCount > MAX_CONTINUATION_LINES) {
+          questionEndIndex = i;
+          break;
+        }
+        continue;
+      }
+
       // [MF-001 / Issue #256] Check if line is a question-like line BEFORE
       // continuation check. This preserves isContinuationLine()'s SRP by not
       // mixing question detection into it. Without this pre-check, indented
@@ -790,7 +807,6 @@ function detectMultipleChoicePrompt(output: string, options?: DetectPromptOption
 
       // Check if this is a continuation line (indented line between options,
       // or path/filename fragments from terminal width wrapping - Issue #181)
-      const rawLine = lines[i]; // Original line with indentation preserved
       if (isContinuationLine(rawLine, line)) {
         continuationLineCount++;
         // Issue #372: Codex TUI indents all output with 2 spaces, causing
