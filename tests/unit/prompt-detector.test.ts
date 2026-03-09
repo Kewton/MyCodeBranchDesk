@@ -546,9 +546,18 @@ Are you sure you want to continue? (yes/no)
       expect(result.isPrompt).toBe(false);
     });
 
-    it('should NOT detect non-consecutive numbered options (Test #3)', () => {
-      // Layer 3 protection: consecutive number validation
+    it('should detect options with single gap due to rendering artifact (Test #3)', () => {
+      // Layer 3 relaxation: allow at most 1 gap of 1 for tmux rendering artifacts
       const output = '❯ 1. Option A\n  3. Option B';
+      const result = detectPrompt(output);
+
+      expect(result.isPrompt).toBe(true);
+      expect(result.promptData?.type).toBe('multiple_choice');
+    });
+
+    it('should NOT detect options with multiple gaps (e.g. [1,3,5]) (Test #3b)', () => {
+      // Layer 3 protection: more than 1 gap is still rejected
+      const output = '❯ 1. Option A\n  3. Option C\n  5. Option E';
       const result = detectPrompt(output);
 
       expect(result.isPrompt).toBe(false);
@@ -597,11 +606,19 @@ Are you sure you want to continue? (yes/no)
       expect(result.isPrompt).toBe(false);
     });
 
-    it('Layer 3: cursor present but non-consecutive numbers should not be detected (Test #3)', () => {
+    it('Layer 3: single gap allowed but multiple gaps rejected (Test #3)', () => {
+      // [1, 3, 5] has 2 gaps → rejected
       const output = '❯ 1. Option A\n  3. Option C\n  5. Option E';
       const result = detectPrompt(output);
 
       expect(result.isPrompt).toBe(false);
+    });
+
+    it('Layer 3: single gap [1, 3] should be allowed for rendering artifact tolerance', () => {
+      const output = '❯ 1. Option A\n  3. Option C';
+      const result = detectPrompt(output);
+
+      expect(result.isPrompt).toBe(true);
     });
 
     it('Layer 4: cursor present, consecutive but only 1 option should not be detected (Test #4)', () => {
@@ -909,11 +926,25 @@ Are you sure you want to continue? (yes/no)
     });
 
     describe('requireDefaultIndicator: false - defense layers', () => {
-      it('should still reject non-consecutive numbers (Layer 3 maintained)', () => {
+      it('should allow single gap [1, 3] for rendering artifact tolerance (Layer 3 relaxed)', () => {
         const output = [
           'Select one:',
           '  1. Option A',
           '  3. Option C',
+        ].join('\n');
+
+        const options: DetectPromptOptions = { requireDefaultIndicator: false };
+        const result = detectPrompt(output, options);
+
+        expect(result.isPrompt).toBe(true);
+      });
+
+      it('should still reject multiple gaps [1, 3, 5] (Layer 3 maintained)', () => {
+        const output = [
+          'Select one:',
+          '  1. Option A',
+          '  3. Option C',
+          '  5. Option E',
         ].join('\n');
 
         const options: DetectPromptOptions = { requireDefaultIndicator: false };
@@ -2329,6 +2360,212 @@ Are you sure you want to continue? (yes/no)
 
       expect(result.isPrompt).toBe(true);
       expect(result.promptData?.question).toContain('Would you like to run');
+    });
+  });
+
+  describe('tmux capture-pane rendering artifact: missing period after option number', () => {
+    // Claude CLI's interactive menu renderer uses cursor positioning to draw options.
+    // When tmux capture-pane captures the final screen state, periods after option
+    // numbers can be overwritten by rendering artifacts, resulting in "2  Yes" instead
+    // of "2. Yes". The detector must handle this gracefully.
+
+    it('should detect options without period (2+ spaces) when requireDefaultIndicator=false', () => {
+      const output = [
+        ' Do you want to allow Claude to fetch this content?',
+        ' \u276F 1. Yes, and remember my choice',
+        '   2  Yes, and don\'t ask again for medium.com',
+        '   3  No, and tell Claude what to do differently (esc)',
+      ].join('\n');
+
+      const options: DetectPromptOptions = { requireDefaultIndicator: false };
+      const result = detectPrompt(output, options);
+
+      expect(result.isPrompt).toBe(true);
+      if (isMultipleChoicePrompt(result.promptData)) {
+        expect(result.promptData.options).toHaveLength(3);
+        expect(result.promptData.options[0].number).toBe(1);
+        expect(result.promptData.options[1].number).toBe(2);
+        expect(result.promptData.options[2].number).toBe(3);
+        expect(result.promptData.question).toContain('allow Claude to fetch');
+      } else {
+        expect.fail('Expected multiple_choice prompt');
+      }
+    });
+
+    it('should detect options without period when all options lack periods', () => {
+      const output = [
+        ' Do you want to proceed?',
+        '   1  Yes',
+        '   2  No',
+        '   3  Cancel',
+      ].join('\n');
+
+      const options: DetectPromptOptions = { requireDefaultIndicator: false };
+      const result = detectPrompt(output, options);
+
+      expect(result.isPrompt).toBe(true);
+      if (isMultipleChoicePrompt(result.promptData)) {
+        expect(result.promptData.options).toHaveLength(3);
+      } else {
+        expect.fail('Expected multiple_choice prompt');
+      }
+    });
+
+    it('should still detect standard format with periods', () => {
+      const output = [
+        ' Do you want to proceed?',
+        ' \u276F 1. Yes',
+        '   2. No',
+        '   3. Cancel',
+      ].join('\n');
+
+      const options: DetectPromptOptions = { requireDefaultIndicator: false };
+      const result = detectPrompt(output, options);
+
+      expect(result.isPrompt).toBe(true);
+      if (isMultipleChoicePrompt(result.promptData)) {
+        expect(result.promptData.options).toHaveLength(3);
+      } else {
+        expect.fail('Expected multiple_choice prompt');
+      }
+    });
+
+    it('should not match single-space after number (avoids false positives)', () => {
+      // "2 items remaining" should not match as an option
+      const output = [
+        'Build completed successfully.',
+        '2 items remaining',
+        '3 warnings found',
+      ].join('\n');
+
+      const options: DetectPromptOptions = { requireDefaultIndicator: false };
+      const result = detectPrompt(output, options);
+
+      // Should not detect as prompt (no question line with ? or keyword)
+      expect(result.isPrompt).toBe(false);
+    });
+
+    it('should detect real-world garbled tmux capture from Claude CLI web fetch permission', () => {
+      // Actual tmux capture-pane output observed in the field
+      const output = [
+        ' Fetch',
+        '      ct-654d3d394ca6',
+        '   https://medium.com/free-code-camp/how-i-got-1000-%EF%B8%8F-on-my-github-pr',
+        '   oject-654d3d394 a6',
+        ' DoClaude wants to fetch content from medium.comnt?',
+        ' \u276F',
+        ' Do2youewantntodallowaClaudeitoffetchdthisccontent?',
+        ' \u276F 1. Yes   d  e     a      a  t     d    r        sc)',
+        '   2  Yes, and don\'t ask again for medium.com',
+        '   3  No, and tell Cl ude what t  do differently (esc)',
+      ].join('\n');
+
+      const options: DetectPromptOptions = { requireDefaultIndicator: false };
+      const result = detectPrompt(output, options);
+
+      expect(result.isPrompt).toBe(true);
+      if (isMultipleChoicePrompt(result.promptData)) {
+        expect(result.promptData.options).toHaveLength(3);
+        expect(result.promptData.options[0].isDefault).toBe(true);
+        expect(result.promptData.options[1].isDefault).toBe(false);
+        expect(result.promptData.options[2].isDefault).toBe(false);
+      } else {
+        expect.fail('Expected multiple_choice prompt');
+      }
+    });
+
+    it('should detect when garbage chars appear between ❯ and option number', () => {
+      // Actual tmux capture-pane output: "❯s1." instead of "❯ 1."
+      // Claude CLI redraws the interactive menu, and capture-pane picks up
+      // overlapping characters between the indicator and the number.
+      const output = [
+        ' Do you want to proceed?',
+        ' \u276Fs1. Yesancel \u00B7 Tab to amend \u00B7 ctrl+e to explain',
+        '   2. Yes, and don\'t ask again for: gh api:*',
+        '   3. No',
+        '',
+        ' Esc to cancel \u00B7 Tab to amend \u00B7 ctrl+e to explain',
+      ].join('\n');
+
+      const options: DetectPromptOptions = { requireDefaultIndicator: false };
+      const result = detectPrompt(output, options);
+
+      expect(result.isPrompt).toBe(true);
+      if (isMultipleChoicePrompt(result.promptData)) {
+        expect(result.promptData.options).toHaveLength(3);
+        expect(result.promptData.options[0].number).toBe(1);
+        expect(result.promptData.options[0].isDefault).toBe(true);
+        expect(result.promptData.options[1].number).toBe(2);
+        expect(result.promptData.options[2].number).toBe(3);
+      } else {
+        expect.fail('Expected multiple_choice prompt');
+      }
+    });
+
+    it('should detect when garbage chars appear between ❯ and number with requireDefault=true', () => {
+      // Same artifact pattern but with requireDefaultIndicator=true (default)
+      const output = [
+        ' Do you want to proceed?',
+        ' \u276Fx1. Yes',
+        '   2. No',
+      ].join('\n');
+
+      const result = detectPrompt(output);
+
+      expect(result.isPrompt).toBe(true);
+      if (isMultipleChoicePrompt(result.promptData)) {
+        expect(result.promptData.options).toHaveLength(2);
+        expect(result.promptData.options[0].isDefault).toBe(true);
+      } else {
+        expect.fail('Expected multiple_choice prompt');
+      }
+    });
+
+    it('should detect with garbage prefix before option number in NORMAL lines', () => {
+      // "Es2" from "Esc to cancel" overlapping with option 2 line
+      const output = [
+        ' Do you want to proceed?',
+        ' \u276F 1  Yes',
+        ' Es2 tYes,nand don\'t askaagain\u00B7for:lgh api:*plain',
+        '   3. No',
+        '',
+        ' Esc to cancel \u00B7 Tab to amend \u00B7 ctrl+e to explain',
+      ].join('\n');
+
+      const options: DetectPromptOptions = { requireDefaultIndicator: false };
+      const result = detectPrompt(output, options);
+
+      expect(result.isPrompt).toBe(true);
+      if (isMultipleChoicePrompt(result.promptData)) {
+        expect(result.promptData.options).toHaveLength(3);
+        expect(result.promptData.options[0].number).toBe(1);
+        expect(result.promptData.options[1].number).toBe(2);
+        expect(result.promptData.options[2].number).toBe(3);
+      } else {
+        expect.fail('Expected multiple_choice prompt');
+      }
+    });
+
+    it('should detect with gap when garbled option is completely unparseable', () => {
+      // Option 2 is so garbled that neither pattern matches → [1, 3] with gap
+      const output = [
+        ' Do you want to proceed?',
+        ' \u276F 1  Yes',
+        '   some completely garbled line without any number',
+        '   3. No',
+      ].join('\n');
+
+      const options: DetectPromptOptions = { requireDefaultIndicator: false };
+      const result = detectPrompt(output, options);
+
+      expect(result.isPrompt).toBe(true);
+      if (isMultipleChoicePrompt(result.promptData)) {
+        expect(result.promptData.options).toHaveLength(2);
+        expect(result.promptData.options[0].number).toBe(1);
+        expect(result.promptData.options[1].number).toBe(3);
+      } else {
+        expect.fail('Expected multiple_choice prompt');
+      }
     });
   });
 });

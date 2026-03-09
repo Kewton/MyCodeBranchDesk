@@ -20,6 +20,7 @@ import {
 } from '../tmux';
 import { detectAndResendIfPastedText } from '../pasted-text-helper';
 import { invalidateCache } from '../tmux-capture-cache';
+import { GEMINI_PROMPT_PATTERN } from '../cli-patterns';
 
 /**
  * Extract error message from unknown error type (DRY)
@@ -110,7 +111,10 @@ export class GeminiTool extends BaseCLITool {
   /**
    * Handle Gemini "Do you trust this folder?" dialog
    * On first run in a new directory, Gemini shows a trust confirmation.
-   * Auto-selects "1. Trust folder" to allow execution.
+   * Option "1. Trust folder" is pre-selected (marked with a bullet indicator);
+   * this method sends Enter to confirm the pre-selected option.
+   * Polls up to TRUST_DIALOG_MAX_ATTEMPTS times, exiting early if the
+   * interactive prompt appears (no dialog needed).
    */
   private async handleTrustDialog(sessionName: string): Promise<void> {
     for (let i = 0; i < TRUST_DIALOG_MAX_ATTEMPTS; i++) {
@@ -125,7 +129,7 @@ export class GeminiTool extends BaseCLITool {
           return;
         }
         // Check if Gemini interactive prompt is already showing (no dialog needed)
-        if (output.match(/^[>❯]\s*$/m)) {
+        if (GEMINI_PROMPT_PATTERN.test(output)) {
           console.log('✓ Gemini prompt detected - no trust dialog needed');
           return;
         }

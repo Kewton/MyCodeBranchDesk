@@ -273,15 +273,43 @@ const TEXT_INPUT_PATTERNS: RegExp[] = [
  * Claude CLI uses ❯, Gemini CLI uses ●, Codex CLI uses › (Issue #372).
  * Used in Pass 1 (existence check) and Pass 2 (option collection) of the 2-pass detection.
  * Anchored at both ends -- ReDoS safe (S4-001).
+ *
+ * Uses [^\d]* between indicator and number to tolerate tmux capture-pane
+ * rendering artifacts where garbage characters appear between ❯ and the
+ * option number (e.g. "❯s1." instead of "❯ 1."). [^\d]* before (\d+) is
+ * ReDoS safe because [^\d] cannot match digits, eliminating backtrack ambiguity.
+ *
+ * Uses (?:\.|\s{2,}) after the number to handle missing periods (same as
+ * NORMAL_OPTION_PATTERN artifact tolerance).
  */
-const DEFAULT_OPTION_PATTERN = /^\s*[\u276F\u25CF\u203A]\s*(\d+)\.\s*(.+)$/;
+const DEFAULT_OPTION_PATTERN = /^\s*[\u276F\u25CF\u203A][^\d]*(\d+)(?:\.|\s{2,})\s*(.+)$/;
 
 /**
  * Pattern for normal option lines (no ❯ indicator, just leading whitespace + number).
  * Only applied in Pass 2 when ❯ indicator existence is confirmed by Pass 1.
  * Anchored at both ends -- ReDoS safe (S4-001).
+ *
+ * Supports two formats:
+ *   - Standard: "  2. Yes, and don't ask again" (number + period)
+ *   - Artifact: "  2  Yes, and don't ask again" (number + 2+ spaces, no period)
+ *
+ * The artifact format occurs when Claude CLI's interactive menu renderer uses
+ * cursor positioning to draw options, and tmux capture-pane captures the final
+ * screen state where periods are overwritten by rendering artifacts.
+ * The \s{2,} variant requires 2+ spaces to avoid matching casual text lines
+ * that happen to start with a number followed by a single space.
+ *
+ * Uses [^\d]{0,3} prefix to tolerate up to 3 garbage non-digit characters
+ * before the option number (e.g. "Es2" from "Esc to cancel" overlapping).
+ * Limited to 3 chars to minimize false positive surface. ReDoS safe because
+ * {0,3} bounds the repetition and [^\d] cannot match \d (no ambiguity).
+ *
+ * Uses (?:\.|\s+) (1+ spaces) instead of \s{2,} to handle garbled lines
+ * where only 1 space remains between number and text (e.g. "Es2 tYes").
+ * False positive protection relies on Layer 3 (consecutive from 1),
+ * Layer 4 (2+ options), and Layer 5 (SEC-001 question line validation).
  */
-const NORMAL_OPTION_PATTERN = /^\s*(\d+)\.\s*(.+)$/;
+const NORMAL_OPTION_PATTERN = /^\s*[^\d]{0,3}(\d+)(?:\.|\s+)\s*(.+)$/;
 
 /**
  * Pattern for separator lines (horizontal rules).
@@ -470,16 +498,24 @@ function findQuestionLineInRange(
  * cursor detection). This function provides Layer 3 defense against future unknown
  * patterns with scattered/non-consecutive numbering.
  *
- * [S3-010] This validation assumes Claude CLI always uses consecutive numbering
- * starting from 1. If in the future Claude CLI is observed to filter choices and
- * output non-consecutive numbers (e.g., 1, 2, 4), consider relaxing this validation
- * (e.g., only check starts-from-1, remove consecutive requirement).
+ * [S3-010] Allows at most one single gap (e.g., [1, 3]) to handle tmux capture-pane
+ * rendering artifacts where one option line becomes too garbled to parse. Claude CLI
+ * prompts typically have 2-4 options, so missing 1 option is a realistic artifact
+ * scenario. Constraints:
+ *   - Must start from 1
+ *   - Strictly increasing
+ *   - Each step gap must be 1 or 2 (no skipping 2+ options at once)
+ *   - At most 1 gap allowed total (rejects [1, 3, 5] which has 2 gaps)
  */
 function isConsecutiveFromOne(numbers: number[]): boolean {
   if (numbers.length === 0) return false;
   if (numbers[0] !== 1) return false;
+  let gapCount = 0;
   for (let i = 1; i < numbers.length; i++) {
-    if (numbers[i] !== numbers[i - 1] + 1) return false;
+    const gap = numbers[i] - numbers[i - 1];
+    if (gap < 1 || gap > 2) return false;
+    if (gap === 2) gapCount++;
+    if (gapCount > 1) return false;
   }
   return true;
 }
