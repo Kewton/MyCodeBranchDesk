@@ -127,9 +127,20 @@ export const MAX_PASTED_TEXT_RETRIES = 3;
 /**
  * Gemini interactive REPL prompt pattern
  * Gemini CLI shows a `>` or `❯` prompt when waiting for user input in interactive mode.
- * Also matches shell prompts as fallback for session initialization phase.
+ *
+ * Two branches (Issue #386):
+ * - Branch 1: `^[>❯]\s*$` -- bare prompt character (empty input line)
+ * - Branch 2: `^\s*[>❯]\s+Type your message.*$` -- new-format prompt with placeholder text
+ *   (e.g., " >   Type your message or @path/to/file"). Leading whitespace is allowed
+ *   because tmux capture-pane output may include padding.
+ *
+ * Branch 2 requires "Type your message" after the indicator to avoid false positives
+ * on quoted response lines (e.g., "> some quoted text").
+ *
+ * @see CLAUDE_PROMPT_PATTERN for similar dual-format matching approach
  */
-export const GEMINI_PROMPT_PATTERN = /^[>❯]\s*$/m;
+// [S4-5] /g flag prohibited: would make test() stateful
+export const GEMINI_PROMPT_PATTERN = /^[>❯]\s*$|^\s*[>❯]\s+Type your message.*$/m;
 
 /**
  * Gemini thinking/processing pattern
@@ -308,7 +319,7 @@ export function getCliToolPatterns(cliToolId: CLIToolType): {
         separatorPattern: /^[─━]{3,}$/m,
         thinkingPattern: GEMINI_THINKING_PATTERN,
         skipPatterns: [
-          /^[>❯]\s*$/, // Prompt line
+          GEMINI_PROMPT_PATTERN, // Prompt line (DRY: shared with GEMINI_PROMPT_PATTERN)
           GEMINI_THINKING_PATTERN, // Thinking indicators
           /^\s*$/, // Empty lines
           /Gemini\s+\d+\.\d+/, // Version line
@@ -388,13 +399,15 @@ export function stripAnsi(str: string): string {
  */
 export function stripBoxDrawing(str: string): string {
   return str.split('\n').map(line => {
-    // Remove border-only lines (╭──╮, ╰──╯, │ only, ┃ only, ╹▀▀▀, etc.)
+    // Remove border-only lines (╭──╮, ╰──╯, │ only, ┃ only, ╹▀▀▀, █ scrollbar, etc.)
     // U+2502 │ (light vertical), U+2503 ┃ (heavy vertical - OpenCode TUI)
     // U+2579 ╹ (heavy up), U+2580 ▀ (upper half block - OpenCode separator)
-    if (/^[\u2502\u2503\u256D\u256E\u256F\u2570\u2500\u2579\u2580\s]+$/.test(line)) return '';
-    // Strip leading whitespace + │/┃ + optional space, trailing space + │/┃
+    // U+2588 █ (full block - OpenCode scrollbar)
+    if (/^[\u2502\u2503\u256D\u256E\u256F\u2570\u2500\u2579\u2580\u2588\s]+$/.test(line)) return '';
+    // Strip leading whitespace + │/┃ + optional space, trailing space + │/┃/█
     // OpenCode TUI adds 2-space padding before ┃ borders (e.g., "  ┃  content")
-    return line.replace(/^\s*[\u2502\u2503]\s?/, '').replace(/\s*[\u2502\u2503]$/, '');
+    // OpenCode scrollbar █ appears at end of content lines
+    return line.replace(/^\s*[\u2502\u2503]\s?/, '').replace(/\s*[\u2502\u2503\u2588]$/, '');
   }).join('\n');
 }
 
