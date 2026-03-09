@@ -2213,6 +2213,48 @@ Are you sure you want to continue? (yes/no)
         expect(result.promptData.options[2].label).toBe('No, suggest changes (esc)');
       }
     });
+
+    it('should detect Gemini model selection dialog with description lines below options', () => {
+      // Issue #460: Gemini CLI /model command shows options with multi-line descriptions.
+      // Description lines (e.g., "     Let Gemini CLI decide...") are deeply indented (5+ spaces)
+      // and may contain keywords like "decide" that trigger isQuestionLikeLine().
+      // These must be treated as continuation lines, not question lines.
+      const output = [
+        '> /model',
+        '',
+        '',
+        'Select Model',
+        '',
+        '\u25CF 1. Auto (Gemini 3)',
+        '     Let Gemini CLI decide the best model for the task: gemini-3.1-pro, gemini-3-flash',
+        '  2. Auto (Gemini 2.5)',
+        '     Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash',
+        '  3. Manual',
+        '     Manually select a model',
+        '',
+        'Remember model for future sessions: false',
+        '(Press Tab to toggle)',
+        '',
+        '> To use a specific Gemini model on startup, use the --model flag.',
+        '',
+        '(Press Esc to close)',
+        '',
+        '',
+      ].join('\n');
+
+      const result = detectPrompt(output);
+
+      expect(result.isPrompt).toBe(true);
+      expect(result.promptData?.type).toBe('multiple_choice');
+      if (isMultipleChoicePrompt(result.promptData)) {
+        expect(result.promptData.options.length).toBe(3);
+        expect(result.promptData.options[0].isDefault).toBe(true);
+        expect(result.promptData.options[0].label).toBe('Auto (Gemini 3)');
+        expect(result.promptData.options[1].label).toBe('Auto (Gemini 2.5)');
+        expect(result.promptData.options[2].label).toBe('Manual');
+        expect(result.promptData.question).toContain('Select Model');
+      }
+    });
   });
 
   // ========================================================================
