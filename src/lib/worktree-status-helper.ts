@@ -62,67 +62,66 @@ export async function detectWorktreeSessionStatus(
   const manager = CLIToolManager.getInstance();
   const allCliTools: readonly CLIToolType[] = CLI_TOOL_IDS;
 
+  // Parallel status detection for all CLI tools (previously sequential loop).
+  // Each tool's capture + status detection is independent, so Promise.all is safe.
+  const results = await Promise.all(
+    allCliTools.map(async (cliToolId): Promise<[CLIToolType, CliToolSessionStatus]> => {
+      const cliTool = manager.getTool(cliToolId);
+      const sessionName = cliTool.getSessionName(worktreeId);
+
+      // Issue #405: Use Set.has() instead of individual hasSession() calls
+      let isRunning = sessionNameSet.has(sessionName);
+
+      // [DR1-005] Claude-only health check (other tools use simple session existence)
+      if (isRunning && cliToolId === 'claude') {
+        const healthResult = await isSessionHealthy(sessionName);
+        if (!healthResult.healthy) {
+          isRunning = false;
+        }
+      }
+
+      // Check status based on terminal state
+      let isWaitingForResponse = false;
+      let isProcessing = false;
+      if (isRunning) {
+        try {
+          // OpenCode TUI uses a 200-line pane; capture full pane to see content area
+          const captureLines = cliToolId === 'opencode' ? OPENCODE_PANE_HEIGHT : 100;
+          const output = await captureSessionOutput(worktreeId, cliToolId, captureLines);
+          const statusResult = detectSessionStatus(output, cliToolId);
+          isWaitingForResponse = statusResult.status === 'waiting';
+          isProcessing = statusResult.status === 'running';
+
+          // Clean up stale pending prompts if no prompt is showing
+          if (!statusResult.hasActivePrompt) {
+            const messages = getMessages(db, worktreeId, undefined, 10, cliToolId);
+            const hasPendingPrompt = messages.some(
+              msg => msg.messageType === 'prompt' && msg.promptData?.status !== 'answered'
+            );
+            if (hasPendingPrompt) {
+              markPendingPromptsAsAnswered(db, worktreeId, cliToolId);
+            }
+          }
+        } catch {
+          // If capture fails, assume processing
+          isProcessing = true;
+        }
+      }
+
+      return [cliToolId, { isRunning, isWaitingForResponse, isProcessing }];
+    })
+  );
+
   const sessionStatusByCli: Partial<Record<CLIToolType, CliToolSessionStatus>> = {};
   let anyRunning = false;
   let anyWaiting = false;
   let anyProcessing = false;
 
-  for (const cliToolId of allCliTools) {
-    const cliTool = manager.getTool(cliToolId);
-    const sessionName = cliTool.getSessionName(worktreeId);
-
-    // Issue #405: Use Set.has() instead of individual hasSession() calls
-    let isRunning = sessionNameSet.has(sessionName);
-
-    // [DR1-005] Claude-only health check (other tools use simple session existence)
-    if (isRunning && cliToolId === 'claude') {
-      const healthResult = await isSessionHealthy(sessionName);
-      if (!healthResult.healthy) {
-        isRunning = false;
-      }
-    }
-
-    // Check status based on terminal state
-    // - isWaitingForResponse: Interactive prompt (yes/no, multiple choice)
-    // - isProcessing: Thinking indicator visible
-    let isWaitingForResponse = false;
-    let isProcessing = false;
-    if (isRunning) {
-      try {
-        // OpenCode TUI uses a 200-line pane; capture full pane to see content area
-        const captureLines = cliToolId === 'opencode' ? OPENCODE_PANE_HEIGHT : 100;
-        const output = await captureSessionOutput(worktreeId, cliToolId, captureLines);
-        const statusResult = detectSessionStatus(output, cliToolId);
-        isWaitingForResponse = statusResult.status === 'waiting';
-        isProcessing = statusResult.status === 'running';
-
-        // Clean up stale pending prompts if no prompt is showing
-        // NOTE: !statusResult.hasActivePrompt is logically equivalent to
-        //       !promptDetection.isPrompt in the previous implementation (C-004)
-        if (!statusResult.hasActivePrompt) {
-          const messages = getMessages(db, worktreeId, undefined, 10, cliToolId);
-          const hasPendingPrompt = messages.some(
-            msg => msg.messageType === 'prompt' && msg.promptData?.status !== 'answered'
-          );
-          if (hasPendingPrompt) {
-            markPendingPromptsAsAnswered(db, worktreeId, cliToolId);
-          }
-        }
-      } catch {
-        // If capture fails, assume processing
-        isProcessing = true;
-      }
-    }
-
-    sessionStatusByCli[cliToolId] = {
-      isRunning,
-      isWaitingForResponse,
-      isProcessing,
-    };
-
-    if (isRunning) anyRunning = true;
-    if (isWaitingForResponse) anyWaiting = true;
-    if (isProcessing) anyProcessing = true;
+  for (const [cliToolId, status] of results) {
+    sessionStatusByCli[cliToolId] = status;
+    if (status.isRunning) anyRunning = true;
+    if (status.isWaitingForResponse) anyWaiting = true;
+    if (status.isProcessing) anyProcessing = true;
   }
 
   return {
