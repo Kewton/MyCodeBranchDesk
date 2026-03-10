@@ -130,22 +130,31 @@ export class CodexTool extends BaseCLITool {
           }
         }
 
-        // Handle trust dialog: "Do you trust the contents of this directory?"
-        // Options: › 1. Yes, continue / 2. No, quit
-        if (!trustDialogHandled && output.includes('Do you trust')) {
-          // Send "1" + Enter to select "Yes, continue"
-          await sendKeys(sessionName, '1', true);
-          trustDialogHandled = true;
-          console.log('✓ Auto-trusted folder for Codex session');
-          // Wait for dialog to process
+        // Handle update notification BEFORE trust dialog check.
+        // Update notification shows: › 1. Update now / 2. Skip / 3. Skip until next version
+        // followed by "Press enter to continue". Must send "2" (Skip) to avoid
+        // triggering npm install which kills the Codex process.
+        if (output.includes('Update') && output.includes('Skip')) {
+          await sendKeys(sessionName, '2', true);
+          console.log('✓ Skipped Codex update notification');
           await new Promise((resolve) => setTimeout(resolve, 500));
           continue;
         }
 
-        // Handle "Press enter to continue" (update notification)
+        // Handle "Press enter to continue" (after update skip or other notification)
         if (output.includes('Press enter to continue')) {
           await sendSpecialKey(sessionName, 'Enter');
-          console.log('✓ Dismissed Codex update notification');
+          console.log('✓ Dismissed Codex notification');
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          continue;
+        }
+
+        // Handle trust dialog: "Do you trust the contents of this directory?"
+        // Options: › 1. Yes, continue / 2. No, quit
+        if (!trustDialogHandled && output.includes('Do you trust')) {
+          await sendKeys(sessionName, '1', true);
+          trustDialogHandled = true;
+          console.log('✓ Auto-trusted folder for Codex session');
           await new Promise((resolve) => setTimeout(resolve, 500));
           continue;
         }
