@@ -10,11 +10,12 @@ import {
   createSession,
   sendKeys,
   killSession,
-  sendSpecialKeys,
   sendSpecialKey,
+  capturePane,
 } from '../tmux';
 import { detectAndResendIfPastedText } from '../pasted-text-helper';
 import { invalidateCache } from '../tmux-capture-cache';
+import { CODEX_PROMPT_PATTERN, stripAnsi } from '../cli-patterns';
 
 /**
  * Extract error message from unknown error type (DRY)
@@ -24,12 +25,17 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-/**
- * Codex initialization timing constants
- * T2.6: Extracted as constants for maintainability
- */
-const CODEX_INIT_WAIT_MS = 3000;  // Wait for Codex to start
-const CODEX_MODEL_SELECT_WAIT_MS = 200;  // Wait between model selection keystrokes
+/** Wait for Codex CLI to initialize after launch */
+const CODEX_INIT_WAIT_MS = 3000;
+
+/** Interval for polling trust dialog / prompt detection */
+const CODEX_POLL_INTERVAL_MS = 1000;
+
+/** Max attempts for initialization polling (30 * 1000ms = 30s total window) */
+const CODEX_INIT_MAX_ATTEMPTS = 30;
+
+/** Timeout for waiting for prompt before sending a message */
+const CODEX_PROMPT_WAIT_TIMEOUT_MS = 15000;
 
 /**
  * Codex CLI tool implementation
@@ -87,27 +93,90 @@ export class CodexTool extends BaseCLITool {
       // Start Codex CLI in interactive mode
       await sendKeys(sessionName, 'codex', true);
 
-      // Wait for Codex to initialize (and potentially show update notification)
+      // Wait for Codex to initialize
       await new Promise((resolve) => setTimeout(resolve, CODEX_INIT_WAIT_MS));
 
-      // Auto-skip update notification if present (select option 2: Skip)
-      await sendKeys(sessionName, '2', true);
-
-      // Wait a moment for the selection to process
-      await new Promise((resolve) => setTimeout(resolve, CODEX_MODEL_SELECT_WAIT_MS));
-
-      // T2.6: Skip model selection dialog by sending Down arrow + Enter
-      // This selects the default model and proceeds to the prompt
-      await sendSpecialKeys(sessionName, ['Down']);
-      await new Promise((resolve) => setTimeout(resolve, CODEX_MODEL_SELECT_WAIT_MS));
-      await sendSpecialKeys(sessionName, ['Enter']);
-      await new Promise((resolve) => setTimeout(resolve, CODEX_MODEL_SELECT_WAIT_MS));
+      // Poll until Codex interactive prompt is ready
+      // Handles trust dialog and update notification automatically
+      await this.waitForReady(sessionName);
 
       console.log(`✓ Started Codex session: ${sessionName}`);
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
       throw new Error(`Failed to start Codex session: ${errorMessage}`);
     }
+  }
+
+  /**
+   * Wait for Codex CLI to become ready (prompt visible).
+   * Handles trust dialog ("Do you trust the contents of this directory?")
+   * and update notification automatically by sending Enter/number keys.
+   * Polls until CODEX_PROMPT_PATTERN is detected or max attempts reached.
+   */
+  private async waitForReady(sessionName: string): Promise<void> {
+    let trustDialogHandled = false;
+    for (let i = 0; i < CODEX_INIT_MAX_ATTEMPTS; i++) {
+      try {
+        const rawOutput = await capturePane(sessionName, 50);
+        const output = stripAnsi(rawOutput);
+
+        // Check if interactive prompt is ready
+        if (CODEX_PROMPT_PATTERN.test(output)) {
+          // Verify it's the actual input prompt, not a prompt inside a dialog
+          // by checking no trust/update dialog is still active
+          if (!output.includes('Do you trust') && !output.includes('Press enter to continue')) {
+            console.log(`✓ Codex prompt detected (attempt ${i + 1})`);
+            return;
+          }
+        }
+
+        // Handle trust dialog: "Do you trust the contents of this directory?"
+        // Options: › 1. Yes, continue / 2. No, quit
+        if (!trustDialogHandled && output.includes('Do you trust')) {
+          // Send "1" + Enter to select "Yes, continue"
+          await sendKeys(sessionName, '1', true);
+          trustDialogHandled = true;
+          console.log('✓ Auto-trusted folder for Codex session');
+          // Wait for dialog to process
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          continue;
+        }
+
+        // Handle "Press enter to continue" (update notification)
+        if (output.includes('Press enter to continue')) {
+          await sendSpecialKey(sessionName, 'Enter');
+          console.log('✓ Dismissed Codex update notification');
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          continue;
+        }
+      } catch {
+        // Capture may fail during initialization - continue polling
+      }
+      await new Promise((resolve) => setTimeout(resolve, CODEX_POLL_INTERVAL_MS));
+    }
+    console.log('⚠ Codex prompt detection timed out after initialization');
+  }
+
+  /**
+   * Wait for Codex prompt before sending a message.
+   * Used by sendMessage to ensure Codex is ready to accept input.
+   */
+  private async waitForPrompt(sessionName: string): Promise<void> {
+    const startTime = Date.now();
+    const pollInterval = 500;
+    while (Date.now() - startTime < CODEX_PROMPT_WAIT_TIMEOUT_MS) {
+      try {
+        const rawOutput = await capturePane(sessionName, 50);
+        const output = stripAnsi(rawOutput);
+        if (CODEX_PROMPT_PATTERN.test(output)) {
+          return;
+        }
+      } catch {
+        // Capture may fail - continue polling
+      }
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+    }
+    console.log('⚠ Codex prompt not detected before send - proceeding anyway');
   }
 
   /**
@@ -128,6 +197,9 @@ export class CodexTool extends BaseCLITool {
     }
 
     try {
+      // Verify Codex is at prompt state before sending
+      await this.waitForPrompt(sessionName);
+
       // Send message to Codex (without Enter)
       await sendKeys(sessionName, message, false);
 
