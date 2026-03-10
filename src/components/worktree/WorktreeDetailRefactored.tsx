@@ -80,7 +80,7 @@ import type { AutoYesStopReason } from '@/config/auto-yes-config';
 import { NotificationDot } from '@/components/common/NotificationDot';
 import { BranchMismatchAlert } from '@/components/worktree/BranchMismatchAlert';
 import type { Worktree, ChatMessage, PromptData, GitStatus, FileContent } from '@/types/models';
-import { getCliToolDisplayName, type CLIToolType } from '@/lib/cli-tools/types';
+import { getCliToolDisplayName, isCliToolType, type CLIToolType } from '@/lib/cli-tools/types';
 import { DEFAULT_SELECTED_AGENTS } from '@/lib/selected-agents-validator';
 import { deriveCliStatus } from '@/types/sidebar';
 import { useTranslations } from 'next-intl';
@@ -88,6 +88,13 @@ import { useFileOperations } from '@/hooks/useFileOperations';
 import { MoveDialog } from '@/components/worktree/MoveDialog';
 import { encodePathForUrl } from '@/lib/url-path-encoder';
 import { parseCmateContent, validateScheduleHeaders, validateSchedulesSection, CMATE_TEMPLATE_CONTENT } from '@/lib/cmate-validator';
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/** localStorage key prefix for persisting the active CLI tool tab per worktree */
+const ACTIVE_CLI_TAB_STORAGE_KEY_PREFIX = 'activeCliTab-';
 
 // ============================================================================
 // Types
@@ -1065,8 +1072,23 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
   const [vibeLocalModel, setVibeLocalModel] = useState<string | null>(null);
   // Issue #374: Vibe-local context window state (initialized from API)
   const [vibeLocalContextWindow, setVibeLocalContextWindow] = useState<number | null>(null);
-  // Issue #4: CLI tool tab state - initialized from selectedAgents[0]
-  const [activeCliTab, setActiveCliTab] = useState<CLIToolType>(DEFAULT_SELECTED_AGENTS[0]);
+  // Issue #4: CLI tool tab state - restored from localStorage or fallback to selectedAgents[0]
+  const [activeCliTab, setActiveCliTabRaw] = useState<CLIToolType>(() => {
+    try {
+      const saved = window.localStorage.getItem(ACTIVE_CLI_TAB_STORAGE_KEY_PREFIX + worktreeId);
+      if (saved && isCliToolType(saved)) {
+        return saved;
+      }
+    } catch { /* localStorage unavailable (SSR) */ }
+    return DEFAULT_SELECTED_AGENTS[0];
+  });
+  // Wrapper: persist activeCliTab to localStorage on change
+  const setActiveCliTab = useCallback((tool: CLIToolType) => {
+    setActiveCliTabRaw(tool);
+    try {
+      window.localStorage.setItem(ACTIVE_CLI_TAB_STORAGE_KEY_PREFIX + worktreeId, tool);
+    } catch { /* localStorage unavailable */ }
+  }, [worktreeId]);
   // Issue #4: Ref to avoid polling callback recreation on tab switch
   const activeCliTabRef = useRef<CLIToolType>(activeCliTab);
   activeCliTabRef.current = activeCliTab;
@@ -1216,7 +1238,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
     if (!displayedAgents.includes(activeCliTab)) {
       setActiveCliTab(displayedAgents[0]);
     }
-  }, [displayedAgents, activeCliTab]);
+  }, [displayedAgents, activeCliTab, setActiveCliTab]);
 
   // Issue #379: Disable auto-follow for OpenCode (full-screen TUI).
   // OpenCode renders its TUI in a fixed viewport where menus (e.g., /model, /commands)
@@ -2063,7 +2085,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
         </div>
       </div>
     ),
-    [autoYesEnabled, autoYesExpiresAt, handleAutoYesToggle, lastAutoResponse, activeCliTab, displayedAgents, worktree?.sessionStatusByCli, handleKillSession]
+    [autoYesEnabled, autoYesExpiresAt, handleAutoYesToggle, lastAutoResponse, activeCliTab, displayedAgents, worktree?.sessionStatusByCli, handleKillSession, setActiveCliTab]
   );
 
   /** Memoized right pane (terminal + file panel) to prevent re-render when left pane state changes */
