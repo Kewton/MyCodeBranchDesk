@@ -2403,6 +2403,39 @@ Are you sure you want to continue? (yes/no)
       expect(result.isPrompt).toBe(true);
       expect(result.promptData?.question).toContain('Would you like to run');
     });
+
+    it('should ignore collapsed preview lines inside Codex approval prompts', () => {
+      const output = [
+        'Would you like to run the following command?',
+        '',
+        '  $ git add README.md docs/runtime-overview.md docs/runtime-permissions.md',
+        '  schemas/session-state.schema.json src/agents/mod.rs src/agents/tester.rs',
+        '  src/cli/commands.rs src/cli/output.rs src/runtime/engine.rs',
+        '  src/runtime/loop_state.rs src/state/session.rs tests/cli.rs',
+        '  tests/pm_and_models.rs tests/state_roundtrip.rs',
+        '  [… 12 lines] ctrl + a view all',
+        '',
+        '\u203A 1. Yes, proceed (y)',
+        '  2. Yes, and don\'t ask again for commands that start with `git add README.md',
+        '     docs/runtime-overview.md docs/runtime-permissions.md schemas/session-',
+        '     state.schema.json src/agents/mod.rs src/agents/tester.rs src/cli/',
+        '     commands.rs src/cli/output.rs src/runtime/engine.rs src/runtime/',
+        '     loop_state.rs src/state/session.rs tests/cli.rs tests/pm_and_models.rs',
+        '     tests/state_roundtrip.rs workspace/anvil-implementation-plan.md` (p)',
+        '  3. No, and tell Codex what to do differently (esc)',
+        '',
+        '  Press enter to confirm or esc to cancel',
+      ].join('\n');
+
+      const result = detectPrompt(output);
+
+      expect(result.isPrompt).toBe(true);
+      expect(result.promptData?.type).toBe('multiple_choice');
+      if (isMultipleChoicePrompt(result.promptData)) {
+        expect(result.promptData.options).toHaveLength(3);
+        expect(result.promptData.options.map(option => option.number)).toEqual([1, 2, 3]);
+      }
+    });
   });
 
   describe('tmux capture-pane rendering artifact: missing period after option number', () => {

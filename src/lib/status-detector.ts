@@ -160,10 +160,12 @@ export function detectSessionStatus(
   // Gemini wraps prompts in box-drawing characters (╭╮╰╯│─) which prevent
   // detectPrompt() from recognizing the prompt content.
   // OpenCode TUI uses ┃ borders and █ scrollbar that need stripping.
-  // For OpenCode, use full cleanOutput instead of lastLines (15-line window)
-  // because OpenCode's multiple-choice prompts with descriptions can exceed
-  // 15 lines. detectPrompt() applies its own 50-line window internally.
-  const promptInput = cliToolId === 'opencode'
+  // For OpenCode and Codex, use full cleanOutput instead of lastLines (15-line window)
+  // because their multiple-choice prompts with descriptions can exceed
+  // 15 lines. Codex approval prompts include long file lists that push the
+  // › indicator line outside the 15-line window. detectPrompt() applies its
+  // own 50-line window internally.
+  const promptInput = (cliToolId === 'opencode' || cliToolId === 'codex')
     ? stripBoxDrawing(cleanOutput)
     : stripBoxDrawing(lastLines);
   const promptDetection = detectPrompt(promptInput, promptOptions);
