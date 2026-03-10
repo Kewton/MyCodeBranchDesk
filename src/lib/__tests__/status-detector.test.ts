@@ -245,6 +245,37 @@ Previous response
         expect(result.confidence).toBe('high');
         expect(result.reason).toBe('thinking_indicator');
       });
+
+      it('should return "waiting" for Codex approval prompts with collapsed preview lines', () => {
+        const output = [
+          'Would you like to run the following command?',
+          '',
+          '  $ git add README.md docs/runtime-overview.md docs/runtime-permissions.md',
+          '  schemas/session-state.schema.json src/agents/mod.rs src/agents/tester.rs',
+          '  src/cli/commands.rs src/cli/output.rs src/runtime/engine.rs',
+          '  src/runtime/loop_state.rs src/state/session.rs tests/cli.rs',
+          '  tests/pm_and_models.rs tests/state_roundtrip.rs',
+          '  [… 12 lines] ctrl + a view all',
+          '',
+          '› 1. Yes, proceed (y)',
+          '  2. Yes, and don\'t ask again for commands that start with `git add README.md',
+          '     docs/runtime-overview.md docs/runtime-permissions.md schemas/session-',
+          '     state.schema.json src/agents/mod.rs src/agents/tester.rs src/cli/',
+          '     commands.rs src/cli/output.rs src/runtime/engine.rs src/runtime/',
+          '     loop_state.rs src/state/session.rs tests/cli.rs tests/pm_and_models.rs',
+          '     tests/state_roundtrip.rs workspace/anvil-implementation-plan.md` (p)',
+          '  3. No, and tell Codex what to do differently (esc)',
+          '',
+          '  Press enter to confirm or esc to cancel',
+        ].join('\n');
+
+        const result = detectSessionStatus(output, 'codex');
+
+        expect(result.status).toBe('waiting');
+        expect(result.confidence).toBe('high');
+        expect(result.reason).toBe('prompt_detected');
+        expect(result.hasActivePrompt).toBe(true);
+      });
     });
 
     describe('gemini', () => {

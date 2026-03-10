@@ -320,6 +320,15 @@ const NORMAL_OPTION_PATTERN = /^\s*[^\d]{0,3}(\d+)(?:\.|\s+)\s*(.+)$/;
 const SEPARATOR_LINE_PATTERN = /^[-─]+$/;
 
 /**
+ * Pattern for collapsed-output summary lines rendered by Codex/OpenAI TUI.
+ * Example: "[… 12 lines] ctrl + a view all"
+ *
+ * These lines can appear between command previews and approval options. They are
+ * not selectable options and must not be parsed as numbered choices.
+ */
+const COLLAPSED_OUTPUT_PATTERN = /^\s*\[[^\]]*\d+\s+lines?\]/i;
+
+/**
  * Maximum number of lines to scan upward from questionEndIndex
  * when the questionEndIndex line itself is not a question-like line.
  *
@@ -732,6 +741,14 @@ function detectMultipleChoicePrompt(output: string, options?: DetectPromptOption
 
   for (let i = effectiveEnd - 1; i >= scanStart; i--) {
     const line = lines[i].trim();
+
+    // Collapsed preview markers like "[… 12 lines] ctrl + a view all" are
+    // metadata, not selectable options. Skip them before option parsing to
+    // avoid misclassifying "12" as an option number.
+    if (COLLAPSED_OUTPUT_PATTERN.test(line)) {
+      continuationLineCount++;
+      continue;
+    }
 
     // Try DEFAULT_OPTION_PATTERN first (❯ indicator)
     const defaultMatch = line.match(DEFAULT_OPTION_PATTERN);

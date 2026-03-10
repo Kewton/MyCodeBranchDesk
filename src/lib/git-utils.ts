@@ -65,11 +65,12 @@ export async function getGitStatus(
   worktreePath: string,
   initialBranch: string | null
 ): Promise<GitStatus> {
-  // Get current branch
-  const branchOutput = await execGitCommand(
-    ['rev-parse', '--abbrev-ref', 'HEAD'],
-    worktreePath
-  );
+  // Parallel: all 3 git commands are independent
+  const [branchOutput, commitOutput, statusOutput] = await Promise.all([
+    execGitCommand(['rev-parse', '--abbrev-ref', 'HEAD'], worktreePath),
+    execGitCommand(['rev-parse', '--short', 'HEAD'], worktreePath),
+    execGitCommand(['status', '--porcelain'], worktreePath),
+  ]);
 
   // Handle detached HEAD or error
   let currentBranch: string;
@@ -81,18 +82,7 @@ export async function getGitStatus(
     currentBranch = branchOutput;
   }
 
-  // Get short commit hash
-  const commitOutput = await execGitCommand(
-    ['rev-parse', '--short', 'HEAD'],
-    worktreePath
-  );
   const commitHash = commitOutput ?? '(unknown)';
-
-  // Check for uncommitted changes
-  const statusOutput = await execGitCommand(
-    ['status', '--porcelain'],
-    worktreePath
-  );
   const isDirty = statusOutput !== null && statusOutput.length > 0;
 
   // Determine branch mismatch

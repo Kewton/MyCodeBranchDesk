@@ -43,23 +43,22 @@ export async function GET(
     const tmuxSessions = await listSessions();
     const sessionNameSet = new Set(tmuxSessions.map(s => s.name));
 
-    const sessionStatus = await detectWorktreeSessionStatus(
-      params.id,
-      sessionNameSet,
-      db,
-      getMessages,
-      markPendingPromptsAsAnswered,
-    );
-
-    // Issue #111: Get git status for branch visualization
-    let gitStatus: GitStatus | undefined;
-    try {
-      const initialBranch = getInitialBranch(db, params.id);
-      gitStatus = await getGitStatus(worktree.path, initialBranch);
-    } catch (gitError) {
-      // Log but don't fail - git status is non-critical
-      console.error(`[GET /api/worktrees/:id] Failed to get git status:`, gitError);
-    }
+    // Parallel: session status detection + git status (independent operations)
+    const initialBranch = getInitialBranch(db, params.id);
+    const [sessionStatus, gitStatus] = await Promise.all([
+      detectWorktreeSessionStatus(
+        params.id,
+        sessionNameSet,
+        db,
+        getMessages,
+        markPendingPromptsAsAnswered,
+      ),
+      getGitStatus(worktree.path, initialBranch).catch((gitError) => {
+        // Log but don't fail - git status is non-critical
+        console.error(`[GET /api/worktrees/:id] Failed to get git status:`, gitError);
+        return undefined as GitStatus | undefined;
+      }),
+    ]);
 
     // Issue #368: selectedAgents is already included in worktree from getWorktreeById
     return NextResponse.json(

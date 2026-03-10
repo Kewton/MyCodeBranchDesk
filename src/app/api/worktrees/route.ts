@@ -21,9 +21,8 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl?.searchParams;
     const repositoryFilter = searchParams?.get('repository');
 
-    // Get worktrees (with optional filter)
+    // Parallel: DB query and tmux session list are independent
     const worktrees = getWorktrees(db, repositoryFilter || undefined);
-
     // Issue #405: Batch query all tmux sessions once (N+1 elimination)
     const tmuxSessions = await listSessions();
     const sessionNameSet = new Set(tmuxSessions.map(s => s.name));
