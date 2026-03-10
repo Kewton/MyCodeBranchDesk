@@ -360,6 +360,14 @@ const QUESTION_SCAN_RANGE = 3;
 const MAX_CONTINUATION_LINES = 5;
 
 /**
+ * Maximum continuation lines for deeply indented wrapped option text.
+ * Codex approval prompts can wrap long "don't ask again..." labels across many
+ * lines with 5+ spaces of indentation. Allow a wider window for those cases
+ * without relaxing the 2-space body-text safeguard above.
+ */
+const MAX_DEEP_INDENT_CONTINUATION_LINES = 12;
+
+/**
  * Creates a "no prompt detected" result.
  * Centralizes the repeated pattern of returning isPrompt: false with trimmed content.
  *
@@ -800,7 +808,7 @@ function detectMultipleChoicePrompt(output: string, options?: DetectPromptOption
       const isDeepIndent = /^\s{4,}/.test(rawLine);
       if (isDeepIndent && isContinuationLine(rawLine, line)) {
         continuationLineCount++;
-        if (continuationLineCount > MAX_CONTINUATION_LINES) {
+        if (continuationLineCount > MAX_DEEP_INDENT_CONTINUATION_LINES) {
           questionEndIndex = i;
           break;
         }
@@ -826,11 +834,14 @@ function detectMultipleChoicePrompt(output: string, options?: DetectPromptOption
       // or path/filename fragments from terminal width wrapping - Issue #181)
       if (isContinuationLine(rawLine, line)) {
         continuationLineCount++;
+        const maxContinuationLines = /^\s{4,}/.test(rawLine)
+          ? MAX_DEEP_INDENT_CONTINUATION_LINES
+          : MAX_CONTINUATION_LINES;
         // Issue #372: Codex TUI indents all output with 2 spaces, causing
         // every line to match isContinuationLine(). Limit the scan distance
         // to prevent traversing into body text where numbered lists would be
         // collected as false options.
-        if (continuationLineCount > MAX_CONTINUATION_LINES) {
+        if (continuationLineCount > maxContinuationLines) {
           questionEndIndex = i;
           break;
         }
