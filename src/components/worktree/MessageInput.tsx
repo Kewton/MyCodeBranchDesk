@@ -328,86 +328,119 @@ export const MessageInput = memo(function MessageInput({ worktreeId, onMessageSe
         data-testid="image-file-input"
       />
 
-      <form onSubmit={handleSubmit} className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-500">
-        {/* Mobile: Slash command button */}
+      <form onSubmit={handleSubmit} className={`bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-500 ${isMobile ? 'flex flex-col gap-1' : 'flex items-center gap-2'}`}>
+        {/* Mobile: Row 1 - action buttons (slash command, attach, interrupt) */}
         {isMobile && (
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                if (isFreeInputMode) {
+                  setIsFreeInputMode(false);
+                }
+                setShowCommandSelector(true);
+              }}
+              className="flex-shrink-0 p-2 text-gray-500 hover:text-cyan-600 hover:bg-cyan-50 dark:text-gray-400 dark:hover:text-cyan-400 dark:hover:bg-cyan-900/30 rounded-full transition-colors"
+              aria-label="Show slash commands"
+              data-testid="mobile-command-button"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={openFileDialog}
+              disabled={isUploading || sending}
+              className="flex-shrink-0 p-2 text-gray-500 hover:text-cyan-600 hover:bg-cyan-50 dark:text-gray-400 dark:hover:text-cyan-400 dark:hover:bg-cyan-900/30 rounded-full transition-colors disabled:text-gray-300 dark:disabled:text-gray-600 disabled:hover:bg-transparent"
+              aria-label="Attach image"
+              data-testid="attach-image-button"
+            >
+              {isUploading ? (
+                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              ) : (
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                </svg>
+              )}
+            </button>
+            <InterruptButton
+              worktreeId={worktreeId}
+              cliToolId={cliToolId || 'claude'}
+              disabled={!isSessionRunning}
+            />
+          </div>
+        )}
+
+        {/* Desktop: Image attach button (inline) */}
+        {!isMobile && (
           <button
             type="button"
-            onClick={() => {
-              if (isFreeInputMode) {
-                setIsFreeInputMode(false);
-              }
-              setShowCommandSelector(true);
-            }}
-            className="flex-shrink-0 p-2 text-gray-500 hover:text-cyan-600 hover:bg-cyan-50 dark:text-gray-400 dark:hover:text-cyan-400 dark:hover:bg-cyan-900/30 rounded-full transition-colors"
-            aria-label="Show slash commands"
-            data-testid="mobile-command-button"
+            onClick={openFileDialog}
+            disabled={isUploading || sending}
+            className="flex-shrink-0 p-2 text-gray-500 hover:text-cyan-600 hover:bg-cyan-50 dark:text-gray-400 dark:hover:text-cyan-400 dark:hover:bg-cyan-900/30 rounded-full transition-colors disabled:text-gray-300 dark:disabled:text-gray-600 disabled:hover:bg-transparent"
+            aria-label="Attach image"
+            data-testid="attach-image-button"
           >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
-            </svg>
+            {isUploading ? (
+              <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : (
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+              </svg>
+            )}
           </button>
         )}
 
-        {/* Issue #474: Image attach button */}
-        <button
-          type="button"
-          onClick={openFileDialog}
-          disabled={isUploading || sending}
-          className="flex-shrink-0 p-2 text-gray-500 hover:text-cyan-600 hover:bg-cyan-50 dark:text-gray-400 dark:hover:text-cyan-400 dark:hover:bg-cyan-900/30 rounded-full transition-colors disabled:text-gray-300 dark:disabled:text-gray-600 disabled:hover:bg-transparent"
-          aria-label="Attach image"
-          data-testid="attach-image-button"
-        >
-          {isUploading ? (
-            <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-          ) : (
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-            </svg>
+        {/* Row 2 (mobile) / inline (desktop): message input + send */}
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <textarea
+            ref={textareaRef}
+            value={message}
+            onChange={handleMessageChange}
+            onKeyDown={handleKeyDown}
+            onCompositionStart={handleCompositionStart}
+            onCompositionEnd={handleCompositionEnd}
+            placeholder={isMobile ? "Type your message..." : "Type your message... (/ for commands, Shift+Enter for line break)"}
+            disabled={sending}
+            rows={1}
+            className="flex-1 outline-none bg-transparent resize-none overflow-y-auto scrollbar-thin"
+            style={{ minHeight: '36px', maxHeight: '160px', paddingTop: '8px', paddingBottom: '8px', lineHeight: '20px' }}
+          />
+
+          {/* Desktop: Interrupt Button */}
+          {!isMobile && (
+            <InterruptButton
+              worktreeId={worktreeId}
+              cliToolId={cliToolId || 'claude'}
+              disabled={!isSessionRunning}
+            />
           )}
-        </button>
 
-        <textarea
-          ref={textareaRef}
-          value={message}
-          onChange={handleMessageChange}
-          onKeyDown={handleKeyDown}
-          onCompositionStart={handleCompositionStart}
-          onCompositionEnd={handleCompositionEnd}
-          placeholder={isMobile ? "Type your message..." : "Type your message... (/ for commands, Shift+Enter for line break)"}
-          disabled={sending}
-          rows={1}
-          className="flex-1 outline-none bg-transparent resize-none overflow-y-auto scrollbar-thin"
-          style={{ minHeight: '36px', maxHeight: '160px', paddingTop: '8px', paddingBottom: '8px', lineHeight: '20px' }}
-        />
-
-        {/* Interrupt Button - visible when session is running */}
-        <InterruptButton
-          worktreeId={worktreeId}
-          cliToolId={cliToolId || 'claude'}
-          disabled={!isSessionRunning}
-        />
-
-        <button
-          type="submit"
-          disabled={(!message.trim() && !attachedImage) || sending}
-          className="flex-shrink-0 p-2 text-cyan-600 hover:bg-cyan-50 dark:text-cyan-400 dark:hover:bg-cyan-900/30 rounded-full transition-colors disabled:text-gray-300 dark:disabled:text-gray-600 disabled:hover:bg-transparent"
-          aria-label="Send message"
-        >
-          {sending ? (
-            <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-          ) : (
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-            </svg>
-          )}
-        </button>
+          <button
+            type="submit"
+            disabled={(!message.trim() && !attachedImage) || sending}
+            className="flex-shrink-0 p-2 text-cyan-600 hover:bg-cyan-50 dark:text-cyan-400 dark:hover:bg-cyan-900/30 rounded-full transition-colors disabled:text-gray-300 dark:disabled:text-gray-600 disabled:hover:bg-transparent"
+            aria-label="Send message"
+          >
+            {sending ? (
+              <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : (
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+            )}
+          </button>
+        </div>
       </form>
 
       {/* Slash Command Selector */}
