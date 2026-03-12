@@ -41,12 +41,16 @@ describe('STATUS_REASON constants', () => {
 });
 
 describe('detectSessionStatus - OpenCode selection_list detection', () => {
-  it('should detect selection list and return waiting status with high confidence', () => {
+  it('should detect "Select model" header and return waiting status', () => {
     const output = buildOpenCodeOutput([
-      'filter: ',
-      '> gpt-4o',
-      '  gpt-4o-mini',
-      '  claude-3.5-sonnet',
+      '              Select model                                     esc',
+      '',
+      '              Search',
+      '',
+      '              Recent',
+      '            > GPT-5.1-Codex-mini GitHub Copilot',
+      '              GPT-5-mini GitHub Copilot',
+      '              claude-3.5-sonnet',
     ]);
 
     const result = detectSessionStatus(output, 'opencode');
@@ -56,11 +60,15 @@ describe('detectSessionStatus - OpenCode selection_list detection', () => {
     expect(result.hasActivePrompt).toBe(false);
   });
 
-  it('should detect selection list with > prefix item', () => {
+  it('should detect "Select provider" header', () => {
     const output = buildOpenCodeOutput([
-      '> ollama/llama3',
-      '  ollama/codellama',
-      '  ollama/mistral',
+      '              Select provider                                  esc',
+      '',
+      '              Search',
+      '',
+      '              OpenAI',
+      '              Anthropic',
+      '              Ollama',
     ]);
 
     const result = detectSessionStatus(output, 'opencode');
@@ -97,7 +105,7 @@ describe('detectSessionStatus - OpenCode selection_list detection', () => {
   // [DR3-002] Priority: (A) processing_indicator takes precedence over (C) selection_list
   it('should prioritize processing_indicator (A) over selection_list (C)', () => {
     const output = buildOpenCodeOutput(
-      ['> some-model', '  other-model'],
+      ['              Select model                                     esc', '  GPT-5-mini'],
       [
         '  \u2503                                \u2503',
         '  \u2579\u2580\u2580\u2580\u2580\u2580\u2580\u2580\u2580',
@@ -115,7 +123,7 @@ describe('detectSessionStatus - OpenCode selection_list detection', () => {
   // [DR3-002] Priority: (B) thinking takes precedence over (C) selection_list
   it('should prioritize thinking (B) over selection_list (C)', () => {
     const output = buildOpenCodeOutput([
-      '> some-model',
+      '              Select model                                     esc',
       'Thinking:',  // thinking indicator in content
     ]);
 

@@ -263,10 +263,13 @@ export function detectSessionStatus(
       }
 
       // C. Check content area for selection list (Issue #473: fuzzy-search list detection)
+      // Selection list header ("Select model"/"Select provider") may be far above the
+      // last content line when many items are listed, so check all content candidates.
       const contentCheckWindow = contentCandidates
         .slice(Math.max(0, lastContentIdx - STATUS_CHECK_LINE_COUNT + 1), lastContentIdx + 1)
         .join('\n');
-      if (OPENCODE_SELECTION_LIST_PATTERN.test(contentCheckWindow)) {
+      const fullContentText = contentCandidates.join('\n');
+      if (OPENCODE_SELECTION_LIST_PATTERN.test(fullContentText)) {
         return {
           status: 'waiting',
           confidence: 'high',

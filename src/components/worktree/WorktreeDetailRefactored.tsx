@@ -2578,30 +2578,28 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
           />
         </main>
 
-        {/* Issue #473: Navigation buttons for OpenCode TUI selection list (mobile) */}
-        {isSelectionListActive && (
-          <div
-            className="fixed left-0 right-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 pt-1 z-30"
-            style={{ bottom: 'calc(7rem + env(safe-area-inset-bottom, 0px))' }}
-          >
-            <NavigationButtons
-              worktreeId={worktreeId}
-              cliToolId={activeCliTab}
-            />
-          </div>
-        )}
-
         {/* Message Input - fixed above tab bar */}
         <div
-          className="fixed left-0 right-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-2 z-30"
+          className="fixed left-0 right-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 z-30"
           style={{ bottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }}
         >
-          <MessageInput
-            worktreeId={worktreeId}
-            onMessageSent={handleMessageSent}
-            cliToolId={activeCliTab}
-            isSessionRunning={state.terminal.isActive}
-          />
+          {/* Issue #473: Navigation buttons for OpenCode TUI selection list (mobile) */}
+          {isSelectionListActive && (
+            <div className="px-2 pt-1 border-b border-gray-200 dark:border-gray-700">
+              <NavigationButtons
+                worktreeId={worktreeId}
+                cliToolId={activeCliTab}
+              />
+            </div>
+          )}
+          <div className="p-2">
+            <MessageInput
+              worktreeId={worktreeId}
+              onMessageSent={handleMessageSent}
+              cliToolId={activeCliTab}
+              isSessionRunning={state.terminal.isActive}
+            />
+          </div>
         </div>
 
         <MobileTabBar

@@ -9,7 +9,7 @@
  * [DR4-006] No dangerouslySetInnerHTML usage.
  */
 
-import { useCallback, type KeyboardEvent } from 'react';
+import { useCallback, useState, type KeyboardEvent } from 'react';
 import type { CLIToolType } from '@/lib/cli-tools/types';
 
 export interface NavigationButtonsProps {
@@ -26,20 +26,24 @@ const NAVIGATION_BUTTONS = [
 ] as const;
 
 export function NavigationButtons({ worktreeId, cliToolId }: NavigationButtonsProps) {
-  const sendKeys = useCallback(async (keys: string[]) => {
-    try {
-      await fetch(`/api/worktrees/${encodeURIComponent(worktreeId)}/special-keys`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cliToolId, keys }),
-      });
-    } catch (err) {
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+
+  const sendKeys = useCallback((keys: string[]) => {
+    // Show immediate visual feedback
+    setActiveKey(keys[0]);
+    setTimeout(() => setActiveKey(null), 150);
+
+    // Fire-and-forget: don't await the fetch to avoid perceived latency
+    fetch(`/api/worktrees/${encodeURIComponent(worktreeId)}/special-keys`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cliToolId, keys }),
+    }).catch((err) => {
       console.error('Failed to send special keys:', err);
-    }
+    });
   }, [worktreeId, cliToolId]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent<HTMLDivElement>) => {
-    // Only intercept arrow keys when this component has focus
     const keyMap: Record<string, string> = {
       ArrowUp: 'Up',
       ArrowDown: 'Down',
@@ -55,22 +59,24 @@ export function NavigationButtons({ worktreeId, cliToolId }: NavigationButtonsPr
 
   return (
     <div
-      className="flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+      className="flex items-center gap-1.5 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-lg"
       onKeyDown={handleKeyDown}
       role="toolbar"
       aria-label="TUI Navigation"
     >
-      <span className="text-xs text-gray-500 dark:text-gray-400 mr-1">Nav</span>
+      <span className="text-xs text-gray-500 dark:text-gray-400 mx-2">Nav</span>
       {NAVIGATION_BUTTONS.map(({ key, label, ariaLabel }) => (
         <button
           key={key}
           type="button"
-          className="min-w-[44px] min-h-[44px] px-3 py-2 text-sm font-medium rounded-md
-            bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600
-            hover:bg-gray-50 dark:hover:bg-gray-600
+          className={`min-w-[44px] min-h-[44px] px-3 py-2 text-sm font-medium rounded-md
+            border border-gray-300 dark:border-gray-600
             focus:outline-none focus:ring-2 focus:ring-blue-500
-            active:bg-gray-100 dark:active:bg-gray-500
-            transition-colors"
+            transition-colors duration-75
+            ${activeKey === key
+              ? 'bg-blue-500 text-white border-blue-500 scale-95'
+              : 'bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 active:bg-gray-100 dark:active:bg-gray-500'
+            }`}
           aria-label={ariaLabel}
           onClick={() => sendKeys([key])}
         >

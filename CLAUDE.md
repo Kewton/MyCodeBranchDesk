@@ -218,6 +218,8 @@ tests/
 | `src/app/api/worktrees/[id]/git/log/route.ts` | Gitコミット履歴取得API（Issue #447） |
 | `src/app/api/worktrees/[id]/git/show/[commitHash]/route.ts` | Gitコミット変更ファイル一覧API（Issue #447） |
 | `src/app/api/worktrees/[id]/git/diff/route.ts` | Gitファイルdiff取得API（Issue #447） |
+| `src/app/api/worktrees/[id]/special-keys/route.ts` | 特殊キー送信API（Up/Down/Enter/Escape、6層防御）（Issue #473） |
+| `src/components/worktree/NavigationButtons.tsx` | OpenCode TUI選択リストナビゲーションボタン（Issue #473） |
 
 ### CLIモジュール
 

@@ -195,20 +195,14 @@ export const OPENCODE_PROCESSING_INDICATOR = /esc interrupt/;
 
 /**
  * OpenCode TUI selection list pattern (Issue #473)
- * Placeholder pattern for detecting fuzzy-search selection lists in OpenCode TUI
- * (e.g., /models, /providers commands).
+ * Detects the fuzzy-search selection list overlay in OpenCode TUI
+ * (e.g., /models, /providers, /connect commands).
  *
- * Matches two typical patterns:
- * 1. "> " followed by a model/provider name (selected item indicator)
- * 2. "filter: " input bar (fuzzy search input)
- *
- * The ">" pattern requires a non-whitespace character after "> " to avoid
- * matching Claude prompt patterns (which use ">" or ">" followed by space only).
- *
- * This is a placeholder pattern - to be refined after capture-pane output
- * samples are collected from actual OpenCode TUI selection lists.
+ * Matches header lines of selection overlays. Known headers:
+ *   "              Select model                                     esc"
+ *   "              Connect a provider                               esc"
  */
-export const OPENCODE_SELECTION_LIST_PATTERN = /^>\s+\S|^filter:\s/m;
+export const OPENCODE_SELECTION_LIST_PATTERN = /^\s*(Select\s+(model|provider)|Connect\s+a\s+provider)/m;
 
 /**
  * OpenCode TUI separator pattern (Issue #379)

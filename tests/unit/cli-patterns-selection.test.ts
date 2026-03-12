@@ -1,6 +1,6 @@
 /**
  * Unit tests for OPENCODE_SELECTION_LIST_PATTERN
- * Issue #473: Placeholder pattern for OpenCode TUI selection list detection
+ * Issue #473: Pattern for OpenCode TUI selection list detection
  * @vitest-environment node
  */
 
@@ -19,30 +19,39 @@ describe('OPENCODE_SELECTION_LIST_PATTERN', () => {
     expect(OPENCODE_SELECTION_LIST_PATTERN).toBeInstanceOf(RegExp);
   });
 
-  it('should match typical selection list patterns with > prefix', () => {
-    // OpenCode TUI selection lists use > prefix for the selected item
-    expect(OPENCODE_SELECTION_LIST_PATTERN.test('> gpt-4o')).toBe(true);
-    expect(OPENCODE_SELECTION_LIST_PATTERN.test('> claude-3.5-sonnet')).toBe(true);
+  it('should match "Select model" header from actual capture-pane output', () => {
+    // Actual OpenCode TUI output: "              Select model                                     esc"
+    expect(OPENCODE_SELECTION_LIST_PATTERN.test('              Select model                                     esc')).toBe(true);
+    expect(OPENCODE_SELECTION_LIST_PATTERN.test('Select model')).toBe(true);
+    expect(OPENCODE_SELECTION_LIST_PATTERN.test('  Select model  ')).toBe(true);
   });
 
-  it('should match filter input pattern', () => {
-    // Selection lists typically have a filter input
-    expect(OPENCODE_SELECTION_LIST_PATTERN.test('filter: gpt')).toBe(true);
+  it('should match "Select provider" header', () => {
+    expect(OPENCODE_SELECTION_LIST_PATTERN.test('              Select provider                                  esc')).toBe(true);
+    expect(OPENCODE_SELECTION_LIST_PATTERN.test('Select provider')).toBe(true);
+  });
+
+  it('should match "Connect a provider" header from /connect command', () => {
+    expect(OPENCODE_SELECTION_LIST_PATTERN.test('              Connect a provider                               esc')).toBe(true);
+    expect(OPENCODE_SELECTION_LIST_PATTERN.test('Connect a provider')).toBe(true);
+  });
+
+  it('should match in multiline content', () => {
+    const multiline = `
+
+              Select model                                     esc
+
+              Search
+
+              Recent
+            > GPT-5.1-Codex-mini GitHub Copilot
+              GPT-5-mini GitHub Copilot`;
+    expect(OPENCODE_SELECTION_LIST_PATTERN.test(multiline)).toBe(true);
   });
 
   it('should not match regular text output', () => {
     expect(OPENCODE_SELECTION_LIST_PATTERN.test('Hello, how can I help you?')).toBe(false);
     expect(OPENCODE_SELECTION_LIST_PATTERN.test('The code looks correct.')).toBe(false);
-  });
-
-  // [DR1-005] Non-overlap with existing patterns
-  it('should not overlap with OPENCODE_PROCESSING_INDICATOR', () => {
-    // "esc interrupt" should not match selection list pattern
-    const processingText = 'esc interrupt';
-    if (OPENCODE_PROCESSING_INDICATOR.test(processingText)) {
-      // If it matches processing, it should ideally not match selection too
-      // (this is a soft check; priority order in status-detector handles conflicts)
-    }
   });
 
   it('should not match OpenCode thinking pattern text', () => {
@@ -55,7 +64,12 @@ describe('OPENCODE_SELECTION_LIST_PATTERN', () => {
   });
 
   it('should not match Claude CLI output patterns', () => {
-    expect(OPENCODE_SELECTION_LIST_PATTERN.test('> ')).toBe(false); // Claude prompt (just > with space, no model name)
+    expect(OPENCODE_SELECTION_LIST_PATTERN.test('> ')).toBe(false);
     expect(OPENCODE_SELECTION_LIST_PATTERN.test('esc to interrupt')).toBe(false);
+  });
+
+  it('should not match text containing "Select" in normal conversation', () => {
+    expect(OPENCODE_SELECTION_LIST_PATTERN.test('Please select a file to edit')).toBe(false);
+    expect(OPENCODE_SELECTION_LIST_PATTERN.test('I selected the model')).toBe(false);
   });
 });
