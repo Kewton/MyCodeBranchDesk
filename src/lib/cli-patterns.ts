@@ -194,6 +194,17 @@ export const OPENCODE_RESPONSE_COMPLETE = /\u25A3\s+\w+\s+\u00b7\s+\S+(?:\s+\u00
 export const OPENCODE_PROCESSING_INDICATOR = /esc interrupt/;
 
 /**
+ * OpenCode TUI selection list pattern (Issue #473)
+ * Detects the fuzzy-search selection list overlay in OpenCode TUI
+ * (e.g., /models, /providers, /connect commands).
+ *
+ * Matches header lines of selection overlays. Known headers:
+ *   "              Select model                                     esc"
+ *   "              Connect a provider                               esc"
+ */
+export const OPENCODE_SELECTION_LIST_PATTERN = /^\s*(Select\s+(model|provider)|Connect\s+a\s+provider)/m;
+
+/**
  * OpenCode TUI separator pattern (Issue #379)
  * Matches lines composed entirely of box-drawing / TUI decoration characters.
  * Covers: vertical lines (U+2503), box corners, horizontal lines, and other TUI elements.
