@@ -17,10 +17,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDbInstance } from '@/lib/db-instance';
 import { getWorktreeById, createMessage, updateLastUserMessage, clearInProgressMessageId, saveInitialBranch, getInitialBranch, getMessages, deleteMessageById } from '@/lib/db';
 import { CLIToolManager } from '@/lib/cli-tools/manager';
-import { CLI_TOOL_IDS, type CLIToolType } from '@/lib/cli-tools/types';
+import { CLI_TOOL_IDS, isImageCapableCLITool, type CLIToolType } from '@/lib/cli-tools/types';
 import { startPolling } from '@/lib/response-poller';
 import { savePendingAssistantResponse } from '@/lib/assistant-response-saver';
 import { getGitStatus } from '@/lib/git-utils';
+import { isPathSafe, resolveAndValidateRealPath } from '@/lib/path-validator';
+import path from 'path';
 
 /** Supported CLI tool IDs - derived from CLI_TOOL_IDS (Issue #368: DRY) */
 const VALID_CLI_TOOL_IDS: readonly CLIToolType[] = CLI_TOOL_IDS;
@@ -31,6 +33,21 @@ const DEFAULT_CLI_TOOL: CLIToolType = 'claude';
 interface SendMessageRequest {
   content: string;
   cliToolId?: CLIToolType;  // Optional: override the worktree's default CLI tool
+  imagePath?: string;  // Issue #474: relative path within .commandmate/attachments/
+}
+
+/** [S4-M2] URL schemes that are not allowed in imagePath (SSRF prevention) */
+const DANGEROUS_SCHEMES = ['file://', 'http://', 'https://', 'ftp://', 'data:'];
+
+/** [S4-M1] Control character regex for CLI injection prevention */
+const CONTROL_CHAR_REGEX = /[\x00-\x1f\x7f]/;
+
+/**
+ * Helper function to create a JSON error response
+ * Issue #474: Centralized error response for imagePath validation
+ */
+function errorResponse(code: string, message: string, status: number) {
+  return NextResponse.json({ error: message, code }, { status });
 }
 
 /**
@@ -156,9 +173,56 @@ export async function POST(
       console.error(`[send] Failed to detect orphaned messages:`, error);
     }
 
+    // Issue #474: Validate imagePath if provided
+    let absoluteImagePath: string | undefined;
+    if (body.imagePath) {
+      // [S4-M2] URL scheme rejection (SSRF prevention)
+      if (DANGEROUS_SCHEMES.some(scheme => body.imagePath!.startsWith(scheme))) {
+        return errorResponse('INVALID_PATH', 'URL schemes are not allowed in imagePath', 400);
+      }
+
+      // [S2-M2] Path traversal defense
+      if (!isPathSafe(body.imagePath, worktree.path)) {
+        return errorResponse('INVALID_PATH', 'Invalid image path', 400);
+      }
+
+      // [S2-M1] Symlink traversal defense
+      if (!resolveAndValidateRealPath(body.imagePath, worktree.path)) {
+        return errorResponse('INVALID_PATH', 'Invalid image path (symlink)', 400);
+      }
+
+      // [S4-S4] Whitelist: must be within .commandmate/attachments/
+      const ALLOWED_IMAGE_DIR = path.join(worktree.path, '.commandmate', 'attachments');
+      const resolvedPath = path.resolve(worktree.path, body.imagePath);
+      if (!resolvedPath.startsWith(ALLOWED_IMAGE_DIR + path.sep) && resolvedPath !== ALLOWED_IMAGE_DIR) {
+        return errorResponse('INVALID_PATH', 'imagePath must be within .commandmate/attachments/', 400);
+      }
+
+      // [S4-M1] Control character check for CLI injection prevention
+      if (CONTROL_CHAR_REGEX.test(resolvedPath)) {
+        return errorResponse('INVALID_PATH', 'Path contains control characters', 400);
+      }
+
+      absoluteImagePath = resolvedPath;
+    }
+
     // Send message to CLI tool
     try {
-      await cliTool.sendMessage(params.id, body.content);
+      // Issue #474: Image-aware sending
+      if (absoluteImagePath) {
+        if (isImageCapableCLITool(cliTool)) {
+          // Image-capable tool: use native image sending
+          await cliTool.sendMessageWithImage(params.id, trimmedContent, absoluteImagePath);
+        } else {
+          // Fallback: embed path in message
+          const messageWithPath = trimmedContent
+            ? `${trimmedContent}\n\n[添付画像: ${absoluteImagePath}]`
+            : `[添付画像: ${absoluteImagePath}]`;
+          await cliTool.sendMessage(params.id, messageWithPath);
+        }
+      } else {
+        await cliTool.sendMessage(params.id, body.content);
+      }
     } catch (error: unknown) {
       console.error(`Failed to send message to ${cliTool.name}:`, error);
       return NextResponse.json(
