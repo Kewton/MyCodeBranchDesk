@@ -57,6 +57,55 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Unknown error';
 }
 
+/**
+ * Validate and resolve imagePath to an absolute path
+ * Issue #474: Extracted from POST handler for SRP and readability
+ *
+ * Security validations:
+ * - [S4-M2] URL scheme rejection (SSRF prevention)
+ * - [S2-M2] Path traversal defense
+ * - [S2-M1] Symlink traversal defense
+ * - [S4-S4] Whitelist: must be within .commandmate/attachments/
+ * - [S4-M1] Control character check for CLI injection prevention
+ *
+ * @param imagePath - Relative image path from request body
+ * @param worktreePath - Absolute path of the worktree
+ * @returns Resolved absolute path on success, or NextResponse error
+ */
+function validateImagePath(
+  imagePath: string,
+  worktreePath: string
+): string | NextResponse {
+  // [S4-M2] URL scheme rejection (SSRF prevention)
+  if (DANGEROUS_SCHEMES.some(scheme => imagePath.startsWith(scheme))) {
+    return errorResponse('INVALID_PATH', 'URL schemes are not allowed in imagePath', 400);
+  }
+
+  // [S2-M2] Path traversal defense
+  if (!isPathSafe(imagePath, worktreePath)) {
+    return errorResponse('INVALID_PATH', 'Invalid image path', 400);
+  }
+
+  // [S2-M1] Symlink traversal defense
+  if (!resolveAndValidateRealPath(imagePath, worktreePath)) {
+    return errorResponse('INVALID_PATH', 'Invalid image path (symlink)', 400);
+  }
+
+  // [S4-S4] Whitelist: must be within .commandmate/attachments/
+  const ALLOWED_IMAGE_DIR = path.join(worktreePath, '.commandmate', 'attachments');
+  const resolvedPath = path.resolve(worktreePath, imagePath);
+  if (!resolvedPath.startsWith(ALLOWED_IMAGE_DIR + path.sep) && resolvedPath !== ALLOWED_IMAGE_DIR) {
+    return errorResponse('INVALID_PATH', 'imagePath must be within .commandmate/attachments/', 400);
+  }
+
+  // [S4-M1] Control character check for CLI injection prevention
+  if (CONTROL_CHAR_REGEX.test(resolvedPath)) {
+    return errorResponse('INVALID_PATH', 'Path contains control characters', 400);
+  }
+
+  return resolvedPath;
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -176,34 +225,11 @@ export async function POST(
     // Issue #474: Validate imagePath if provided
     let absoluteImagePath: string | undefined;
     if (body.imagePath) {
-      // [S4-M2] URL scheme rejection (SSRF prevention)
-      if (DANGEROUS_SCHEMES.some(scheme => body.imagePath!.startsWith(scheme))) {
-        return errorResponse('INVALID_PATH', 'URL schemes are not allowed in imagePath', 400);
+      const validationResult = validateImagePath(body.imagePath, worktree.path);
+      if (validationResult instanceof NextResponse) {
+        return validationResult;
       }
-
-      // [S2-M2] Path traversal defense
-      if (!isPathSafe(body.imagePath, worktree.path)) {
-        return errorResponse('INVALID_PATH', 'Invalid image path', 400);
-      }
-
-      // [S2-M1] Symlink traversal defense
-      if (!resolveAndValidateRealPath(body.imagePath, worktree.path)) {
-        return errorResponse('INVALID_PATH', 'Invalid image path (symlink)', 400);
-      }
-
-      // [S4-S4] Whitelist: must be within .commandmate/attachments/
-      const ALLOWED_IMAGE_DIR = path.join(worktree.path, '.commandmate', 'attachments');
-      const resolvedPath = path.resolve(worktree.path, body.imagePath);
-      if (!resolvedPath.startsWith(ALLOWED_IMAGE_DIR + path.sep) && resolvedPath !== ALLOWED_IMAGE_DIR) {
-        return errorResponse('INVALID_PATH', 'imagePath must be within .commandmate/attachments/', 400);
-      }
-
-      // [S4-M1] Control character check for CLI injection prevention
-      if (CONTROL_CHAR_REGEX.test(resolvedPath)) {
-        return errorResponse('INVALID_PATH', 'Path contains control characters', 400);
-      }
-
-      absoluteImagePath = resolvedPath;
+      absoluteImagePath = validationResult;
     }
 
     // Send message to CLI tool
@@ -221,7 +247,7 @@ export async function POST(
           await cliTool.sendMessage(params.id, messageWithPath);
         }
       } else {
-        await cliTool.sendMessage(params.id, body.content);
+        await cliTool.sendMessage(params.id, trimmedContent);
       }
     } catch (error: unknown) {
       console.error(`Failed to send message to ${cliTool.name}:`, error);
@@ -233,10 +259,11 @@ export async function POST(
 
     // Create user message in database with CLI tool ID
     // Use the pre-generated timestamp for consistency
+    // [DRY] Use trimmedContent consistently (same value sent to CLI and used for orphan detection)
     const message = createMessage(db, {
       worktreeId: params.id,
       role: 'user',
-      content: body.content,
+      content: trimmedContent,
       messageType: 'normal',
       timestamp: userMessageTimestamp,
       cliToolId,
@@ -257,7 +284,7 @@ export async function POST(
     }
 
     // Update last user message for worktree
-    updateLastUserMessage(db, params.id, body.content, userMessageTimestamp);
+    updateLastUserMessage(db, params.id, trimmedContent, userMessageTimestamp);
 
     // Clear in-progress message ID (session state is managed by savePendingAssistantResponse)
     clearInProgressMessageId(db, params.id, cliToolId);

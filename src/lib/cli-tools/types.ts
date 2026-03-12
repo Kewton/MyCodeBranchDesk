@@ -207,8 +207,9 @@ export interface IImageCapableCLITool extends ICLITool {
  * @returns True if the tool implements IImageCapableCLITool
  */
 export function isImageCapableCLITool(tool: ICLITool): tool is IImageCapableCLITool {
-  return typeof (tool as IImageCapableCLITool).supportsImage === 'function'
-    && (tool as IImageCapableCLITool).supportsImage() === true;
+  const candidate = tool as IImageCapableCLITool;
+  return typeof candidate.supportsImage === 'function'
+    && candidate.supportsImage() === true;
 }
 
 /**
