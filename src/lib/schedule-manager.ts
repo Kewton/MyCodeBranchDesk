@@ -2,6 +2,7 @@
  * Schedule Manager
  * Issue #294: Manages scheduled execution of claude -p commands
  * Issue #409: Performance optimization with mtime caching and batch upsert
+ * Issue #479: Split into schedule-manager.ts + cron-parser.ts + job-executor.ts
  *
  * Uses a single timer to periodically scan all worktrees for CMATE.md changes
  * and execute scheduled tasks via croner cron expressions.
@@ -16,17 +17,26 @@
  * [S3-010] initScheduleManager() is called after initializeWorktrees()
  */
 
-import { randomUUID } from 'crypto';
-import { statSync } from 'fs';
-import path from 'path';
 import { Cron } from 'croner';
 import { readCmateFile, parseSchedulesSection } from './cmate-parser';
-import { executeClaudeCommand, getActiveProcesses, type ExecuteCommandOptions } from './claude-executor';
-import { CMATE_FILENAME } from '@/config/cmate-constants';
-import type { ScheduleEntry } from '@/types/cmate';
+import { getActiveProcesses } from './claude-executor';
+import {
+  getCmateMtime,
+  getAllWorktrees,
+  batchUpsertSchedules,
+  disableStaleSchedules,
+} from './cron-parser';
+import {
+  executeSchedule,
+  recoverRunningLogs,
+  type ScheduleState,
+} from './job-executor';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('schedule-manager');
+
+// Re-export for backward compatibility (public API preservation)
+export { batchUpsertSchedules } from './cron-parser';
 
 // =============================================================================
 // Constants
@@ -41,20 +51,6 @@ export const MAX_CONCURRENT_SCHEDULES = 100;
 // =============================================================================
 // Types
 // =============================================================================
-
-/** Internal schedule state for a running cron job */
-interface ScheduleState {
-  /** Schedule ID from DB */
-  scheduleId: string;
-  /** Worktree ID */
-  worktreeId: string;
-  /** Cron job instance */
-  cronJob: Cron;
-  /** Whether currently executing */
-  isExecuting: boolean;
-  /** Schedule entry from CMATE.md */
-  entry: ScheduleEntry;
-}
 
 /** Timer state for the manager */
 interface ManagerState {
@@ -83,26 +79,6 @@ interface ManagerState {
    */
   cmateFileCache: Map<string, number>;
 }
-
-/** DB row shape for worktree queries */
-interface WorktreeRow {
-  id: string;
-  path: string;
-}
-
-/** DB row shape for schedule ID and name lookup */
-interface ScheduleIdNameRow {
-  id: string;
-  name: string;
-}
-
-/** DB row shape for schedule ID lookup */
-interface ScheduleIdRow {
-  id: string;
-}
-
-/** Execution log status values */
-type ExecutionLogStatus = 'running' | 'completed' | 'failed' | 'timeout' | 'cancelled';
 
 // =============================================================================
 // Global State (hot reload persistence)
@@ -144,329 +120,6 @@ function getLazyDbInstance(): ReturnType<typeof import('./db-instance').getDbIns
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { getDbInstance } = require('./db-instance') as typeof import('./db-instance');
   return getDbInstance();
-}
-
-// =============================================================================
-// CMATE.md mtime Helper
-// =============================================================================
-
-/**
- * Get the modification time (mtimeMs) of the CMATE.md file in a worktree directory.
- *
- * Trust boundary (SEC4-003): worktreePath is DB-derived from getAllWorktrees()
- * and was validated by validateWorktreePath() at worktree registration time.
- * Therefore, path traversal re-validation is not needed here.
- * readCmateFile() has validateCmatePath() because it can be called externally,
- * whereas getCmateMtime() is an internal function called only from syncSchedules().
- *
- * @param worktreePath - Path to the worktree directory (DB-derived, trusted)
- * @returns mtimeMs value, or null if the file does not exist or cannot be read
- */
-function getCmateMtime(worktreePath: string): number | null {
-  // Uses CMATE_FILENAME from @/config/cmate-constants directly (DR1-001, CR2-001)
-  const filePath = path.join(worktreePath, CMATE_FILENAME);
-  try {
-    return statSync(filePath).mtimeMs;
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      'code' in error &&
-      (error as NodeJS.ErrnoException).code === 'ENOENT'
-    ) {
-      return null;
-    }
-    // Permission errors etc. - log and treat as no file (SEC4-004-note)
-    logger.warn('file:stat-failed', { filePath });
-    return null;
-  }
-}
-
-// =============================================================================
-// DB Operations
-// =============================================================================
-
-/**
- * Get all worktrees from the database.
- *
- * @returns Array of worktree rows with id and path
- */
-function getAllWorktrees(): WorktreeRow[] {
-  try {
-    const db = getLazyDbInstance();
-    return db.prepare('SELECT id, path FROM worktrees').all() as WorktreeRow[];
-  } catch (error) {
-    logger.error('worktree:fetch-failed', { error: error instanceof Error ? error.message : String(error) });
-    return [];
-  }
-}
-
-/**
- * Batch upsert schedule entries into the database.
- * Replaces the previous per-entry upsertSchedule() function (DR1-002).
- *
- * Uses a single SELECT to build an existing schedules map, then performs
- * all UPDATE/INSERT operations within a single transaction.
- *
- * Sanitization chain (SEC4-004): This function is called exclusively from
- * syncSchedules(), which passes entries produced by parseSchedulesSection().
- * parseSchedulesSection() calls sanitizeMessageContent() (S4-002) on all
- * message fields, so entries arriving here are already sanitized.
- * If batchUpsertSchedules() is called from a different code path in the
- * future, an input validation layer must be added at the call site.
- *
- * Note on next_execute_at (CR2-002): The scheduled_executions table has a
- * next_execute_at column (INTEGER, nullable) that is intentionally not
- * operated on by this function, consistent with the prior upsertSchedule().
- *
- * @param worktreeId - The worktree ID to associate schedules with
- * @param entries - Schedule entries from CMATE.md (sanitized by parseSchedulesSection)
- * @returns Array of schedule IDs (existing or newly created), in the same order as entries
- */
-export function batchUpsertSchedules(
-  worktreeId: string,
-  entries: ScheduleEntry[]
-): string[] {
-  if (entries.length === 0) return [];
-
-  const db = getLazyDbInstance();
-  const now = Date.now();
-
-  // Bulk fetch existing schedules for this worktree.
-  // better-sqlite3's prepare() is cached at the DB instance level (DR1-007),
-  // so calling it each invocation does not incur additional compilation cost.
-  const existingRows = db.prepare(
-    'SELECT id, name FROM scheduled_executions WHERE worktree_id = ?'
-  ).all(worktreeId) as ScheduleIdNameRow[];
-
-  const existingByName = new Map<string, string>();
-  for (const row of existingRows) {
-    existingByName.set(row.name, row.id);
-  }
-
-  const resultIds: string[] = [];
-
-  const updateStmt = db.prepare(`
-    UPDATE scheduled_executions
-    SET message = ?, cron_expression = ?, cli_tool_id = ?, enabled = ?, updated_at = ?
-    WHERE id = ?
-  `);
-
-  const insertStmt = db.prepare(`
-    INSERT INTO scheduled_executions (id, worktree_id, name, message, cron_expression, cli_tool_id, enabled, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  const runTransaction = db.transaction(() => {
-    for (const entry of entries) {
-      const existingId = existingByName.get(entry.name);
-
-      if (existingId) {
-        updateStmt.run(
-          entry.message, entry.cronExpression, entry.cliToolId,
-          entry.enabled ? 1 : 0, now, existingId
-        );
-        resultIds.push(existingId);
-      } else {
-        const id = randomUUID();
-        insertStmt.run(
-          id, worktreeId, entry.name, entry.message, entry.cronExpression,
-          entry.cliToolId, entry.enabled ? 1 : 0, now, now
-        );
-        resultIds.push(id);
-      }
-    }
-  });
-
-  runTransaction();
-
-  return resultIds;
-}
-
-/**
- * Create an execution log entry in 'running' status.
- *
- * @param scheduleId - The parent schedule ID
- * @param worktreeId - The worktree ID
- * @param message - The execution message/prompt
- * @returns The new execution log ID
- */
-function createExecutionLog(
-  scheduleId: string,
-  worktreeId: string,
-  message: string
-): string {
-  const db = getLazyDbInstance();
-  const now = Date.now();
-  const id = randomUUID();
-
-  db.prepare(`
-    INSERT INTO execution_logs (id, schedule_id, worktree_id, message, status, started_at, created_at)
-    VALUES (?, ?, ?, ?, 'running', ?, ?)
-  `).run(id, scheduleId, worktreeId, message, now, now);
-
-  return id;
-}
-
-/**
- * Update an execution log entry with results.
- *
- * @param logId - The execution log ID to update
- * @param status - The final execution status
- * @param result - The execution output or error message
- * @param exitCode - The process exit code, or null if unknown
- */
-function updateExecutionLog(
-  logId: string,
-  status: ExecutionLogStatus,
-  result: string | null,
-  exitCode: number | null
-): void {
-  const db = getLazyDbInstance();
-  const now = Date.now();
-
-  db.prepare(`
-    UPDATE execution_logs SET status = ?, result = ?, exit_code = ?, completed_at = ? WHERE id = ?
-  `).run(status, result, exitCode, now, logId);
-}
-
-/**
- * Update the last_executed_at timestamp for a schedule.
- *
- * @param scheduleId - The schedule ID to update
- */
-function updateScheduleLastExecuted(scheduleId: string): void {
-  const db = getLazyDbInstance();
-  const now = Date.now();
-
-  db.prepare('UPDATE scheduled_executions SET last_executed_at = ?, updated_at = ? WHERE id = ?')
-    .run(now, now, scheduleId);
-}
-
-/**
- * Recovery: mark all 'running' execution logs as 'failed' on startup.
- * This handles the case where the server was killed while executions
- * were still in progress.
- */
-function recoverRunningLogs(): void {
-  try {
-    const db = getLazyDbInstance();
-    const now = Date.now();
-
-    const result = db.prepare(
-      "UPDATE execution_logs SET status = 'failed', completed_at = ? WHERE status = 'running'"
-    ).run(now);
-
-    if (result.changes > 0) {
-      logger.warn('execution:recovered-stale', { count: result.changes });
-    }
-  } catch (error) {
-    logger.error('execution:recover-failed', { error: error instanceof Error ? error.message : String(error) });
-  }
-}
-
-/**
- * Disable DB schedules that are no longer present in CMATE.md.
- * Sets enabled = 0 for schedules belonging to the given worktrees
- * that are not in the activeScheduleIds set.
- * Skips records already disabled to avoid unnecessary DB writes.
- *
- * @param activeScheduleIds - Set of schedule IDs currently active from CMATE.md
- * @param worktreeIds - Array of worktree IDs that were scanned
- */
-function disableStaleSchedules(
-  activeScheduleIds: Set<string>,
-  worktreeIds: string[]
-): void {
-  if (worktreeIds.length === 0) return;
-
-  try {
-    const db = getLazyDbInstance();
-    const now = Date.now();
-    // SEC4-002: Dynamic placeholder generation is SQL injection-safe because only
-    // '?' placeholders are interpolated into SQL; actual values are passed via
-    // prepared statement parameter binding. worktreeIds originates from
-    // getAllWorktrees() (bounded by MAX_CONCURRENT_SCHEDULES ~100), well within
-    // SQLite's SQLITE_MAX_VARIABLE_NUMBER (default 999).
-    const placeholders = worktreeIds.map(() => '?').join(',');
-
-    // Get enabled schedules for the scanned worktrees
-    const rows = db.prepare(
-      `SELECT id FROM scheduled_executions WHERE worktree_id IN (${placeholders}) AND enabled = 1`
-    ).all(...worktreeIds) as ScheduleIdRow[];
-
-    let disabledCount = 0;
-    const updateStmt = db.prepare(
-      'UPDATE scheduled_executions SET enabled = 0, updated_at = ? WHERE id = ?'
-    );
-
-    for (const row of rows) {
-      if (!activeScheduleIds.has(row.id)) {
-        updateStmt.run(now, row.id);
-        disabledCount++;
-      }
-    }
-
-    if (disabledCount > 0) {
-      logger.info('schedule:disabled-stale', { count: disabledCount });
-    }
-  } catch (error) {
-    logger.error('schedule:disable-stale-failed', { error: error instanceof Error ? error.message : String(error) });
-  }
-}
-
-// =============================================================================
-// Schedule Execution
-// =============================================================================
-
-/**
- * Execute a scheduled task.
- * Guards against concurrent execution of the same schedule.
- *
- * @param state - The schedule state to execute
- */
-async function executeSchedule(state: ScheduleState): Promise<void> {
-  if (state.isExecuting) {
-    logger.warn('execution:skip-concurrent', { name: state.entry.name });
-    return;
-  }
-
-  state.isExecuting = true;
-  const logId = createExecutionLog(state.scheduleId, state.worktreeId, state.entry.message);
-
-  try {
-    const db = getLazyDbInstance();
-    const worktree = db.prepare('SELECT path, vibe_local_model FROM worktrees WHERE id = ?').get(state.worktreeId) as { path: string; vibe_local_model: string | null } | undefined;
-
-    if (!worktree) {
-      updateExecutionLog(logId, 'failed', 'Worktree not found', null);
-      return;
-    }
-
-    // Build options for vibe-local model
-    const options: ExecuteCommandOptions | undefined =
-      state.entry.cliToolId === 'vibe-local' && worktree.vibe_local_model
-        ? { model: worktree.vibe_local_model }
-        : undefined;
-
-    const result = await executeClaudeCommand(
-      state.entry.message,
-      worktree.path,
-      state.entry.cliToolId,
-      state.entry.permission,
-      options
-    );
-
-    updateExecutionLog(logId, result.status, result.output, result.exitCode);
-    updateScheduleLastExecuted(state.scheduleId);
-
-    logger.info('execution:completed', { name: state.entry.name, status: result.status });
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    updateExecutionLog(logId, 'failed', errorMessage, null);
-    logger.error('execution:failed', { name: state.entry.name, error: errorMessage });
-  } finally {
-    state.isExecuting = false;
-  }
 }
 
 // =============================================================================

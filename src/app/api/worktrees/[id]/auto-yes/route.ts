@@ -11,11 +11,11 @@ import { getWorktreeById } from '@/lib/db';
 import {
   getAutoYesState,
   setAutoYesEnabled,
-  isValidWorktreeId,
   startAutoYesPolling,
   stopAutoYesPolling,
   type AutoYesState,
 } from '@/lib/auto-yes-manager';
+import { isValidWorktreeId } from '@/lib/path-validator';
 import { CLI_TOOL_IDS, type CLIToolType } from '@/lib/cli-tools/types';
 import { isAllowedDuration, DEFAULT_AUTO_YES_DURATION, validateStopPattern, type AutoYesDuration } from '@/config/auto-yes-config';
 import { createLogger } from '@/lib/logger';

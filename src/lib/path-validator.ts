@@ -10,6 +10,25 @@ import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('path-validator');
 
+// =============================================================================
+// Worktree ID Validation (Issue #479: moved from auto-yes-manager.ts)
+// =============================================================================
+
+/** Worktree ID validation pattern (security: prevent command injection) */
+export const WORKTREE_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
+
+/**
+ * Validate worktree ID format (security measure).
+ * Only allows alphanumeric characters, hyphens, and underscores.
+ *
+ * @param worktreeId - Worktree ID to validate
+ * @returns true if the ID matches the allowed pattern
+ */
+export function isValidWorktreeId(worktreeId: string): boolean {
+  if (!worktreeId || worktreeId.length === 0) return false;
+  return WORKTREE_ID_PATTERN.test(worktreeId);
+}
+
 /**
  * [SEC-394] Check whether resolvedPath is within resolvedRoot.
  *

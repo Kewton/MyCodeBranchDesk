@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbInstance } from '@/lib/db-instance';
 import { getWorktreeById } from '@/lib/db';
-import { isValidWorktreeId } from '@/lib/auto-yes-manager';
+import { isValidWorktreeId } from '@/lib/path-validator';
 import { isPathSafe } from '@/lib/path-validator';
 import { getGitDiff, handleGitApiError } from '@/lib/git-utils';
 import { COMMIT_HASH_PATTERN } from '@/types/git';

@@ -10,11 +10,11 @@ import {
   clearAllAutoYesStates,
   clearAllPollerStates,
   startAutoYesPolling,
-  isValidWorktreeId,
   deleteAutoYesState,
   getAutoYesStateWorktreeIds,
   getAutoYesPollerWorktreeIds,
 } from '@/lib/auto-yes-manager';
+import { isValidWorktreeId } from '@/lib/path-validator';
 
 // Mock dependencies required by startAutoYesPolling
 import { vi } from 'vitest';

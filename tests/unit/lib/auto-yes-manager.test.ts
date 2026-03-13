@@ -8,7 +8,6 @@ import {
   stopAutoYesPolling,
   stopAllAutoYesPolling,
   getLastServerResponseTimestamp,
-  isValidWorktreeId,
   calculateBackoffInterval,
   getActivePollerCount,
   clearAllPollerStates,
@@ -29,6 +28,7 @@ import {
   type AutoYesState,
   type AutoYesPollerState,
 } from '@/lib/auto-yes-manager';
+import { isValidWorktreeId } from '@/lib/path-validator';
 import { DEFAULT_AUTO_YES_DURATION } from '@/config/auto-yes-config';
 
 // Mock modules for pollAutoYes testing (Issue #161)
