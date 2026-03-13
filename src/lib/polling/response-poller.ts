@@ -19,8 +19,8 @@
  * - OpenCode extraction stop conditions (OPENCODE_PROMPT_PATTERN, OPENCODE_PROMPT_AFTER_RESPONSE)
  */
 
-import { captureSessionOutput, isSessionRunning } from './session/cli-session';
-import { getDbInstance } from './db-instance';
+import { captureSessionOutput, isSessionRunning } from '@/lib/session/cli-session';
+import { getDbInstance } from '@/lib/db-instance';
 import {
   createMessage,
   getSessionState,
@@ -28,13 +28,13 @@ import {
   getWorktreeById,
   clearInProgressMessageId,
   markPendingPromptsAsAnswered,
-} from './db';
-import { broadcastMessage } from './ws-server';
-import { detectPrompt } from './detection/prompt-detector';
-import type { PromptDetectionResult } from './detection/prompt-detector';
-import { recordClaudeConversation } from './conversation-logger';
-import type { CLIToolType } from './cli-tools/types';
-import { parseClaudeOutput } from './claude-output';
+} from '@/lib/db';
+import { broadcastMessage } from '@/lib/ws-server';
+import { detectPrompt } from '@/lib/detection/prompt-detector';
+import type { PromptDetectionResult } from '@/lib/detection/prompt-detector';
+import { recordClaudeConversation } from '@/lib/conversation-logger';
+import type { CLIToolType } from '@/lib/cli-tools/types';
+import { parseClaudeOutput } from '@/lib/claude-output';
 import {
   getCliToolPatterns,
   stripAnsi,
@@ -46,7 +46,7 @@ import {
   OPENCODE_RESPONSE_COMPLETE,
   OPENCODE_PROCESSING_INDICATOR,
   OPENCODE_SKIP_PATTERNS,
-} from './detection/cli-patterns';
+} from '@/lib/detection/cli-patterns';
 
 /**
  * Polling interval in milliseconds (default: 2 seconds)

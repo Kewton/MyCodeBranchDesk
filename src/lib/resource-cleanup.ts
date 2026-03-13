@@ -20,7 +20,7 @@ import {
   getAutoYesPollerWorktreeIds,
   deleteAutoYesState,
   stopAutoYesPolling,
-} from './auto-yes-manager';
+} from './polling/auto-yes-manager';
 import { stopScheduleForWorktree, getScheduleWorktreeIds } from './schedule-manager';
 import { getDbInstance } from './db-instance';
 

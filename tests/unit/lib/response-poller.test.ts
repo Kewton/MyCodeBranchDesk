@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { cleanClaudeResponse } from '@/lib/response-poller';
+import { cleanClaudeResponse } from '@/lib/polling/response-poller';
 import type { PromptDetectionResult } from '@/lib/detection/prompt-detector';
 
 describe('cleanClaudeResponse() - Pasted text filtering (Issue #212)', () => {

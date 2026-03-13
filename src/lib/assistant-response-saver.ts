@@ -21,7 +21,7 @@ import {
   updateSessionState,
 } from './db';
 import { broadcastMessage } from './ws-server';
-import { cleanClaudeResponse, cleanGeminiResponse, cleanOpenCodeResponse } from './response-poller';
+import { cleanClaudeResponse, cleanGeminiResponse, cleanOpenCodeResponse } from './polling/response-poller';
 import { stripAnsi } from './detection/cli-patterns';
 import type { CLIToolType } from './cli-tools/types';
 import type { ChatMessage } from '@/types/models';

@@ -13,7 +13,7 @@ import { captureSessionOutputFresh } from '@/lib/session/cli-session';
 import { detectPrompt, type PromptDetectionResult } from '@/lib/detection/prompt-detector';
 import { stripAnsi, stripBoxDrawing, buildDetectPromptOptions } from '@/lib/detection/cli-patterns';
 import { sendPromptAnswer } from '@/lib/prompt-answer-sender';
-import { isValidWorktreeId } from '@/lib/auto-yes-manager';
+import { isValidWorktreeId } from '@/lib/polling/auto-yes-manager';
 import type { PromptType } from '@/types/models';
 
 interface PromptResponseRequest {

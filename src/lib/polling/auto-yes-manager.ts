@@ -8,17 +8,17 @@
  * auto-yes responses when browser tabs are in background.
  */
 
-import type { CLIToolType } from './cli-tools/types';
-import { captureSessionOutput } from './session/cli-session';
-import { detectPrompt } from './detection/prompt-detector';
+import type { CLIToolType } from '@/lib/cli-tools/types';
+import { captureSessionOutput } from '@/lib/session/cli-session';
+import { detectPrompt } from '@/lib/detection/prompt-detector';
 import { resolveAutoAnswer } from './auto-yes-resolver';
-import { sendPromptAnswer } from './prompt-answer-sender';
-import { CLIToolManager } from './cli-tools/manager';
-import { stripAnsi, stripBoxDrawing, detectThinking, buildDetectPromptOptions } from './detection/cli-patterns';
+import { sendPromptAnswer } from '@/lib/prompt-answer-sender';
+import { CLIToolManager } from '@/lib/cli-tools/manager';
+import { stripAnsi, stripBoxDrawing, detectThinking, buildDetectPromptOptions } from '@/lib/detection/cli-patterns';
 import { DEFAULT_AUTO_YES_DURATION, validateStopPattern, type AutoYesDuration, type AutoYesStopReason } from '@/config/auto-yes-config';
-import { generatePromptKey } from './detection/prompt-key';
-import { getErrorMessage } from './errors';
-import { invalidateCache } from './tmux/tmux-capture-cache';
+import { generatePromptKey } from '@/lib/detection/prompt-key';
+import { getErrorMessage } from '@/lib/errors';
+import { invalidateCache } from '@/lib/tmux/tmux-capture-cache';
 
 // Re-export from shared config for backward compatibility (Issue #314)
 export type { AutoYesStopReason } from '@/config/auto-yes-config';

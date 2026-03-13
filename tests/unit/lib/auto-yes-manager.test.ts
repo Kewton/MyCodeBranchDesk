@@ -28,7 +28,7 @@ import {
   DUPLICATE_RETRY_EXPIRY_MS,
   type AutoYesState,
   type AutoYesPollerState,
-} from '@/lib/auto-yes-manager';
+} from '@/lib/polling/auto-yes-manager';
 import { DEFAULT_AUTO_YES_DURATION } from '@/config/auto-yes-config';
 
 // Mock modules for pollAutoYes testing (Issue #161)
@@ -128,7 +128,7 @@ describe('auto-yes-manager', () => {
   // [MF-001] AUTO_YES_TIMEOUT_MS deletion regression test
   describe('AUTO_YES_TIMEOUT_MS migration', () => {
     it('should not export AUTO_YES_TIMEOUT_MS from auto-yes-manager', async () => {
-      const managerModule = await import('@/lib/auto-yes-manager');
+      const managerModule = await import('@/lib/polling/auto-yes-manager');
       // Verify AUTO_YES_TIMEOUT_MS is not exported
       expect('AUTO_YES_TIMEOUT_MS' in managerModule).toBe(false);
     });
@@ -833,7 +833,7 @@ describe('auto-yes-manager', () => {
     it('should calculate correct Down arrow offset (default=1, target=3 -> 2x Down + Enter)', async () => {
       const { captureSessionOutput } = await import('@/lib/session/cli-session');
       const { sendKeys, sendSpecialKeys } = await import('@/lib/tmux/tmux');
-      const autoYesResolver = await import('@/lib/auto-yes-resolver');
+      const autoYesResolver = await import('@/lib/polling/auto-yes-resolver');
 
       vi.useFakeTimers();
       const now = Date.now();
@@ -876,7 +876,7 @@ describe('auto-yes-manager', () => {
     it('should calculate correct Up arrow offset (default=3, target=1 -> 2x Up + Enter)', async () => {
       const { captureSessionOutput } = await import('@/lib/session/cli-session');
       const { sendKeys, sendSpecialKeys } = await import('@/lib/tmux/tmux');
-      const autoYesResolver = await import('@/lib/auto-yes-resolver');
+      const autoYesResolver = await import('@/lib/polling/auto-yes-resolver');
 
       vi.useFakeTimers();
       const now = Date.now();
@@ -919,7 +919,7 @@ describe('auto-yes-manager', () => {
     it('should send just Enter when default=target (offset=0)', async () => {
       const { captureSessionOutput } = await import('@/lib/session/cli-session');
       const { sendKeys, sendSpecialKeys } = await import('@/lib/tmux/tmux');
-      const autoYesResolver = await import('@/lib/auto-yes-resolver');
+      const autoYesResolver = await import('@/lib/polling/auto-yes-resolver');
 
       vi.useFakeTimers();
       const now = Date.now();

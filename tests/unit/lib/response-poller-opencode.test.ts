@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 import {
   isOpenCodeComplete,
   cleanOpenCodeResponse,
-} from '@/lib/response-poller';
+} from '@/lib/polling/response-poller';
 import {
   OPENCODE_PROMPT_PATTERN,
   OPENCODE_PROMPT_AFTER_RESPONSE,
