@@ -214,8 +214,6 @@ function validateWorktreePath(worktreePath: string): string {
  * @returns Model map (key: model name, value: { name: display name })
  * @internal
  */
-// TODO: If a 3rd provider is added, extract common HTTP fetch logic
-// to fetchWithTimeout(url, timeoutMs, maxResponseSize): Promise<string | null>
 export async function fetchOllamaModels(): Promise<ProviderModels> {
   const models: ProviderModels = {};
   try {
@@ -281,8 +279,6 @@ export async function fetchOllamaModels(): Promise<ProviderModels> {
  * @returns Model map (key: model id, value: { name: model id })
  * @internal
  */
-// TODO: If a 3rd provider is added, extract common HTTP fetch logic
-// to fetchWithTimeout(url, timeoutMs, maxResponseSize): Promise<string | null>
 export async function fetchLmStudioModels(): Promise<ProviderModels> {
   const models: ProviderModels = {};
   try {
@@ -340,6 +336,7 @@ export async function fetchLmStudioModels(): Promise<ProviderModels> {
  * Provider configuration is built dynamically: only providers with models are included.
  * If a 3rd provider is added, consider refactoring to a data-driven design
  * (providerDefinitions array + loop) instead of inline if-branches. [KISS]
+ * HTTP fetch logic (fetchWithTimeout) can be extracted to a shared helper.
  *
  * @param worktreePath - Worktree directory path (from DB)
  * @internal
