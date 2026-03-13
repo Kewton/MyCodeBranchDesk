@@ -202,10 +202,5 @@ export function clearTuiAccumulator(pollerKey: string): void {
   tuiResponseAccumulator.delete(pollerKey);
 }
 
-/**
- * normalizeOpenCodeLine is also needed by response-cleaner for cleanOpenCodeResponse.
- * Export for reuse.
- *
- * @internal Exported for sibling module use
- */
+/** @internal Re-exported for response-cleaner.ts (cleanOpenCodeResponse) */
 export { normalizeOpenCodeLine };

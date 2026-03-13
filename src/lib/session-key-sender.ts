@@ -21,22 +21,11 @@ import {
 } from './cli-patterns';
 import { detectAndResendIfPastedText } from './pasted-text-helper';
 import { invalidateCache } from './tmux-capture-cache';
+import { getErrorMessage } from './errors';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
-
-// ----- Helper Functions -----
-
-/**
- * Extract error message from unknown error type
- *
- * @param error - Unknown error object
- * @returns Error message string
- */
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 /**
  * Capture tmux pane output and strip ANSI escape sequences
@@ -163,7 +152,7 @@ export async function sendMessageToSession(
   // Issue #405: Invalidate cache after sending message
   invalidateCache(sessionName);
 
-  console.log(`Sent message to Claude session: ${sessionName}`);
+  console.info(`[session-key-sender] Sent message to session: ${sessionName}`);
 }
 
 // =============================================================================
@@ -196,7 +185,7 @@ export async function stopSession(sessionName: string): Promise<boolean> {
     const killed = await killSession(sessionName);
 
     if (killed) {
-      console.log(`Stopped Claude session: ${sessionName}`);
+      console.info(`[session-key-sender] Stopped session: ${sessionName}`);
     }
 
     return killed;

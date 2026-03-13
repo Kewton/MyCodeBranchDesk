@@ -252,7 +252,7 @@ export function deleteAllMessages(
   `);
 
   stmt.run(worktreeId);
-  console.log(`[deleteAllMessages] Deleted all messages for worktree: ${worktreeId}`);
+  console.info(`[chat-db] Deleted all messages for worktree: ${worktreeId}`);
 }
 
 /**
@@ -301,7 +301,7 @@ export function deleteMessagesByCliTool(
   `);
 
   const result = stmt.run(worktreeId, cliTool);
-  console.log(`[deleteMessagesByCliTool] Deleted ${result.changes} messages for worktree: ${worktreeId}, cliTool: ${cliTool}`);
+  console.info(`[chat-db] Deleted ${result.changes} messages for worktree: ${worktreeId}, cliTool: ${cliTool}`);
   return result.changes;
 }
 

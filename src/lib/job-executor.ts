@@ -181,7 +181,7 @@ export async function executeSchedule(state: ScheduleState): Promise<void> {
     updateExecutionLog(logId, result.status, result.output, result.exitCode);
     updateScheduleLastExecuted(state.scheduleId);
 
-    console.log(`[schedule-manager] Executed ${state.entry.name}: ${result.status}`);
+    console.info(`[schedule-manager] Executed ${state.entry.name}: ${result.status}`);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     updateExecutionLog(logId, 'failed', errorMessage, null);

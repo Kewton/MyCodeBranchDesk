@@ -230,7 +230,7 @@ export function disableStaleSchedules(
     }
 
     if (disabledCount > 0) {
-      console.log(`[schedule-manager] Disabled ${disabledCount} stale DB schedule(s)`);
+      console.info(`[schedule-manager] Disabled ${disabledCount} stale DB schedule(s)`);
     }
   } catch (error) {
     console.error('[schedule-manager] Failed to disable stale schedules:', error);
