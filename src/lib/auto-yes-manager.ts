@@ -10,13 +10,13 @@
 
 import type { CLIToolType } from './cli-tools/types';
 import { captureSessionOutput } from './cli-session';
-import { detectPrompt } from './prompt-detector';
+import { detectPrompt } from './detection/prompt-detector';
 import { resolveAutoAnswer } from './auto-yes-resolver';
 import { sendPromptAnswer } from './prompt-answer-sender';
 import { CLIToolManager } from './cli-tools/manager';
-import { stripAnsi, stripBoxDrawing, detectThinking, buildDetectPromptOptions } from './cli-patterns';
+import { stripAnsi, stripBoxDrawing, detectThinking, buildDetectPromptOptions } from './detection/cli-patterns';
 import { DEFAULT_AUTO_YES_DURATION, validateStopPattern, type AutoYesDuration, type AutoYesStopReason } from '@/config/auto-yes-config';
-import { generatePromptKey } from './prompt-key';
+import { generatePromptKey } from './detection/prompt-key';
 import { getErrorMessage } from './errors';
 import { invalidateCache } from './tmux/tmux-capture-cache';
 

@@ -5,8 +5,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { detectSessionStatus } from '@/lib/status-detector';
-import { STATUS_REASON } from '@/lib/status-detector';
+import { detectSessionStatus } from '@/lib/detection/status-detector';
+import { STATUS_REASON } from '@/lib/detection/status-detector';
 
 // Helper: Build OpenCode TUI output with content area + footer
 // OpenCode TUI layout: content area (top) | empty padding | footer (ctrl+t/ctrl+p line)

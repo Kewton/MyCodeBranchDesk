@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { detectPrompt, resetDetectPromptCache } from '@/lib/prompt-detector';
+import { detectPrompt, resetDetectPromptCache } from '@/lib/detection/prompt-detector';
 
 describe('Prompt Detector - Duplicate log suppression', () => {
   let debugSpy: ReturnType<typeof vi.spyOn>;

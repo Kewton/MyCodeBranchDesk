@@ -20,7 +20,7 @@ import {
 } from '../tmux/tmux';
 import { detectAndResendIfPastedText } from '../pasted-text-helper';
 import { invalidateCache } from '../tmux/tmux-capture-cache';
-import { GEMINI_PROMPT_PATTERN, stripAnsi } from '../cli-patterns';
+import { GEMINI_PROMPT_PATTERN, stripAnsi } from '../detection/cli-patterns';
 
 /**
  * Extract error message from unknown error type (DRY)

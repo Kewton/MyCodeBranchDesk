@@ -9,7 +9,7 @@ import { getMessageById, updatePromptData, getWorktreeById } from '@/lib/db';
 import { sendKeys } from '@/lib/tmux/tmux';
 import { CLIToolManager } from '@/lib/cli-tools/manager';
 import { startPolling } from '@/lib/response-poller';
-import { getAnswerInput } from '@/lib/prompt-detector';
+import { getAnswerInput } from '@/lib/detection/prompt-detector';
 import { broadcastMessage } from '@/lib/ws-server';
 
 /**

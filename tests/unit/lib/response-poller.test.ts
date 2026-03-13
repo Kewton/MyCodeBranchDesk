@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { cleanClaudeResponse } from '@/lib/response-poller';
-import type { PromptDetectionResult } from '@/lib/prompt-detector';
+import type { PromptDetectionResult } from '@/lib/detection/prompt-detector';
 
 describe('cleanClaudeResponse() - Pasted text filtering (Issue #212)', () => {
   it('should filter out lines containing Pasted text pattern', () => {

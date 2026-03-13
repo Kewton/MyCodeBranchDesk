@@ -22,7 +22,7 @@ import {
 } from './db';
 import { broadcastMessage } from './ws-server';
 import { cleanClaudeResponse, cleanGeminiResponse, cleanOpenCodeResponse } from './response-poller';
-import { stripAnsi } from './cli-patterns';
+import { stripAnsi } from './detection/cli-patterns';
 import type { CLIToolType } from './cli-tools/types';
 import type { ChatMessage } from '@/types/models';
 

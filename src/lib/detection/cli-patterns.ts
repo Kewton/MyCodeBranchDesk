@@ -3,9 +3,9 @@
  * Shared between response-poller.ts and API routes
  */
 
-import type { CLIToolType } from './cli-tools/types';
+import type { CLIToolType } from '@/lib/cli-tools/types';
 import type { DetectPromptOptions } from './prompt-detector';
-import { createLogger } from './logger';
+import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('cli-patterns');
 

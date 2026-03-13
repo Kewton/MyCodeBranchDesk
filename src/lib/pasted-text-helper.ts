@@ -19,7 +19,7 @@ import {
   PASTED_TEXT_PATTERN,
   PASTED_TEXT_DETECT_DELAY,
   MAX_PASTED_TEXT_RETRIES,
-} from './cli-patterns';
+} from './detection/cli-patterns';
 import { createLogger } from './logger';
 
 // SF-S2-002: Logger is generated internally, not injected from callers

@@ -21,7 +21,7 @@ import { vi } from 'vitest';
 vi.mock('@/lib/cli-session', () => ({
   captureSessionOutput: vi.fn().mockResolvedValue(''),
 }));
-vi.mock('@/lib/prompt-detector', () => ({
+vi.mock('@/lib/detection/prompt-detector', () => ({
   detectPrompt: vi.fn().mockReturnValue({ isPrompt: false }),
 }));
 vi.mock('@/lib/auto-yes-resolver', () => ({

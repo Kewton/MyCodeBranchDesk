@@ -14,7 +14,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { resolveAutoAnswer } from '@/lib/auto-yes-resolver';
 import { buildPromptResponseBody } from '@/lib/prompt-response-body-builder';
-import { generatePromptKey } from '@/lib/prompt-key';
+import { generatePromptKey } from '@/lib/detection/prompt-key';
 import type { PromptData } from '@/types/models';
 
 /** Duplicate prevention window in milliseconds (3 seconds) */

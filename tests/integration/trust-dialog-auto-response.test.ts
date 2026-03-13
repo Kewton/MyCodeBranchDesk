@@ -40,7 +40,7 @@ import {
 import {
   CLAUDE_TRUST_DIALOG_PATTERN,
   CLAUDE_PROMPT_PATTERN,
-} from '@/lib/cli-patterns';
+} from '@/lib/detection/cli-patterns';
 import { hasSession, createSession, sendKeys, capturePane } from '@/lib/tmux/tmux';
 
 describe('Issue #201: Trust dialog auto-response - Acceptance Tests', () => {

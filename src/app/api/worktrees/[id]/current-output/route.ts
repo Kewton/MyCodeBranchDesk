@@ -9,7 +9,7 @@ import { getWorktreeById, getSessionState } from '@/lib/db';
 import { CLIToolManager } from '@/lib/cli-tools/manager';
 import { CLI_TOOL_IDS, type CLIToolType } from '@/lib/cli-tools/types';
 import { captureSessionOutput } from '@/lib/cli-session';
-import { detectSessionStatus, STATUS_REASON } from '@/lib/status-detector';
+import { detectSessionStatus, STATUS_REASON } from '@/lib/detection/status-detector';
 import { getAutoYesState, getLastServerResponseTimestamp, isValidWorktreeId } from '@/lib/auto-yes-manager';
 
 /** Issue #368: Derive from CLI_TOOL_IDS (DRY) */

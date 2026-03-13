@@ -17,7 +17,7 @@ import {
   CLAUDE_SESSION_ERROR_PATTERNS,
   CLAUDE_SESSION_ERROR_REGEX_PATTERNS,
   stripAnsi,
-} from './cli-patterns';
+} from './detection/cli-patterns';
 import { detectAndResendIfPastedText } from './pasted-text-helper';
 import { invalidateCache } from './tmux/tmux-capture-cache';
 import { exec } from 'child_process';

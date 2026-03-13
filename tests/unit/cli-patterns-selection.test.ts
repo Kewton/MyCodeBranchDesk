@@ -12,7 +12,7 @@ import {
   OPENCODE_PROMPT_PATTERN,
   OPENCODE_THINKING_PATTERN,
   OPENCODE_RESPONSE_COMPLETE,
-} from '@/lib/cli-patterns';
+} from '@/lib/detection/cli-patterns';
 
 describe('OPENCODE_SELECTION_LIST_PATTERN', () => {
   it('should be a RegExp', () => {

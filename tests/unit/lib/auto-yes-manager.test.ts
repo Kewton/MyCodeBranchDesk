@@ -487,8 +487,8 @@ describe('auto-yes-manager', () => {
   describe('Issue #161: pollAutoYes thinking state skip', () => {
     it('should skip prompt detection when thinking state is detected', async () => {
       const { captureSessionOutput } = await import('@/lib/cli-session');
-      const { detectThinking } = await import('@/lib/cli-patterns');
-      const { detectPrompt } = await import('@/lib/prompt-detector');
+      const { detectThinking } = await import('@/lib/detection/cli-patterns');
+      const { detectPrompt } = await import('@/lib/detection/prompt-detector');
       const { sendKeys } = await import('@/lib/tmux/tmux');
 
       vi.useFakeTimers();
@@ -668,7 +668,7 @@ describe('auto-yes-manager', () => {
       //    exactly at the Nth line from end (N = THINKING_CHECK_LINE_COUNT),
       //    verify detectPrompt detects it, confirming both windows are aligned.
 
-      const { detectPrompt } = await import('@/lib/prompt-detector');
+      const { detectPrompt } = await import('@/lib/detection/prompt-detector');
 
       // Part 1: Direct value assertion
       expect(THINKING_CHECK_LINE_COUNT).toBe(50);

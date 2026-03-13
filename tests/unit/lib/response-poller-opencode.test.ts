@@ -17,7 +17,7 @@ import {
   OPENCODE_PROCESSING_INDICATOR,
   OPENCODE_SEPARATOR_PATTERN,
   OPENCODE_SKIP_PATTERNS,
-} from '@/lib/cli-patterns';
+} from '@/lib/detection/cli-patterns';
 
 describe('response-poller OpenCode integration', () => {
   describe('isOpenCodeComplete()', () => {

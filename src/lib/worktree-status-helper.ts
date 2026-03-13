@@ -15,7 +15,7 @@
 import { CLIToolManager } from './cli-tools/manager';
 import { CLI_TOOL_IDS, type CLIToolType } from './cli-tools/types';
 import { captureSessionOutput } from './cli-session';
-import { detectSessionStatus } from './status-detector';
+import { detectSessionStatus } from './detection/status-detector';
 import { OPENCODE_PANE_HEIGHT } from './cli-tools/opencode';
 import { isSessionHealthy } from './claude-session';
 import type { getMessages as GetMessagesFn, markPendingPromptsAsAnswered as MarkPendingFn } from './db';

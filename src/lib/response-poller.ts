@@ -30,8 +30,8 @@ import {
   markPendingPromptsAsAnswered,
 } from './db';
 import { broadcastMessage } from './ws-server';
-import { detectPrompt } from './prompt-detector';
-import type { PromptDetectionResult } from './prompt-detector';
+import { detectPrompt } from './detection/prompt-detector';
+import type { PromptDetectionResult } from './detection/prompt-detector';
 import { recordClaudeConversation } from './conversation-logger';
 import type { CLIToolType } from './cli-tools/types';
 import { parseClaudeOutput } from './claude-output';
@@ -46,7 +46,7 @@ import {
   OPENCODE_RESPONSE_COMPLETE,
   OPENCODE_PROCESSING_INDICATOR,
   OPENCODE_SKIP_PATTERNS,
-} from './cli-patterns';
+} from './detection/cli-patterns';
 
 /**
  * Polling interval in milliseconds (default: 2 seconds)

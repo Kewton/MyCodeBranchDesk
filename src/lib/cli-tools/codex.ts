@@ -15,7 +15,7 @@ import {
 } from '../tmux/tmux';
 import { detectAndResendIfPastedText } from '../pasted-text-helper';
 import { invalidateCache } from '../tmux/tmux-capture-cache';
-import { CODEX_PROMPT_PATTERN, stripAnsi } from '../cli-patterns';
+import { CODEX_PROMPT_PATTERN, stripAnsi } from '../detection/cli-patterns';
 
 /**
  * Extract error message from unknown error type (DRY)

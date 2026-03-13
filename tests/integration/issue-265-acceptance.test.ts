@@ -55,7 +55,7 @@ import { hasSession, createSession, sendKeys, capturePane, killSession } from '@
 import {
   CLAUDE_SESSION_ERROR_PATTERNS,
   CLAUDE_SESSION_ERROR_REGEX_PATTERNS,
-} from '@/lib/cli-patterns';
+} from '@/lib/detection/cli-patterns';
 
 const TEST_SESSION_OPTIONS = {
   worktreeId: 'test-worktree',

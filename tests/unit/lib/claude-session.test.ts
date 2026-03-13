@@ -75,7 +75,7 @@ import {
   CLAUDE_SEPARATOR_PATTERN,
   CLAUDE_SESSION_ERROR_PATTERNS,
   CLAUDE_SESSION_ERROR_REGEX_PATTERNS,
-} from '@/lib/cli-patterns';
+} from '@/lib/detection/cli-patterns';
 import { detectAndResendIfPastedText } from '@/lib/pasted-text-helper';
 
 // ----- Shared test constants (DRY) -----
