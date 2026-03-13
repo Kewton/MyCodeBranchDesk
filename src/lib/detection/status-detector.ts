@@ -24,7 +24,7 @@
  * coupling via a minimal DTO/projection type.
  */
 
-import { stripAnsi, stripBoxDrawing, detectThinking, getCliToolPatterns, buildDetectPromptOptions, OPENCODE_RESPONSE_COMPLETE, OPENCODE_PROCESSING_INDICATOR, OPENCODE_SELECTION_LIST_PATTERN, CLAUDE_SELECTION_LIST_FOOTER } from './cli-patterns';
+import { stripAnsi, stripBoxDrawing, detectThinking, getCliToolPatterns, buildDetectPromptOptions, OPENCODE_RESPONSE_COMPLETE, OPENCODE_PROCESSING_INDICATOR, OPENCODE_SELECTION_LIST_PATTERN, CLAUDE_SELECTION_LIST_FOOTER, CODEX_PROMPT_PATTERN } from './cli-patterns';
 import { detectPrompt } from './prompt-detector';
 import type { PromptDetectionResult } from './prompt-detector';
 import type { CLIToolType } from '@/lib/cli-tools/types';
@@ -317,6 +317,57 @@ export function detectSessionStatus(
           hasActivePrompt: true,
           promptDetection,
         };
+      }
+    }
+  }
+
+  // 2.7. Codex TUI idle prompt detection
+  // Codex TUI layout: conversation area (top) | empty padding (~30 lines) | input area + status bar (bottom).
+  // The idle prompt `›` appears at the end of the conversation area, but TUI padding pushes it
+  // far above the 15-line window (lastLines), so standard step-3 detection misses it.
+  // Strategy: find the Codex status bar (`{model} · {N}% left · {path}`), then check if the
+  // last non-empty content line above the status bar/input area is the idle `›` prompt.
+  if (cliToolId === 'codex') {
+    const codexStatusBarPattern = /^\s*\S+.*\d+%\s+left\s+·/;
+    let codexFooterBoundary = -1;
+    for (let ci = contentLines.length - 1; ci >= Math.max(0, contentLines.length - 10); ci--) {
+      if (codexStatusBarPattern.test(contentLines[ci])) {
+        codexFooterBoundary = ci;
+        break;
+      }
+    }
+    if (codexFooterBoundary >= 0) {
+      // Scan upward from status bar to find the › idle prompt above TUI padding.
+      // Codex TUI structure: [conversation...] › [padding ~30 empty lines] [input area] [status bar]
+      // The › must be the LAST item in the conversation area (above padding gap).
+      // If Codex is processing, there would be • response text after ›, not ›.
+      const scanLimit = Math.max(0, codexFooterBoundary - 50);
+      let consecutiveEmptyLines = 0;
+      let crossedPaddingGap = false;
+      for (let ci = codexFooterBoundary - 1; ci >= scanLimit; ci--) {
+        const line = contentLines[ci].trim();
+        if (!line) {
+          consecutiveEmptyLines++;
+          if (consecutiveEmptyLines >= 5) crossedPaddingGap = true;
+          continue;
+        }
+        consecutiveEmptyLines = 0;
+        // Only check for › prompt AFTER crossing the TUI padding gap.
+        // Lines below the gap are input area text (skip them).
+        if (crossedPaddingGap) {
+          if (CODEX_PROMPT_PATTERN.test(line)) {
+            return {
+              status: 'ready',
+              confidence: 'high',
+              reason: 'input_prompt',
+              hasActivePrompt: false,
+              promptDetection,
+            };
+          }
+          // Non-› content above padding = Codex is processing (e.g., • response text)
+          break;
+        }
+        // Below the gap: input area text, continue scanning upward
       }
     }
   }
