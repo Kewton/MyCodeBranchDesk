@@ -23,6 +23,8 @@ import { Modal } from '@/components/ui';
 import { FileContent } from '@/types/models';
 import { ImageViewer } from './ImageViewer';
 import { VideoViewer } from './VideoViewer';
+import type { SandboxLevel } from '@/config/html-extensions';
+import { SANDBOX_ATTRIBUTES } from '@/config/html-extensions';
 import { copyToClipboard } from '@/lib/clipboard-utils';
 import { Copy, Check, Maximize2, Minimize2, ClipboardCopy, Pencil, Search, X } from 'lucide-react';
 import { Z_INDEX } from '@/config/z-index';
@@ -35,6 +37,123 @@ const MARP_FRONTMATTER_REGEX = /^---\s*\nmarp:\s*true/;
 
 /** Maximum MARP content length (1MB) */
 const MAX_MARP_CONTENT_LENGTH = 1_000_000;
+
+/**
+ * [Issue #490] Mobile HTML preview with tab switching (Source/Preview)
+ * No split view on mobile due to space constraints.
+ */
+function HtmlPreviewMobile({
+  htmlContent,
+  filePath,
+}: {
+  htmlContent: string;
+  filePath: string;
+}) {
+  const [activeTab, setActiveTab] = useState<'source' | 'preview'>('preview');
+  const [sandboxLevel, setSandboxLevel] = useState<SandboxLevel>('safe');
+  const confirmedFilesRef = useRef<Set<string>>(new Set());
+
+  const handleSandboxChange = useCallback((newLevel: SandboxLevel) => {
+    if (newLevel === 'interactive' && !confirmedFilesRef.current.has(filePath)) {
+      const confirmed = window.confirm(
+        'Interactiveモードではスクリプトが実行されます。信頼できないHTMLファイルではSafeモードを使用してください。'
+      );
+      if (!confirmed) return;
+      confirmedFilesRef.current.add(filePath);
+    }
+    setSandboxLevel(newLevel);
+  }, [filePath]);
+
+  const highlightedHtml = useMemo(() => {
+    try {
+      return hljs.highlight(htmlContent, { language: 'html', ignoreIllegals: true }).value;
+    } catch {
+      return hljs.highlightAuto(htmlContent).value;
+    }
+  }, [htmlContent]);
+
+  const lineNumbers = useMemo(
+    () => Array.from({ length: htmlContent.split('\n').length }, (_, i) => i + 1),
+    [htmlContent],
+  );
+  const highlightedLines = useMemo(() => highlightedHtml.split('\n'), [highlightedHtml]);
+
+  return (
+    <div className="flex flex-col h-full" data-testid="html-preview-mobile">
+      {/* Tab bar */}
+      <div className="flex items-center justify-between p-1 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+        <div className="flex gap-1">
+          {(['source', 'preview'] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                activeTab === tab
+                  ? 'bg-cyan-100 dark:bg-cyan-900/50 text-cyan-700 dark:text-cyan-300'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-1">
+          {(['safe', 'interactive'] as const).map((level) => (
+            <button
+              key={level}
+              type="button"
+              onClick={() => handleSandboxChange(level)}
+              className={`px-2 py-1 text-xs font-medium rounded-md transition-colors ${
+                sandboxLevel === level
+                  ? level === 'safe'
+                    ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300'
+                    : 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              {level.charAt(0).toUpperCase() + level.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+      {/* Content */}
+      <div className="flex-1 overflow-auto min-h-0">
+        {activeTab === 'source' ? (
+          <table className="text-sm w-full border-collapse">
+            <tbody>
+              {lineNumbers.map((lineNumber) => {
+                const idx = lineNumber - 1;
+                return (
+                  <tr key={lineNumber}>
+                    <td className="pl-3 pr-2 text-right select-none font-mono border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 sticky left-0 align-top whitespace-nowrap text-gray-400 dark:text-gray-600">
+                      {lineNumber}
+                    </td>
+                    <td className="px-4 text-gray-900 dark:text-gray-100 align-top">
+                      <pre className="m-0 whitespace-pre-wrap break-words font-mono">
+                        <code
+                          className="hljs"
+                          dangerouslySetInnerHTML={{ __html: highlightedLines[idx] ?? '' }}
+                        />
+                      </pre>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        ) : (
+          <iframe
+            srcDoc={htmlContent}
+            sandbox={SANDBOX_ATTRIBUTES[sandboxLevel]}
+            title={`HTML Preview: ${filePath}`}
+            className="w-full h-full border-0 bg-white"
+          />
+        )}
+      </div>
+    </div>
+  );
+}
 
 export interface FileViewerProps {
   isOpen: boolean;
@@ -256,7 +375,7 @@ export const FileViewer = memo(function FileViewer({ isOpen, onClose, worktreeId
   }, [onEditMarkdown, filePath, onClose]);
 
   const codeViewData = useMemo(() => {
-    if (!content || content.isImage || content.isVideo || (isMarp && marpSlides)) {
+    if (!content || content.isImage || content.isVideo || content.isHtml || (isMarp && marpSlides)) {
       return null;
     }
     const lineNumbers = Array.from(
@@ -288,6 +407,15 @@ export const FileViewer = memo(function FileViewer({ isOpen, onClose, worktreeId
     }
     if (content.isVideo) {
       return <VideoViewer src={content.content} mimeType={content.mimeType} />;
+    }
+    // [Issue #490] HTML preview with mobile tab switching (Source/Preview)
+    if (content.isHtml) {
+      return (
+        <HtmlPreviewMobile
+          htmlContent={content.content}
+          filePath={filePath}
+        />
+      );
     }
     if (isMarp && marpSlides) {
       return (

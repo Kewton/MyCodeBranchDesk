@@ -40,6 +40,7 @@ import {
   getMimeTypeByVideoExtension,
   validateVideoContent,
 } from '@/config/video-extensions';
+import { isHtmlExtension, HTML_MAX_SIZE_BYTES } from '@/config/html-extensions';
 import { extname } from 'path';
 import { readFile, stat } from 'fs/promises';
 import { createLogger } from '@/lib/logger';
@@ -260,6 +261,14 @@ export async function GET(
     // [Issue #469] Last-Modified / If-Modified-Since conditional request support
     const fullPath = join(worktree.path, relativePath);
     const fileStat = await stat(fullPath);
+
+    // [Issue #490] HTML file size pre-check (DR4-004: DoS prevention before readFileContent)
+    if (isHtmlExtension(ext) && fileStat.size > HTML_MAX_SIZE_BYTES) {
+      return createErrorResponse(
+        'FILE_TOO_LARGE',
+        `HTML file exceeds ${HTML_MAX_SIZE_BYTES} bytes limit`
+      );
+    }
     const lastModified = fileStat.mtime.toUTCString();
 
     // Check If-Modified-Since header for 304 response
@@ -287,12 +296,16 @@ export async function GET(
       );
     }
 
+    // [Issue #490] Add isHtml flag for HTML files
+    const isHtml = isHtmlExtension(ext);
+
     return NextResponse.json({
       success: true,
       path: relativePath,
       content: fileResult.content,
       extension,
       worktreePath: worktree.path,
+      ...(isHtml && { isHtml: true }),
     }, {
       headers: {
         'Last-Modified': lastModified,

@@ -25,9 +25,11 @@ describe('EDITABLE_EXTENSIONS', () => {
     expect(Array.isArray(EDITABLE_EXTENSIONS)).toBe(true);
   });
 
-  it('should only include .md for now', () => {
-    expect(EDITABLE_EXTENSIONS).toHaveLength(1);
-    expect(EDITABLE_EXTENSIONS[0]).toBe('.md');
+  it('should include .md, .html, .htm', () => {
+    expect(EDITABLE_EXTENSIONS).toHaveLength(3);
+    expect(EDITABLE_EXTENSIONS).toContain('.md');
+    expect(EDITABLE_EXTENSIONS).toContain('.html');
+    expect(EDITABLE_EXTENSIONS).toContain('.htm');
   });
 });
 
@@ -41,6 +43,18 @@ describe('EXTENSION_VALIDATORS', () => {
     const mdValidator = EXTENSION_VALIDATORS.find(v => v.extension === '.md');
     expect(mdValidator?.maxFileSize).toBe(1024 * 1024);
   });
+
+  it('should have a validator for .html extension - Issue #490', () => {
+    const htmlValidator = EXTENSION_VALIDATORS.find(v => v.extension === '.html');
+    expect(htmlValidator).toBeDefined();
+    expect(htmlValidator?.maxFileSize).toBe(5 * 1024 * 1024);
+  });
+
+  it('should have a validator for .htm extension - Issue #490', () => {
+    const htmValidator = EXTENSION_VALIDATORS.find(v => v.extension === '.htm');
+    expect(htmValidator).toBeDefined();
+    expect(htmValidator?.maxFileSize).toBe(5 * 1024 * 1024);
+  });
 });
 
 describe('isEditableExtension', () => {
@@ -53,6 +67,14 @@ describe('isEditableExtension', () => {
     expect(isEditableExtension('.Md')).toBe(true);
   });
 
+  it('should return true for .html - Issue #490', () => {
+    expect(isEditableExtension('.html')).toBe(true);
+  });
+
+  it('should return true for .htm - Issue #490', () => {
+    expect(isEditableExtension('.htm')).toBe(true);
+  });
+
   it('should return false for non-editable extensions', () => {
     expect(isEditableExtension('.txt')).toBe(false);
     expect(isEditableExtension('.js')).toBe(false);
@@ -63,6 +85,10 @@ describe('isEditableExtension', () => {
   it('should handle edge cases', () => {
     expect(isEditableExtension('')).toBe(false);
     expect(isEditableExtension('md')).toBe(false); // no dot
+  });
+
+  it('should return false for html without dot (DR3-004: intentional asymmetry with isHtmlExtension)', () => {
+    expect(isEditableExtension('html')).toBe(false);
   });
 });
 
@@ -150,6 +176,55 @@ describe('validateContent', () => {
       expect(consoleSpy).not.toHaveBeenCalled();
 
       consoleSpy.mockRestore();
+    });
+  });
+
+  describe('HTML content validation - Issue #490', () => {
+    it('should accept valid HTML content for .html', () => {
+      const result = validateContent('.html', '<html><body><h1>Hello</h1></body></html>');
+      expect(result.valid).toBe(true);
+    });
+
+    it('should accept valid HTML content for .htm', () => {
+      const result = validateContent('.htm', '<html><body><p>World</p></body></html>');
+      expect(result.valid).toBe(true);
+    });
+
+    it('should reject HTML content exceeding 5MB for .html', () => {
+      const largeContent = 'x'.repeat(5 * 1024 * 1024 + 1); // 5MB + 1 byte
+      const result = validateContent('.html', largeContent);
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('File size exceeds limit');
+    });
+
+    it('should accept HTML content at exactly 5MB for .html', () => {
+      const maxContent = 'x'.repeat(5 * 1024 * 1024); // exactly 5MB
+      const result = validateContent('.html', maxContent);
+      expect(result.valid).toBe(true);
+    });
+
+    it('should reject HTML content exceeding 5MB for .htm', () => {
+      const largeContent = 'x'.repeat(5 * 1024 * 1024 + 1);
+      const result = validateContent('.htm', largeContent);
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('File size exceeds limit');
+    });
+
+    it('should reject HTML content with NULL bytes (binary detection) - DR2-005', () => {
+      const result = validateContent('.html', '<html>\x00</html>');
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Binary content detected');
+    });
+
+    it('should reject .htm content with NULL bytes (binary detection) - DR2-005', () => {
+      const result = validateContent('.htm', '<html>\x00</html>');
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Binary content detected');
+    });
+
+    it('should accept empty HTML content', () => {
+      const result = validateContent('.html', '');
+      expect(result.valid).toBe(true);
     });
   });
 

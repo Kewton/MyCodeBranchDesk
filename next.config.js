@@ -63,6 +63,7 @@ const nextConfig = {
               "media-src 'self' data:", // Allow video playback with data URIs (Issue #302)
               "font-src 'self' data:",
               "connect-src 'self' ws: wss:", // Allow WebSocket connections
+              "frame-src 'self'", // Allow iframe srcdoc for HTML/MARP preview (Issue #490, DR4-007: blob: excluded)
               "frame-ancestors 'none'",
             ].join('; '),
           },

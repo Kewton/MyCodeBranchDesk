@@ -26,6 +26,22 @@ import hljs from 'highlight.js';
 import 'highlight.js/styles/github-dark.css';
 import { Z_INDEX } from '@/config/z-index';
 
+/** Dynamic import of HtmlPreview for HTML files in tab panel - Issue #490 */
+const HtmlPreview = dynamic(
+  () =>
+    import('@/components/worktree/HtmlPreview').then((mod) => ({
+      default: mod.HtmlPreview,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center py-12 bg-white dark:bg-gray-900">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 dark:border-gray-600 border-t-cyan-600 dark:border-t-cyan-400" />
+      </div>
+    ),
+  },
+);
+
 /** Dynamic import of MarkdownEditor for .md files in tab panel */
 const MarkdownEditor = dynamic(
   () =>
@@ -649,6 +665,26 @@ export const FilePanelContent = memo(function FilePanelContent({
           <FileToolbar filePath={tab.path} isMaximized={isMaximized} onToggleMaximize={toggleMaximize} />
           <div className="flex-1 overflow-auto">
             <VideoViewer src={content.content} mimeType={content.mimeType} />
+          </div>
+        </div>
+      </MaximizableWrapper>
+    );
+  }
+
+  // [Issue #490] HTML preview (after isVideo, before md - DR3-005)
+  if (content.isHtml) {
+    return (
+      <MaximizableWrapper isMaximized={isMaximized} onToggle={toggleMaximize} filePath={tab.path}>
+        <div className="h-full flex flex-col">
+          <FileToolbar filePath={tab.path} isMaximized={isMaximized} onToggleMaximize={toggleMaximize} copyableContent={content.content} />
+          <div className="flex-1 min-h-0">
+            <HtmlPreview
+              worktreeId={worktreeId}
+              filePath={tab.path}
+              htmlContent={content.content}
+              onFileSaved={onFileSaved}
+              onDirtyChange={onDirtyChange ? (isDirty: boolean) => onDirtyChange(tab.path, isDirty) : undefined}
+            />
           </div>
         </div>
       </MaximizableWrapper>
