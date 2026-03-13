@@ -294,6 +294,31 @@ describe('MemoPane', () => {
     });
   });
 
+  describe('Insert to message propagation (Issue #485)', () => {
+    it('should pass onInsertToMessage to MemoCard components', async () => {
+      const onInsertToMessage = vi.fn();
+      render(<MemoPane {...defaultProps} onInsertToMessage={onInsertToMessage} />);
+
+      await waitFor(() => {
+        expect(screen.getAllByTestId('memo-card')).toHaveLength(2);
+      });
+
+      // Insert buttons should be rendered on each MemoCard
+      const insertButtons = screen.getAllByTestId('insert-memo-content');
+      expect(insertButtons.length).toBe(2);
+    });
+
+    it('should not render insert buttons when onInsertToMessage is not provided', async () => {
+      render(<MemoPane {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getAllByTestId('memo-card')).toHaveLength(2);
+      });
+
+      expect(screen.queryAllByTestId('insert-memo-content')).toHaveLength(0);
+    });
+  });
+
   describe('Styling', () => {
     it('should apply custom className', async () => {
       render(<MemoPane {...defaultProps} className="custom-class" />);

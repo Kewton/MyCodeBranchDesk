@@ -744,6 +744,8 @@ interface MobileContentProps {
   onHistorySubTabChange: (tab: 'message' | 'git') => void;
   /** [Issue #447] Diff select handler for GitPane */
   onDiffSelect: (diff: string, filePath: string) => void;
+  /** [Issue #485] Insert to message callback */
+  onInsertToMessage?: (content: string) => void;
 }
 
 /** Renders content based on active mobile tab */
@@ -780,6 +782,7 @@ export const MobileContent = memo(function MobileContent({
   historySubTab,
   onHistorySubTabChange,
   onDiffSelect,
+  onInsertToMessage,
 }: MobileContentProps) {
   switch (activeTab) {
     case 'terminal':
@@ -832,6 +835,7 @@ export const MobileContent = memo(function MobileContent({
                 onFilePathClick={onFilePathClick}
                 className="flex-1 min-h-0"
                 showToast={showToast}
+                onInsertToMessage={onInsertToMessage}
               />
             </ErrorBoundary>
           ) : (
@@ -891,6 +895,7 @@ export const MobileContent = memo(function MobileContent({
             onVibeLocalModelChange={onVibeLocalModelChange}
             vibeLocalContextWindow={vibeLocalContextWindow}
             onVibeLocalContextWindowChange={onVibeLocalContextWindowChange}
+            onInsertToMessage={onInsertToMessage}
           />
         </ErrorBoundary>
       );

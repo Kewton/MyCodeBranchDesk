@@ -256,6 +256,16 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
   // [Issue #447] History sub-tab: 'message' (default) or 'git'
   const [historySubTab, setHistorySubTab] = useState<'message' | 'git'>('message');
 
+  // TODO: [D1-001] pendingInsertText の状態管理を useTextInsertion カスタムフックに抽出する（技術的負債）
+  // [Issue #485] State for inserting text from history/memo into message input
+  const [pendingInsertText, setPendingInsertText] = useState<string | null>(null);
+  const handleInsertToMessage = useCallback((text: string) => {
+    setPendingInsertText(text);
+  }, []);
+  const handleInsertConsumed = useCallback(() => {
+    setPendingInsertText(null);
+  }, []);
+
   // [Issue #447] Diff content for right pane display (PC only)
   const [diffContent, setDiffContent] = useState<string | null>(null);
   const [diffFilePath, setDiffFilePath] = useState<string | null>(null);
@@ -1337,6 +1347,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
                   onFilePathClick={handleFilePathClick}
                   className="flex-1 min-h-0"
                   showToast={showToast}
+                  onInsertToMessage={handleInsertToMessage}
                 />
               )}
               {historySubTab === 'git' && (
@@ -1395,13 +1406,14 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
                 vibeLocalContextWindow={vibeLocalContextWindow}
                 onVibeLocalContextWindowChange={handleVibeLocalContextWindowChange}
                 maxAgents={4}
+                onInsertToMessage={handleInsertToMessage}
               />
             </ErrorBoundary>
           )}
         </div>
       </div>
     ),
-    [leftPaneTab, handleLeftPaneTabChange, historySubTab, state.messages, worktreeId, handleFilePathClick, showToast, fileSearch.query, fileSearch.mode, fileSearch.isSearching, fileSearch.error, fileSearch.setQuery, fileSearch.setMode, fileSearch.clearSearch, fileSearch.results?.results, handleFileSelect, handleNewFile, handleNewDirectory, handleRename, handleDelete, handleUpload, handleMove, handleCmateSetup, fileTreeRefresh, selectedAgents, handleSelectedAgentsChange, vibeLocalModel, handleVibeLocalModelChange, vibeLocalContextWindow, handleVibeLocalContextWindowChange, handleDiffSelect]
+    [leftPaneTab, handleLeftPaneTabChange, historySubTab, state.messages, worktreeId, handleFilePathClick, showToast, fileSearch.query, fileSearch.mode, fileSearch.isSearching, fileSearch.error, fileSearch.setQuery, fileSearch.setMode, fileSearch.clearSearch, fileSearch.results?.results, handleFileSelect, handleNewFile, handleNewDirectory, handleRename, handleDelete, handleUpload, handleMove, handleCmateSetup, fileTreeRefresh, selectedAgents, handleSelectedAgentsChange, vibeLocalModel, handleVibeLocalModelChange, vibeLocalContextWindow, handleVibeLocalContextWindowChange, handleDiffSelect, handleInsertToMessage]
   );
 
   // ========================================================================
@@ -1467,6 +1479,8 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
               onMessageSent={handleMessageSent}
               cliToolId={activeCliTab}
               isSessionRunning={state.terminal.isActive}
+              pendingInsertText={pendingInsertText}
+              onInsertConsumed={handleInsertConsumed}
             />
           </div>
           {/* Prompt Panel - fixed overlay at bottom */}
@@ -1705,6 +1719,7 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
             historySubTab={historySubTab}
             onHistorySubTabChange={setHistorySubTab}
             onDiffSelect={handleDiffSelect}
+            onInsertToMessage={handleInsertToMessage}
           />
         </main>
 
@@ -1728,6 +1743,8 @@ export const WorktreeDetailRefactored = memo(function WorktreeDetailRefactored({
               onMessageSent={handleMessageSent}
               cliToolId={activeCliTab}
               isSessionRunning={state.terminal.isActive}
+              pendingInsertText={pendingInsertText}
+              onInsertConsumed={handleInsertConsumed}
             />
           </div>
         </div>

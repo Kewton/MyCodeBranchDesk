@@ -8,7 +8,7 @@
 'use client';
 
 import React, { useMemo, useCallback, memo } from 'react';
-import { Copy } from 'lucide-react';
+import { Copy, ArrowDownToLine } from 'lucide-react';
 import type { ConversationPair } from '@/types/conversation';
 import type { ChatMessage } from '@/types/models';
 
@@ -30,6 +30,8 @@ export interface ConversationPairCardProps {
   onToggleExpand?: () => void;
   /** Callback when a message is copied (optional) */
   onCopy?: (content: string) => void;
+  /** Issue #485: Callback when user message is inserted into message input */
+  onInsertToMessage?: (content: string) => void;
 }
 
 /** Parsed content part type */
@@ -198,10 +200,12 @@ const UserMessageSection = memo(function UserMessageSection({
   message,
   onFilePathClick,
   onCopy,
+  onInsertToMessage,
 }: {
   message: ChatMessage;
   onFilePathClick: (path: string) => void;
   onCopy?: (content: string) => void;
+  onInsertToMessage?: (content: string) => void;
 }) {
   const formattedTime = useMemo(
     () => message.timestamp.toLocaleTimeString(),
@@ -217,6 +221,18 @@ const UserMessageSection = memo(function UserMessageSection({
       <div className="text-sm text-gray-200 whitespace-pre-wrap break-words">
         <MessageContent content={message.content} onFilePathClick={onFilePathClick} />
       </div>
+      {onInsertToMessage && (
+        <button
+          type="button"
+          data-testid="insert-user-message"
+          onClick={() => onInsertToMessage(message.content)}
+          className="absolute top-2 right-10 p-1 text-gray-400 hover:text-cyan-400 bg-gray-800/80 rounded transition-colors"
+          aria-label="Insert to message"
+          title="Insert to message"
+        >
+          <ArrowDownToLine size={14} aria-hidden="true" />
+        </button>
+      )}
       {onCopy && (
         <button
           type="button"
@@ -403,6 +419,7 @@ export const ConversationPairCard = memo(function ConversationPairCard({
   isExpanded = false,
   onToggleExpand,
   onCopy,
+  onInsertToMessage,
 }: ConversationPairCardProps) {
   // Determine if expand button should be shown
   const hasLongContent = useMemo(() => {
@@ -456,6 +473,7 @@ export const ConversationPairCard = memo(function ConversationPairCard({
           message={pair.userMessage}
           onFilePathClick={onFilePathClick}
           onCopy={onCopy}
+          onInsertToMessage={onInsertToMessage}
         />
       )}
 

@@ -14,7 +14,7 @@
 'use client';
 
 import React, { useState, useCallback, useRef, useEffect, memo } from 'react';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, ArrowDownToLine } from 'lucide-react';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { copyToClipboard } from '@/lib/clipboard-utils';
 import type { WorktreeMemo } from '@/types/models';
@@ -43,6 +43,8 @@ export interface MemoCardProps {
   error?: string | null;
   /** Additional CSS classes */
   className?: string;
+  /** Issue #485: Callback when memo content is inserted into message input */
+  onInsertToMessage?: (content: string) => void;
 }
 
 // ============================================================================
@@ -68,6 +70,7 @@ export const MemoCard = memo(function MemoCard({
   isSaving: externalIsSaving,
   error: externalError,
   className = '',
+  onInsertToMessage,
 }: MemoCardProps) {
   // Local state for title and content
   const [title, setTitle] = useState(memo.title);
@@ -156,6 +159,15 @@ export const MemoCard = memo(function MemoCard({
    * Failure is silently handled -- the icon remains unchanged, which serves
    * as implicit feedback to the user (see design policy Section 8.3).
    */
+  /**
+   * Issue #485: Insert memo content into message input.
+   * Empty or whitespace-only content is silently ignored.
+   */
+  const handleInsert = useCallback(() => {
+    if (!content.trim()) return;
+    onInsertToMessage?.(content);
+  }, [content, onInsertToMessage]);
+
   const handleCopy = useCallback(async () => {
     if (!content.trim()) return;
     try {
@@ -190,6 +202,19 @@ export const MemoCard = memo(function MemoCard({
           >
             Saving...
           </span>
+        )}
+        {/* Issue #485: Insert to message button */}
+        {onInsertToMessage && (
+          <button
+            type="button"
+            data-testid="insert-memo-content"
+            onClick={handleInsert}
+            aria-label="Insert to message"
+            className="p-1 text-gray-400 dark:text-gray-500 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors rounded"
+            title="Insert to message"
+          >
+            <ArrowDownToLine className="w-4 h-4" aria-hidden="true" />
+          </button>
         )}
         {/* Copy button */}
         <button
