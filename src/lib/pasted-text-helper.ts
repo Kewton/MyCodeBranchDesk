@@ -13,7 +13,7 @@
  *   tmux.ts provides double-quote escaping as a defense layer.
  */
 
-import { capturePane, sendKeys } from './tmux';
+import { capturePane, sendKeys } from './tmux/tmux';
 import {
   stripAnsi,
   PASTED_TEXT_PATTERN,

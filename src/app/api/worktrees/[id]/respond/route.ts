@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbInstance } from '@/lib/db-instance';
 import { getMessageById, updatePromptData, getWorktreeById } from '@/lib/db';
-import { sendKeys } from '@/lib/tmux';
+import { sendKeys } from '@/lib/tmux/tmux';
 import { CLIToolManager } from '@/lib/cli-tools/manager';
 import { startPolling } from '@/lib/response-poller';
 import { getAnswerInput } from '@/lib/prompt-detector';

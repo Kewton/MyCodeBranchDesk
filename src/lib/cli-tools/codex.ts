@@ -12,9 +12,9 @@ import {
   killSession,
   sendSpecialKey,
   capturePane,
-} from '../tmux';
+} from '../tmux/tmux';
 import { detectAndResendIfPastedText } from '../pasted-text-helper';
-import { invalidateCache } from '../tmux-capture-cache';
+import { invalidateCache } from '../tmux/tmux-capture-cache';
 import { CODEX_PROMPT_PATTERN, stripAnsi } from '../cli-patterns';
 
 /**

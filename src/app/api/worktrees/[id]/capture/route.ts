@@ -16,7 +16,7 @@ import { isCliToolType } from '@/lib/cli-tools/types';
 import { CLIToolManager } from '@/lib/cli-tools/manager';
 import { getWorktreeById } from '@/lib/db';
 import { getDbInstance } from '@/lib/db-instance';
-import { hasSession, capturePane } from '@/lib/tmux';
+import { hasSession, capturePane } from '@/lib/tmux/tmux';
 
 export async function POST(
   req: NextRequest,

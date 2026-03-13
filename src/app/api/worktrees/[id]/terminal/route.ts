@@ -16,8 +16,8 @@ import { isCliToolType } from '@/lib/cli-tools/types';
 import { CLIToolManager } from '@/lib/cli-tools/manager';
 import { getWorktreeById } from '@/lib/db';
 import { getDbInstance } from '@/lib/db-instance';
-import { hasSession, sendKeys } from '@/lib/tmux';
-import { invalidateCache } from '@/lib/tmux-capture-cache';
+import { hasSession, sendKeys } from '@/lib/tmux/tmux';
+import { invalidateCache } from '@/lib/tmux/tmux-capture-cache';
 
 /** Maximum command length to prevent DoS via large send-keys payloads (D1-006) */
 const MAX_COMMAND_LENGTH = 10000;

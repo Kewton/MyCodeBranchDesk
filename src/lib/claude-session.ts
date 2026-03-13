@@ -10,7 +10,7 @@ import {
   capturePane,
   killSession,
   sendSpecialKey,
-} from './tmux';
+} from './tmux/tmux';
 import {
   CLAUDE_PROMPT_PATTERN,
   CLAUDE_TRUST_DIALOG_PATTERN,
@@ -19,7 +19,7 @@ import {
   stripAnsi,
 } from './cli-patterns';
 import { detectAndResendIfPastedText } from './pasted-text-helper';
-import { invalidateCache } from './tmux-capture-cache';
+import { invalidateCache } from './tmux/tmux-capture-cache';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { access, constants } from 'fs/promises';

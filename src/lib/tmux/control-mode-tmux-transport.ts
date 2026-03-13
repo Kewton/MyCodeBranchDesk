@@ -4,10 +4,10 @@ import type {
   TransportCapabilities,
   TransportHandlers,
   TransportSubscription,
-} from '../session-transport';
-import { createSession, hasSession, killSession, sendKeys, sendSpecialKey, capturePane } from '../tmux';
-import { incrementTmuxControlCapturePaneCalls } from '../tmux-control-mode-metrics';
-import { getTmuxControlRegistry, type TmuxControlRegistry } from '../tmux-control-registry';
+} from './session-transport';
+import { createSession, hasSession, killSession, sendKeys, sendSpecialKey, capturePane } from './tmux';
+import { incrementTmuxControlCapturePaneCalls } from './tmux-control-mode-metrics';
+import { getTmuxControlRegistry, type TmuxControlRegistry } from './tmux-control-registry';
 
 const CONTROL_MODE_CAPABILITIES: TransportCapabilities = {
   streamingOutput: true,

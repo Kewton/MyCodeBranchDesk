@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock dependencies for sendSpecialKeysAndInvalidate
-vi.mock('@/lib/tmux-capture-cache', () => ({
+vi.mock('@/lib/tmux/tmux-capture-cache', () => ({
   invalidateCache: vi.fn(),
 }));
 
@@ -27,8 +27,8 @@ import {
   sendSpecialKeysAndInvalidate,
   SPECIAL_KEY_VALUES,
   sendSpecialKeys,
-} from '@/lib/tmux';
-import { invalidateCache } from '@/lib/tmux-capture-cache';
+} from '@/lib/tmux/tmux';
+import { invalidateCache } from '@/lib/tmux/tmux-capture-cache';
 
 describe('NAVIGATION_KEY_VALUES', () => {
   it('should be a readonly array', () => {

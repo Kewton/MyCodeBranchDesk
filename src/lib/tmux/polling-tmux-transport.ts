@@ -3,7 +3,7 @@ import type {
   SessionTransport,
   TransportCapabilities,
   TransportSubscription,
-} from '../session-transport';
+} from './session-transport';
 import {
   capturePane,
   createSession,
@@ -11,7 +11,7 @@ import {
   killSession,
   sendKeys,
   sendSpecialKey,
-} from '../tmux';
+} from './tmux';
 
 const POLLING_TMUX_CAPABILITIES: TransportCapabilities = {
   streamingOutput: false,

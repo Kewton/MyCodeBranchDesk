@@ -14,9 +14,9 @@ import { isCliToolType } from './cli-tools/types';
 import { CLIToolManager } from './cli-tools/manager';
 import { getDbInstance } from './db-instance';
 import { getWorktreeById } from './db';
-import { observeTmuxControlFirstOutputLatency } from './tmux-control-mode-metrics';
-import { getControlModeTmuxTransport } from './transports/control-mode-tmux-transport';
-import { isTmuxControlModeEnabled } from './tmux-control-mode-flags';
+import { observeTmuxControlFirstOutputLatency } from './tmux/tmux-control-mode-metrics';
+import { getControlModeTmuxTransport } from './tmux/control-mode-tmux-transport';
+import { isTmuxControlModeEnabled } from './tmux/tmux-control-mode-flags';
 
 interface WebSocketMessage {
   type:

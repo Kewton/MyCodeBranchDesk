@@ -11,7 +11,7 @@
 import { stopPolling as stopResponsePolling } from './response-poller';
 import { stopAutoYesPolling, deleteAutoYesState } from './auto-yes-manager';
 import { stopScheduleForWorktree } from './schedule-manager';
-import { clearAllCache } from './tmux-capture-cache';
+import { clearAllCache } from './tmux/tmux-capture-cache';
 import { CLI_TOOL_IDS, type CLIToolType } from './cli-tools/types';
 import { getErrorMessage } from './errors';
 

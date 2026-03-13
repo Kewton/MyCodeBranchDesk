@@ -13,7 +13,7 @@ import { isCliToolType } from '@/lib/cli-tools/types';
 import { CLIToolManager } from '@/lib/cli-tools/manager';
 import { getWorktreeById } from '@/lib/db';
 import { getDbInstance } from '@/lib/db-instance';
-import { hasSession, isAllowedSpecialKey, sendSpecialKeysAndInvalidate } from '@/lib/tmux';
+import { hasSession, isAllowedSpecialKey, sendSpecialKeysAndInvalidate } from '@/lib/tmux/tmux';
 
 /** Maximum number of keys per request to prevent abuse */
 const MAX_KEYS_LENGTH = 10;

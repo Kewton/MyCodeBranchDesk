@@ -18,7 +18,7 @@ import { stripAnsi, stripBoxDrawing, detectThinking, buildDetectPromptOptions } 
 import { DEFAULT_AUTO_YES_DURATION, validateStopPattern, type AutoYesDuration, type AutoYesStopReason } from '@/config/auto-yes-config';
 import { generatePromptKey } from './prompt-key';
 import { getErrorMessage } from './errors';
-import { invalidateCache } from './tmux-capture-cache';
+import { invalidateCache } from './tmux/tmux-capture-cache';
 
 // Re-export from shared config for backward compatibility (Issue #314)
 export type { AutoYesStopReason } from '@/config/auto-yes-config';

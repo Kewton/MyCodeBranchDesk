@@ -16,9 +16,9 @@ import {
   sendKeys,
   sendSpecialKey,
   killSession,
-} from '../tmux';
+} from '../tmux/tmux';
 import { detectAndResendIfPastedText } from '../pasted-text-helper';
-import { invalidateCache } from '../tmux-capture-cache';
+import { invalidateCache } from '../tmux/tmux-capture-cache';
 import { getDbInstance } from '../db-instance';
 import { getWorktreeById } from '../db';
 

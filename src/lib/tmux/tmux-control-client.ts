@@ -1,5 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
-import { createLogger } from './logger';
+import { createLogger } from '@/lib/logger';
 import { TmuxControlParser, type TmuxControlEvent } from './tmux-control-parser';
 
 const logger = createLogger('tmux-control-client');

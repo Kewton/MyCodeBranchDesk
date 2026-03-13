@@ -14,15 +14,15 @@
 import { CLIToolManager } from './cli-tools/manager';
 import type { CLIToolType } from './cli-tools/types';
 import { createLogger } from './logger';
-import type { SessionTransport } from './session-transport';
-import { getPollingTmuxTransport } from './transports/polling-tmux-transport';
+import type { SessionTransport } from './tmux/session-transport';
+import { getPollingTmuxTransport } from './tmux/polling-tmux-transport';
 import {
   getOrFetchCapture,
   setCachedCapture,
   invalidateCache,
   sliceOutput,
   CACHE_MAX_CAPTURE_LINES,
-} from './tmux-capture-cache';
+} from './tmux/tmux-capture-cache';
 
 const logger = createLogger('cli-session');
 
