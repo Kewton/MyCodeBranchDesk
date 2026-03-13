@@ -3,15 +3,19 @@
  * [SF-003] Configuration for editable file extensions
  * [Stage 3 NTH-001] Extensible design for future extensions
  *
- * This module defines which file extensions can be edited in the MarkdownEditor.
- * Currently only .md files are supported, but the design allows for easy extension.
+ * Defines file extensions that can be edited and saved in the browser.
+ * Functions as the write permission list for PUT /api/worktrees/[id]/files/[...path] API.
+ * - .md: Edited via MarkdownEditor
+ * - .html/.htm: Edited via HtmlPreview (Issue #490)
  */
+
+import { HTML_MAX_SIZE_BYTES } from '@/config/html-extensions';
 
 /**
  * List of file extensions that can be edited
  * Future extensions (txt, json, yaml) can be added here
  */
-export const EDITABLE_EXTENSIONS: readonly string[] = ['.md'] as const;
+export const EDITABLE_EXTENSIONS: readonly string[] = ['.md', '.html', '.htm'] as const;
 
 /**
  * Extension validator configuration
@@ -33,6 +37,15 @@ export const EXTENSION_VALIDATORS: ExtensionValidator[] = [
   {
     extension: '.md',
     maxFileSize: 1024 * 1024, // 1MB
+  },
+  // Issue #490: HTML files - additionalValidation undefined (sandbox attribute ensures safety)
+  {
+    extension: '.html',
+    maxFileSize: HTML_MAX_SIZE_BYTES,
+  },
+  {
+    extension: '.htm',
+    maxFileSize: HTML_MAX_SIZE_BYTES,
   },
 ];
 

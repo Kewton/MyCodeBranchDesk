@@ -288,6 +288,8 @@ export interface FileContent {
   isImage?: boolean;
   /** Whether the file is a video (optional, for video files) - Issue #302 */
   isVideo?: boolean;
+  /** Whether the file is an HTML file (optional, for HTML files) - Issue #490 */
+  isHtml?: boolean;
   /** MIME type (optional, for image/video files) */
   mimeType?: string;
 }
