@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbInstance } from '@/lib/db-instance';
 import { getWorktreeById } from '@/lib/db';
-import { isValidWorktreeId } from '@/lib/auto-yes-manager';
+import { isValidWorktreeId } from '@/lib/path-validator';
 import { isValidUuidV4 } from '@/config/schedule-config';
 
 /**

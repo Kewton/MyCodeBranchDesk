@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { getDbInstance } from '@/lib/db-instance';
 import { getWorktreeById } from '@/lib/db';
-import { isValidWorktreeId } from '@/lib/auto-yes-manager';
+import { isValidWorktreeId } from '@/lib/path-validator';
 import {
   MAX_SCHEDULE_NAME_LENGTH,
   MAX_SCHEDULE_MESSAGE_LENGTH,

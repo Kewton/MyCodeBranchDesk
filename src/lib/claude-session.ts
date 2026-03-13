@@ -9,7 +9,6 @@ import {
   sendKeys,
   capturePane,
   killSession,
-  sendSpecialKey,
 } from './tmux';
 import {
   CLAUDE_PROMPT_PATTERN,
@@ -18,8 +17,12 @@ import {
   CLAUDE_SESSION_ERROR_REGEX_PATTERNS,
   stripAnsi,
 } from './cli-patterns';
-import { detectAndResendIfPastedText } from './pasted-text-helper';
-import { invalidateCache } from './tmux-capture-cache';
+import {
+  sanitizeSessionEnvironment,
+  waitForPrompt as waitForPromptInternal,
+  sendMessageToSession,
+  stopSession,
+} from './session-key-sender';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { access, constants } from 'fs/promises';
@@ -388,44 +391,6 @@ async function ensureHealthySession(sessionName: string): Promise<boolean> {
   return true;
 }
 
-// ----- Environment Sanitization (Bug 3) -----
-
-/**
- * Remove CLAUDECODE environment variable from tmux session environment
- * Prevents Claude Code from detecting nested session and refusing to start
- * (SF-002: SRP - environment sanitization separated from session creation)
- *
- * MF-S3-002: tmux set-environment -g -u operates on the global tmux environment.
- * Impact analysis:
- * - CLAUDECODE is a Claude Code-specific variable, so Codex/Gemini sessions
- *   (CLI_TOOL_IDS: ['claude', 'codex', 'gemini']) are NOT affected by its removal.
- * - Multiple Claude sessions concurrently calling unset (-g -u) is safe because
- *   the unset operation is idempotent (unsetting an already-unset variable is a no-op).
- *
- * SEC-SF-001: sessionName is validated by the caller chain:
- * ClaudeTool.startSession() -> BaseCLITool.getSessionName() -> validateSessionName()
- * This ensures sessionName contains only safe characters (alphanumeric + hyphen).
- *
- * SEC-SF-003: Migration trigger for session-scoped set-environment (without -g flag):
- * - When sanitization of additional environment variables (e.g., CODEX_*, GEMINI_*)
- *   is required, migrate to session-scoped operations to prevent cross-session side effects.
- * - Current scope (CLAUDECODE only) is safe with global scope due to idempotent unset.
- *
- * @param sessionName - tmux session name
- */
-async function sanitizeSessionEnvironment(sessionName: string): Promise<void> {
-  // 3-1: Remove from tmux global environment
-  // MF-S3-002: -g flag affects global tmux environment.
-  // Safe because: (1) CLAUDECODE is Claude-specific, (2) unset is idempotent.
-  await execAsync('tmux set-environment -g -u CLAUDECODE 2>/dev/null || true');
-
-  // 3-2: Unset inside the session shell (safety net)
-  // 100ms wait: empirically determined time for sendKeys command to reach the shell
-  // SF-S3-004: 100ms is 0.67% of CLAUDE_INIT_TIMEOUT (15000ms), acceptable overhead
-  await sendKeys(sessionName, 'unset CLAUDECODE', true);
-  await new Promise(resolve => setTimeout(resolve, 100));
-}
-
 /**
  * Options for starting a Claude session
  */
@@ -538,7 +503,7 @@ export async function getClaudeSessionState(
 
 /**
  * Wait for session to be at prompt state
- * Polls for prompt detection using CLAUDE_PROMPT_PATTERN (DRY-001)
+ * Delegates to session-key-sender.ts (Issue #479: SRP split)
  *
  * @param sessionName - tmux session name
  * @param timeout - Timeout in milliseconds (default: CLAUDE_PROMPT_WAIT_TIMEOUT)
@@ -554,20 +519,7 @@ export async function waitForPrompt(
   sessionName: string,
   timeout: number = CLAUDE_PROMPT_WAIT_TIMEOUT
 ): Promise<void> {
-  const startTime = Date.now();
-  const pollInterval = CLAUDE_PROMPT_POLL_INTERVAL;
-
-  while (Date.now() - startTime < timeout) {
-    // SF-001: Use getCleanPaneOutput helper (DRY)
-    const cleanOutput = await getCleanPaneOutput(sessionName);
-    // DRY-001: Use CLAUDE_PROMPT_PATTERN from cli-patterns.ts
-    if (CLAUDE_PROMPT_PATTERN.test(cleanOutput)) {
-      return; // Prompt detected
-    }
-    await new Promise((resolve) => setTimeout(resolve, pollInterval));
-  }
-
-  throw new Error(`Prompt detection timeout (${timeout}ms)`);
+  return waitForPromptInternal(sessionName, timeout);
 }
 
 /**
@@ -683,6 +635,7 @@ export async function startClaudeSession(
 
 /**
  * Send a message to Claude CLI
+ * Delegates to session-key-sender.ts sendMessageToSession() (Issue #479: SRP split)
  *
  * @param worktreeId - Worktree ID
  * @param message - Message content to send
@@ -698,40 +651,12 @@ export async function sendMessageToClaude(
   message: string
 ): Promise<void> {
   const sessionName = getSessionName(worktreeId);
-
-  // Check if session exists
-  const exists = await hasSession(sessionName);
-  if (!exists) {
-    throw new Error(
-      `Claude session ${sessionName} does not exist. Start the session first.`
-    );
-  }
-
-  // Verify prompt state before sending (CONS-006, DRY-001)
-  // SF-001: Use getCleanPaneOutput helper (DRY)
-  const cleanOutput = await getCleanPaneOutput(sessionName);
-  if (!CLAUDE_PROMPT_PATTERN.test(cleanOutput)) {
-    // Path B: Prompt not detected - wait for it (P1: throw on timeout)
-    await waitForPrompt(sessionName, CLAUDE_SEND_PROMPT_WAIT_TIMEOUT);
-  }
-
-  // P0: Stability delay after prompt detection (both Path A and Path B)
-  await new Promise((resolve) => setTimeout(resolve, CLAUDE_POST_PROMPT_DELAY));
-
-  // Send message using sendKeys consistently (CONS-001)
-  await sendKeys(sessionName, message, false);
-  await sendKeys(sessionName, '', true);
-
-  // Issue #212: Detect [Pasted text] and resend Enter for multi-line messages
-  // MF-001: Single-line messages skip detection (+0ms overhead)
-  if (message.includes('\n')) {
-    await detectAndResendIfPastedText(sessionName);
-  }
-
-  // Issue #405: Invalidate cache after sending message
-  invalidateCache(sessionName);
-
-  console.log(`Sent message to Claude session: ${sessionName}`);
+  await sendMessageToSession(
+    sessionName,
+    message,
+    CLAUDE_POST_PROMPT_DELAY,
+    CLAUDE_SEND_PROMPT_WAIT_TIMEOUT,
+  );
 }
 
 /**
@@ -768,6 +693,7 @@ export async function captureClaudeOutput(
 
 /**
  * Stop a Claude session
+ * Delegates to session-key-sender.ts stopSession() (Issue #479: SRP split)
  *
  * @param worktreeId - Worktree ID
  * @returns True if session was stopped, false if it didn't exist
@@ -779,34 +705,7 @@ export async function captureClaudeOutput(
  */
 export async function stopClaudeSession(worktreeId: string): Promise<boolean> {
   const sessionName = getSessionName(worktreeId);
-
-  try {
-    // Send Ctrl+D to exit Claude gracefully
-    const exists = await hasSession(sessionName);
-    if (exists) {
-      await sendKeys(sessionName, '', false);
-      // Send Ctrl+D (ASCII 4)
-      await sendSpecialKey(sessionName, 'C-d');
-
-      // Issue #405: Invalidate cache after sending stop signal
-      invalidateCache(sessionName);
-
-      // Wait a moment for Claude to exit
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    }
-
-    // Kill the tmux session
-    const killed = await killSession(sessionName);
-
-    if (killed) {
-      console.log(`Stopped Claude session: ${sessionName}`);
-    }
-
-    return killed;
-  } catch (error: unknown) {
-    console.error(`Error stopping Claude session: ${getErrorMessage(error)}`);
-    return false;
-  }
+  return stopSession(sessionName);
 }
 
 /**

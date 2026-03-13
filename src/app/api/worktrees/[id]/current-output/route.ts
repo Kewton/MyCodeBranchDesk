@@ -10,7 +10,8 @@ import { CLIToolManager } from '@/lib/cli-tools/manager';
 import { CLI_TOOL_IDS, type CLIToolType } from '@/lib/cli-tools/types';
 import { captureSessionOutput } from '@/lib/cli-session';
 import { detectSessionStatus, STATUS_REASON } from '@/lib/status-detector';
-import { getAutoYesState, getLastServerResponseTimestamp, isValidWorktreeId } from '@/lib/auto-yes-manager';
+import { getAutoYesState, getLastServerResponseTimestamp } from '@/lib/auto-yes-manager';
+import { isValidWorktreeId } from '@/lib/path-validator';
 
 /** Issue #368: Derive from CLI_TOOL_IDS (DRY) */
 function isCliTool(value: string | null): value is CLIToolType {
