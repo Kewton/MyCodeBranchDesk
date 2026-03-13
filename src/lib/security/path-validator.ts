@@ -6,6 +6,28 @@
 
 import path from 'path';
 import { realpathSync, existsSync, lstatSync, readlinkSync } from 'fs';
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('path-validator');
+
+// =============================================================================
+// Worktree ID Validation (Issue #479: moved from auto-yes-manager.ts)
+// =============================================================================
+
+/** Worktree ID validation pattern (security: prevent command injection) */
+export const WORKTREE_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
+
+/**
+ * Validate worktree ID format (security measure).
+ * Only allows alphanumeric characters, hyphens, and underscores.
+ *
+ * @param worktreeId - Worktree ID to validate
+ * @returns true if the ID matches the allowed pattern
+ */
+export function isValidWorktreeId(worktreeId: string): boolean {
+  if (!worktreeId || worktreeId.length === 0) return false;
+  return WORKTREE_ID_PATTERN.test(worktreeId);
+}
 
 /**
  * [SEC-394] Check whether resolvedPath is within resolvedRoot.
@@ -176,9 +198,7 @@ export function resolveAndValidateRealPath(targetPath: string, rootDir: string):
       const resolvedTarget = realpathSync(fullPath);
       const ok = isWithinRoot(resolvedTarget, resolvedRoot);
       if (!ok) {
-        console.warn(
-          `[SEC-394] symlink traversal rejected: ${targetPath} -> ${resolvedTarget}`
-        );
+        logger.warn('security:symlink-rejected', { targetPath, resolvedTarget });
       }
       return ok;
     } catch {
@@ -197,9 +217,7 @@ export function resolveAndValidateRealPath(targetPath: string, rootDir: string):
         const resolvedLinkTarget = path.resolve(path.dirname(fullPath), linkTarget);
         const ok = isWithinRoot(resolvedLinkTarget, resolvedRoot);
         if (!ok) {
-          console.warn(
-            `[SEC-394] dangling symlink traversal rejected: ${targetPath} -> ${resolvedLinkTarget}`
-          );
+          logger.warn('security:dangling-symlink-rejected', { targetPath, resolvedLinkTarget });
         }
         return ok;
       } catch {
@@ -219,9 +237,7 @@ export function resolveAndValidateRealPath(targetPath: string, rootDir: string):
         const resolvedAncestor = realpathSync(currentPath);
         const ok = isWithinRoot(resolvedAncestor, resolvedRoot);
         if (!ok) {
-          console.warn(
-            `[SEC-394] symlink traversal rejected (ancestor): ${currentPath} -> ${resolvedAncestor}`
-          );
+          logger.warn('security:symlink-ancestor-rejected', { currentPath, resolvedAncestor });
         }
         return ok;
       } catch {

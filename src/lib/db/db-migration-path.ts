@@ -12,6 +12,9 @@ import fs from 'fs';
 import path from 'path';
 import { homedir } from 'os';
 import { isSystemDirectory } from '@/config/system-directories';
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('db-migration-path');
 
 /**
  * Migration result interface
@@ -51,7 +54,7 @@ export function resolveAndValidatePath(
 
     // Check if path is in a system directory
     if (isSystemDirectory(resolvedPath)) {
-      console.warn(
+      logger.warn(
         `[Security] ${description} points to system directory, skipping: ${resolvedPath}`
       );
       return null;
@@ -60,7 +63,7 @@ export function resolveAndValidatePath(
     return resolvedPath;
   } catch {
     // Failed to resolve path (broken symlink, etc.)
-    console.warn(`[Security] Failed to resolve ${description}: ${filePath}`);
+    logger.warn(`[Security] Failed to resolve ${description}: ${filePath}`);
     return null;
   }
 }
@@ -90,12 +93,12 @@ export function getLegacyDbPaths(): string[] {
       if (!isSystemDirectory(resolvedPath)) {
         paths.push(envDbPath);
       } else {
-        console.warn(
+        logger.warn(
           `[Security] Skipping DATABASE_PATH in system directory: ${resolvedPath}`
         );
       }
     } catch {
-      console.warn(`[Security] Invalid DATABASE_PATH: ${envDbPath}`);
+      logger.warn(`[Security] Invalid DATABASE_PATH: ${envDbPath}`);
     }
   }
 
@@ -161,10 +164,10 @@ export function migrateDbIfNeeded(targetPath: string): MigrationResult {
     // Copy database to new location
     fs.copyFileSync(resolvedLegacyPath, resolvedTargetPath);
 
-    console.log(
+    logger.info(
       `[Migration] Database migrated from ${resolvedLegacyPath} to ${resolvedTargetPath}`
     );
-    console.log(`[Migration] Backup created at ${backupPath}`);
+    logger.info(`[Migration] Backup created at ${backupPath}`);
 
     return {
       migrated: true,

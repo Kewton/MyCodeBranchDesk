@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbInstance } from '@/lib/db-instance';
 import { getWorktreeById } from '@/lib/db';
-import { isValidWorktreeId } from '@/lib/polling/auto-yes-manager';
+import { isValidWorktreeId } from '@/lib/security/path-validator';
 import { getGitLog, handleGitApiError } from '@/lib/git/git-utils';
 
 export async function GET(

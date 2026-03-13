@@ -10,7 +10,6 @@ import {
   clearAllAutoYesStates,
   clearAllPollerStates,
   startAutoYesPolling,
-  isValidWorktreeId,
   deleteAutoYesState,
   getAutoYesStateWorktreeIds,
   getAutoYesPollerWorktreeIds,
