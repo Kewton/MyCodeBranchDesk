@@ -118,7 +118,14 @@ src/
 ├── contexts/      # React Context
 ├── hooks/         # カスタムフック（useContextMenu等）
 ├── lib/           # ユーティリティ・ビジネスロジック
-│   └── cli-tools/ # CLIツール抽象化層
+│   ├── cli-tools/ # CLIツール抽象化層
+│   ├── db/        # データベース（Issue #481）
+│   ├── tmux/      # tmuxセッション管理・トランスポート（Issue #481）
+│   ├── security/  # 認証・IP制限・パス検証・サニタイズ（Issue #481）
+│   ├── detection/ # ステータス検出・プロンプト検出（Issue #481）
+│   ├── session/   # セッション管理・実行エンジン（Issue #481）
+│   ├── polling/   # ポーリング・Auto-Yes（Issue #481）
+│   └── git/       # Git操作・worktree管理・クローン（Issue #481）
 └── types/         # 型定義
 
 tests/
@@ -134,27 +141,27 @@ tests/
 | モジュール | 役割 |
 |-----------|------|
 | `src/middleware.ts` | 認証ミドルウェア（Edge Runtime） |
-| `src/lib/auth.ts` | トークン認証コア |
-| `src/lib/ip-restriction.ts` | IP/CIDR制限 |
+| `src/lib/security/auth.ts` | トークン認証コア |
+| `src/lib/security/ip-restriction.ts` | IP/CIDR制限 |
 | `src/config/auth-config.ts` | 認証設定定数 |
 | `src/lib/env.ts` | 環境変数取得・フォールバック |
-| `src/lib/db-instance.ts` | DBインスタンス管理 |
-| `src/lib/db-path-resolver.ts` | DBパス解決 |
-| `src/lib/db-migration-path.ts` | DBマイグレーション |
-| `src/lib/db-repository.ts` | リポジトリDB操作 |
-| `src/lib/tmux.ts` | tmuxセッション管理基盤（execFile使用） |
-| `src/lib/tmux-capture-cache.ts` | tmux captureキャッシュ（TTL=2秒、singleflight） |
-| `src/lib/claude-session.ts` | Claude CLIセッション管理・ヘルスチェック |
-| `src/lib/status-detector.ts` | セッションステータス検出 |
-| `src/lib/worktree-status-helper.ts` | Worktreeセッションステータス一括検出 |
-| `src/lib/response-poller.ts` | レスポンスポーリング・thinking検出 |
-| `src/lib/prompt-detector.ts` | プロンプト検出（2パス方式） |
-| `src/lib/cli-patterns.ts` | CLIツール別パターン定義 |
-| `src/lib/auto-yes-manager.ts` | Auto-Yes状態管理・サーバー側ポーリング |
-| `src/lib/auto-yes-resolver.ts` | Auto-Yes自動応答判定 |
+| `src/lib/db/db-instance.ts` | DBインスタンス管理 |
+| `src/lib/db/db-path-resolver.ts` | DBパス解決 |
+| `src/lib/db/db-migration-path.ts` | DBマイグレーション |
+| `src/lib/db/db-repository.ts` | リポジトリDB操作 |
+| `src/lib/tmux/tmux.ts` | tmuxセッション管理基盤（execFile使用） |
+| `src/lib/tmux/tmux-capture-cache.ts` | tmux captureキャッシュ（TTL=2秒、singleflight） |
+| `src/lib/session/claude-session.ts` | Claude CLIセッション管理・ヘルスチェック |
+| `src/lib/detection/status-detector.ts` | セッションステータス検出 |
+| `src/lib/session/worktree-status-helper.ts` | Worktreeセッションステータス一括検出 |
+| `src/lib/polling/response-poller.ts` | レスポンスポーリング・thinking検出 |
+| `src/lib/detection/prompt-detector.ts` | プロンプト検出（2パス方式） |
+| `src/lib/detection/cli-patterns.ts` | CLIツール別パターン定義 |
+| `src/lib/polling/auto-yes-manager.ts` | Auto-Yes状態管理・サーバー側ポーリング |
+| `src/lib/polling/auto-yes-resolver.ts` | Auto-Yes自動応答判定 |
 | `src/config/auto-yes-config.ts` | Auto-Yes設定定数・バリデーション |
 | `src/config/file-polling-config.ts` | ファイルポーリング定数（FILE_TREE_POLL_INTERVAL_MS, FILE_CONTENT_POLL_INTERVAL_MS）（Issue #469） |
-| `src/lib/prompt-key.ts` | promptKey重複排除ユーティリティ |
+| `src/lib/detection/prompt-key.ts` | promptKey重複排除ユーティリティ |
 | `src/lib/cli-tools/` | CLIツール抽象化（Strategy パターン） |
 | `src/lib/cli-tools/types.ts` | CLIツール型定義（IImageCapableCLITool/isImageCapableCLITool追加）（Issue #474） |
 | `src/lib/cli-tools/codex.ts` | Codex CLIセッション管理 |
@@ -162,24 +169,24 @@ tests/
 | `src/lib/cli-tools/opencode.ts` | OpenCode CLIツール |
 | `src/lib/cli-tools/opencode-config.ts` | OpenCode設定自動生成（Ollama/LM Studio） |
 | `src/lib/selected-agents-validator.ts` | エージェント選択バリデーション（2-4エージェント） |
-| `src/lib/claude-executor.ts` | CLI非インタラクティブ実行エンジン |
+| `src/lib/session/claude-executor.ts` | CLI非インタラクティブ実行エンジン |
 | `src/lib/schedule-manager.ts` | cronベーススケジューラー |
 | `src/lib/cmate-parser.ts` | CMATE.md汎用パーサー |
 | `src/lib/session-cleanup.ts` | セッション/ポーラー/スケジューラー停止（Facade） |
 | `src/lib/resource-cleanup.ts` | リソースリーク対策（孤立プロセス/Map検出） |
-| `src/lib/env-sanitizer.ts` | 環境変数サニタイズ |
+| `src/lib/security/env-sanitizer.ts` | 環境変数サニタイズ |
 | `src/lib/proxy/handler.ts` | HTTPプロキシハンドラ |
 | `src/lib/proxy/config.ts` | プロキシ設定定数 |
-| `src/lib/path-validator.ts` | パスバリデーション・symlink防御 |
+| `src/lib/security/path-validator.ts` | パスバリデーション・symlink防御 |
 | `src/lib/file-operations.ts` | ファイルCRUD操作（5層セキュリティ） |
-| `src/lib/clone-manager.ts` | クローン処理管理（排他制御） |
+| `src/lib/git/clone-manager.ts` | クローン処理管理（排他制御） |
 | `src/lib/version-checker.ts` | バージョンアップ通知 |
 | `src/lib/slash-commands.ts` | スラッシュコマンドローダー |
 | `src/lib/url-path-encoder.ts` | ファイルパスURLエンコード |
 | `src/lib/file-search.ts` | ファイル内容検索 |
 | `src/lib/terminal-highlight.ts` | CSS Custom Highlight API ラッパー（Issue #47）XSS安全なターミナルハイライト |
 | `src/lib/file-tree.ts` | ディレクトリツリー構造生成 |
-| `src/lib/git-utils.ts` | Git情報取得・コミット履歴/diff取得（Issue #447） |
+| `src/lib/git/git-utils.ts` | Git情報取得・コミット履歴/diff取得（Issue #447） |
 | `src/types/git.ts` | Git関連型定義（CommitInfo, ChangedFile, GitLogResponse等）（Issue #447） |
 | `src/lib/sidebar-utils.ts` | サイドバーソート・グループ化ユーティリティ（SortKey, SortDirection, ViewMode型, BranchGroup型, sortBranches(), groupBranches()）（Issue #449） |
 | `src/contexts/SidebarContext.tsx` | サイドバー状態管理Context（isOpen, sortKey, viewMode, localStorageパターン）（Issue #449） |
