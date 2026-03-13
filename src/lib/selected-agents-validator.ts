@@ -9,9 +9,6 @@
  */
 
 import { CLI_TOOL_IDS, type CLIToolType } from './cli-tools/types';
-import { createLogger } from '@/lib/logger';
-
-const logger = createLogger('selected-agents-validator');
 
 /** Minimum number of selected agents */
 export const MIN_SELECTED_AGENTS = 2;
@@ -62,17 +59,17 @@ export function parseSelectedAgents(raw: string | null): CLIToolType[] {
   try {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) {
-      logger.warn('parse:invalid-format');
+      // invalid format - return default silently
       return DEFAULT_SELECTED_AGENTS;
     }
     const result = validateAgentsPair(parsed);
     if (!result.valid) {
-      logger.warn('parse:validation-failed');
+      // validation failed - return default silently
       return DEFAULT_SELECTED_AGENTS;
     }
     return result.value!;
   } catch {
-    logger.warn('parse:json-error');
+    // JSON parse error - return default silently
     return DEFAULT_SELECTED_AGENTS;
   }
 }

@@ -3,28 +3,13 @@
  * Issue #368: Agent settings tab - validator functions
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   parseSelectedAgents,
   validateSelectedAgentsInput,
   validateAgentsPair,
   DEFAULT_SELECTED_AGENTS,
 } from '@/lib/selected-agents-validator';
-
-// Mock logger module (Issue #480)
-const { mockLogger } = vi.hoisted(() => {
-  const mockLogger = {
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    withContext: vi.fn().mockReturnThis(),
-  };
-  return { mockLogger };
-});
-vi.mock('@/lib/logger', () => ({
-  createLogger: vi.fn(() => mockLogger),
-}));
 
 
 describe('validateAgentsPair()', () => {
@@ -90,14 +75,6 @@ describe('validateAgentsPair()', () => {
 });
 
 describe('parseSelectedAgents()', () => {
-  
-  beforeEach(() => {
-    mockLogger.warn.mockClear();
-    mockLogger.info.mockClear();
-  });
-
-  afterEach(() => {
-});
 
   it('should return default for null input', () => {
     const result = parseSelectedAgents(null);
@@ -119,16 +96,14 @@ describe('parseSelectedAgents()', () => {
     expect(result).toEqual(['vibe-local', 'gemini']);
   });
 
-  it('should return default and warn for invalid JSON', () => {
+  it('should return default for invalid JSON', () => {
     const result = parseSelectedAgents('not-json');
     expect(result).toEqual(DEFAULT_SELECTED_AGENTS);
-    expect(mockLogger.warn).toHaveBeenCalled();
   });
 
-  it('should return default and warn for non-array JSON', () => {
+  it('should return default for non-array JSON', () => {
     const result = parseSelectedAgents('{"key":"value"}');
     expect(result).toEqual(DEFAULT_SELECTED_AGENTS);
-    expect(mockLogger.warn).toHaveBeenCalled();
   });
 
   it('should parse valid JSON with 3 or 4 agents', () => {
@@ -139,32 +114,25 @@ describe('parseSelectedAgents()', () => {
     expect(result4).toEqual(['claude', 'codex', 'gemini', 'vibe-local']);
   });
 
-  it('should return default and warn for array with wrong length', () => {
+  it('should return default for array with wrong length', () => {
     const result = parseSelectedAgents('["claude"]');
     expect(result).toEqual(DEFAULT_SELECTED_AGENTS);
-    expect(mockLogger.warn).toHaveBeenCalled();
   });
 
-  it('should return default and warn for invalid tool IDs', () => {
+  it('should return default for invalid tool IDs', () => {
     const result = parseSelectedAgents('["claude","invalid"]');
     expect(result).toEqual(DEFAULT_SELECTED_AGENTS);
-    expect(mockLogger.warn).toHaveBeenCalled();
   });
 
-  it('should return default and warn for duplicate tool IDs', () => {
+  it('should return default for duplicate tool IDs', () => {
     const result = parseSelectedAgents('["claude","claude"]');
     expect(result).toEqual(DEFAULT_SELECTED_AGENTS);
-    expect(mockLogger.warn).toHaveBeenCalled();
   });
 
-  it('should sanitize raw value in warn log (no ANSI, no newlines, truncated)', () => {
+  it('should return default for malicious input', () => {
     const maliciousRaw = '\x1b[31m' + 'a'.repeat(200) + '\n\rend';
-    parseSelectedAgents(maliciousRaw);
-    expect(mockLogger.warn).toHaveBeenCalled();
-    // With structured logger, the warn call uses action + data format
-    // Verify the logger was called (sanitization is handled by the logger module)
-    const warnCalls = mockLogger.warn.mock.calls;
-    expect(warnCalls.length).toBeGreaterThanOrEqual(1);
+    const result = parseSelectedAgents(maliciousRaw);
+    expect(result).toEqual(DEFAULT_SELECTED_AGENTS);
   });
 });
 
