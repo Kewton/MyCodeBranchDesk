@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.6] - 2026-03-11
+
+### Added
+- File auto-update polling for external change detection (Issue #469)
+  - `useFilePolling` hook with visibility-change lifecycle management
+  - `useFileContentPolling` hook with If-Modified-Since/304 support
+  - `useFileContentSearch` shared search hook
+  - `FileSearchBar` shared component
+  - `file-polling-config.ts` for polling interval constants
+  - File tree and content auto-refresh when agent modifies files
+
+### Fixed
+- Auto-Yes: add retry expiry to prevent permanent duplicate prompt blocking
+- Codex: detect approval prompts with wrapped preview lines
+- Codex: handle long wrapped approval options
+- Sidebar: add fallback navigation when Next.js router.push silently fails
+
+### Refactored
+- File panel: extract duplicated search logic into shared hook and component
+
 ## [0.4.5] - 2026-03-10
 
 ### Added
@@ -774,7 +794,8 @@ _No changes recorded._
   - `MCBD_DB_PATH` -> `CM_DB_PATH`
 - `NEXT_PUBLIC_MCBD_AUTH_TOKEN` -> `NEXT_PUBLIC_CM_AUTH_TOKEN`
 
-[unreleased]: https://github.com/Kewton/CommandMate/compare/v0.4.5...HEAD
+[unreleased]: https://github.com/Kewton/CommandMate/compare/v0.4.6...HEAD
+[0.4.6]: https://github.com/Kewton/CommandMate/compare/v0.4.5...v0.4.6
 [0.4.5]: https://github.com/Kewton/CommandMate/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/Kewton/CommandMate/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/Kewton/CommandMate/compare/v0.4.2...v0.4.3
