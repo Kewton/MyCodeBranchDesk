@@ -321,12 +321,12 @@ export function detectSessionStatus(
     }
   }
 
-  // 2.7. Codex TUI idle prompt detection
+  // 2.7. Codex TUI content area detection (thinking + idle prompt)
   // Codex TUI layout: conversation area (top) | empty padding (~30 lines) | input area + status bar (bottom).
-  // The idle prompt `›` appears at the end of the conversation area, but TUI padding pushes it
-  // far above the 15-line window (lastLines), so standard step-3 detection misses it.
-  // Strategy: find the Codex status bar (`{model} · {N}% left · {path}`), then check if the
-  // last non-empty content line above the status bar/input area is the idle `›` prompt.
+  // Standard windowed checks (last 5/15 lines) only see padding/status bar, missing both:
+  // A. Thinking indicators (• Ran, • Planning) in the conversation area → should show spinner
+  // B. Idle prompt (›) at the end of the conversation area → should show ready
+  // Strategy: find the Codex status bar, extract content above it, then check for thinking/idle.
   if (cliToolId === 'codex') {
     const codexStatusBarPattern = /^\s*\S+.*\d+%\s+left\s+·/;
     let codexFooterBoundary = -1;
@@ -337,37 +337,53 @@ export function detectSessionStatus(
       }
     }
     if (codexFooterBoundary >= 0) {
-      // Scan upward from status bar to find the › idle prompt above TUI padding.
-      // Codex TUI structure: [conversation...] › [padding ~30 empty lines] [input area] [status bar]
-      // The › must be the LAST item in the conversation area (above padding gap).
-      // If Codex is processing, there would be • response text after ›, not ›.
-      const scanLimit = Math.max(0, codexFooterBoundary - 50);
-      let consecutiveEmptyLines = 0;
-      let crossedPaddingGap = false;
-      for (let ci = codexFooterBoundary - 1; ci >= scanLimit; ci--) {
-        const line = contentLines[ci].trim();
-        if (!line) {
-          consecutiveEmptyLines++;
-          if (consecutiveEmptyLines >= 5) crossedPaddingGap = true;
-          continue;
+      // Find last non-empty content line above footer (skip padding + input area)
+      let lastContentIdx = codexFooterBoundary - 1;
+      while (lastContentIdx >= 0 && contentLines[lastContentIdx].trim() === '') {
+        lastContentIdx--;
+      }
+      if (lastContentIdx >= 0) {
+        // A. Check content area for thinking indicators (wider window than step 2)
+        const codexThinkingWindow = contentLines
+          .slice(Math.max(0, lastContentIdx - STATUS_THINKING_LINE_COUNT + 1), lastContentIdx + 1)
+          .join('\n');
+        if (detectThinking('codex', codexThinkingWindow)) {
+          return {
+            status: 'running',
+            confidence: 'high',
+            reason: 'thinking_indicator',
+            hasActivePrompt: false,
+            promptDetection,
+          };
         }
-        consecutiveEmptyLines = 0;
-        // Only check for › prompt AFTER crossing the TUI padding gap.
-        // Lines below the gap are input area text (skip them).
-        if (crossedPaddingGap) {
-          if (CODEX_PROMPT_PATTERN.test(line)) {
-            return {
-              status: 'ready',
-              confidence: 'high',
-              reason: 'input_prompt',
-              hasActivePrompt: false,
-              promptDetection,
-            };
-          }
-          // Non-› content above padding = Codex is processing (e.g., • response text)
-          break;
+
+        // B. Check if the last content line is the idle › prompt.
+        // The last non-empty line above the status bar is the current active line.
+        // When Codex is idle, this is the › prompt (with optional suggestion text).
+        // When processing, this is command output (not ›), so the check naturally fails.
+        const lastContentLine = contentLines[lastContentIdx].trim();
+        if (CODEX_PROMPT_PATTERN.test(lastContentLine)) {
+          return {
+            status: 'ready',
+            confidence: 'high',
+            reason: 'input_prompt',
+            hasActivePrompt: false,
+            promptDetection,
+          };
         }
-        // Below the gap: input area text, continue scanning upward
+
+        // C. Fallback: status bar present but neither thinking nor idle › detected.
+        // This means Codex is actively processing — command output has pushed the
+        // • Ran/• Working indicators beyond the 5-line thinking window.
+        // The status bar ("model · N% left · path") is always visible during Codex
+        // sessions, and the only idle state (›) was checked in B above.
+        return {
+          status: 'running',
+          confidence: 'high',
+          reason: 'thinking_indicator',
+          hasActivePrompt: false,
+          promptDetection,
+        };
       }
     }
   }

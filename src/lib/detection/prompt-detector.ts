@@ -602,7 +602,13 @@ function isContinuationLine(rawLine: string, line: string): boolean {
 
   // Check 1: Indented non-option line (label text wrapping with indentation).
   // Must have 2+ leading spaces, not start with a number (option line), and not end with '?'.
+  // Exception: deeply indented lines (4+ spaces) are accepted even if they start with a
+  // digit, since option lines use 2-space indent. This handles Codex approval prompts
+  // where wrapped filenames like "14.md workspace/..." start with digits.
   if (!endsWithQuestion && /^\s{2,}[^\d]/.test(rawLine) && !/^\s*\d+\./.test(rawLine)) {
+    return true;
+  }
+  if (!endsWithQuestion && /^\s{4,}/.test(rawLine) && !/^\s*\d+\.\s/.test(rawLine)) {
     return true;
   }
 
