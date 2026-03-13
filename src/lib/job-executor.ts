@@ -10,7 +10,7 @@
  */
 
 import { randomUUID } from 'crypto';
-import { executeClaudeCommand, type ExecuteCommandOptions } from './claude-executor';
+import { executeClaudeCommand, type ExecuteCommandOptions } from './session/claude-executor';
 import type { ScheduleEntry } from '@/types/cmate';
 import { createLogger } from '@/lib/logger';
 

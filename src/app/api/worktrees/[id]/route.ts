@@ -9,12 +9,12 @@ import { getDbInstance } from '@/lib/db-instance';
 import { getWorktreeById, updateWorktreeDescription, updateWorktreeLink, updateFavorite, updateStatus, updateCliToolId, updateSelectedAgents, updateVibeLocalModel, updateVibeLocalContextWindow, getMessages, markPendingPromptsAsAnswered, getInitialBranch } from '@/lib/db';
 import { CLIToolManager } from '@/lib/cli-tools/manager';
 import { CLI_TOOL_IDS, OLLAMA_MODEL_PATTERN, isValidVibeLocalContextWindow, VIBE_LOCAL_CONTEXT_WINDOW_MIN, VIBE_LOCAL_CONTEXT_WINDOW_MAX, type CLIToolType } from '@/lib/cli-tools/types';
-import { getGitStatus } from '@/lib/git-utils';
+import { getGitStatus } from '@/lib/git/git-utils';
 import type { GitStatus } from '@/types/models';
-import { isValidWorktreeId } from '@/lib/path-validator';
+import { isValidWorktreeId } from '@/lib/security/path-validator';
 import { validateSelectedAgentsInput } from '@/lib/selected-agents-validator';
-import { listSessions } from '@/lib/tmux';
-import { detectWorktreeSessionStatus } from '@/lib/worktree-status-helper';
+import { listSessions } from '@/lib/tmux/tmux';
+import { detectWorktreeSessionStatus } from '@/lib/session/worktree-status-helper';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('api/worktrees');

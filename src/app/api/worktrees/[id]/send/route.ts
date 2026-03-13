@@ -18,10 +18,10 @@ import { getDbInstance } from '@/lib/db-instance';
 import { getWorktreeById, createMessage, updateLastUserMessage, clearInProgressMessageId, saveInitialBranch, getInitialBranch, getMessages, deleteMessageById } from '@/lib/db';
 import { CLIToolManager } from '@/lib/cli-tools/manager';
 import { CLI_TOOL_IDS, isImageCapableCLITool, type CLIToolType } from '@/lib/cli-tools/types';
-import { startPolling } from '@/lib/response-poller';
+import { startPolling } from '@/lib/polling/response-poller';
 import { savePendingAssistantResponse } from '@/lib/assistant-response-saver';
-import { getGitStatus } from '@/lib/git-utils';
-import { isPathSafe, resolveAndValidateRealPath } from '@/lib/path-validator';
+import { getGitStatus } from '@/lib/git/git-utils';
+import { isPathSafe, resolveAndValidateRealPath } from '@/lib/security/path-validator';
 import path from 'path';
 import { createLogger } from '@/lib/logger';
 

@@ -17,10 +17,10 @@ import {
   sendSpecialKey,
   killSession,
   capturePane,
-} from '../tmux';
+} from '../tmux/tmux';
 import { detectAndResendIfPastedText } from '../pasted-text-helper';
-import { invalidateCache } from '../tmux-capture-cache';
-import { GEMINI_PROMPT_PATTERN, stripAnsi } from '../cli-patterns';
+import { invalidateCache } from '../tmux/tmux-capture-cache';
+import { GEMINI_PROMPT_PATTERN, stripAnsi } from '../detection/cli-patterns';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('cli-tools/gemini');

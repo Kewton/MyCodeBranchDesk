@@ -13,18 +13,17 @@ import {
   deleteAutoYesState,
   getAutoYesStateWorktreeIds,
   getAutoYesPollerWorktreeIds,
-} from '@/lib/auto-yes-manager';
-import { isValidWorktreeId } from '@/lib/path-validator';
+} from '@/lib/polling/auto-yes-manager';
 
 // Mock dependencies required by startAutoYesPolling
 import { vi } from 'vitest';
-vi.mock('@/lib/cli-session', () => ({
+vi.mock('@/lib/session/cli-session', () => ({
   captureSessionOutput: vi.fn().mockResolvedValue(''),
 }));
-vi.mock('@/lib/prompt-detector', () => ({
+vi.mock('@/lib/detection/prompt-detector', () => ({
   detectPrompt: vi.fn().mockReturnValue({ isPrompt: false }),
 }));
-vi.mock('@/lib/auto-yes-resolver', () => ({
+vi.mock('@/lib/polling/auto-yes-resolver', () => ({
   resolveAutoAnswer: vi.fn().mockReturnValue(null),
 }));
 vi.mock('@/lib/prompt-answer-sender', () => ({

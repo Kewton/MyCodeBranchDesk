@@ -23,7 +23,7 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 // Mock tmux module before importing claude-session
-vi.mock('@/lib/tmux', () => ({
+vi.mock('@/lib/tmux/tmux', () => ({
   hasSession: vi.fn(),
   createSession: vi.fn(),
   sendKeys: vi.fn(),
@@ -51,12 +51,12 @@ import {
   CLAUDE_INIT_TIMEOUT,
   CLAUDE_INIT_POLL_INTERVAL,
   CLAUDE_POST_PROMPT_DELAY,
-} from '@/lib/claude-session';
+} from '@/lib/session/claude-session';
 import {
   CLAUDE_TRUST_DIALOG_PATTERN,
   CLAUDE_PROMPT_PATTERN,
-} from '@/lib/cli-patterns';
-import { hasSession, createSession, sendKeys, capturePane } from '@/lib/tmux';
+} from '@/lib/detection/cli-patterns';
+import { hasSession, createSession, sendKeys, capturePane } from '@/lib/tmux/tmux';
 
 describe('Issue #201: Trust dialog auto-response - Acceptance Tests', () => {
   beforeEach(() => {

@@ -11,7 +11,7 @@ import {
   PASTED_TEXT_PATTERN,
   OPENCODE_SKIP_PATTERNS,
   OPENCODE_RESPONSE_COMPLETE,
-} from './cli-patterns';
+} from './detection/cli-patterns';
 import { normalizeOpenCodeLine } from './tui-accumulator';
 
 /**

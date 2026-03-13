@@ -115,7 +115,7 @@ describe('Auth Middleware', () => {
   });
 
   it('should redirect to /login for unauthenticated requests', async () => {
-    const { hashToken } = await import('@/lib/auth');
+    const { hashToken } = await import('@/lib/security/auth');
     const hash = hashToken('test-token');
     process.env.CM_AUTH_TOKEN_HASH = hash;
     vi.resetModules();
@@ -128,7 +128,7 @@ describe('Auth Middleware', () => {
   });
 
   it('should pass through for authenticated requests with valid cookie', async () => {
-    const { generateToken, hashToken } = await import('@/lib/auth');
+    const { generateToken, hashToken } = await import('@/lib/security/auth');
     const token = generateToken();
     const hash = hashToken(token);
     process.env.CM_AUTH_TOKEN_HASH = hash;
@@ -142,7 +142,7 @@ describe('Auth Middleware', () => {
   });
 
   it('should pass through for /login path (excluded)', async () => {
-    const { hashToken } = await import('@/lib/auth');
+    const { hashToken } = await import('@/lib/security/auth');
     const hash = hashToken('test-token');
     process.env.CM_AUTH_TOKEN_HASH = hash;
     vi.resetModules();
@@ -155,7 +155,7 @@ describe('Auth Middleware', () => {
   });
 
   it('should pass through for /api/auth/login path (excluded)', async () => {
-    const { hashToken } = await import('@/lib/auth');
+    const { hashToken } = await import('@/lib/security/auth');
     const hash = hashToken('test-token');
     process.env.CM_AUTH_TOKEN_HASH = hash;
     vi.resetModules();
@@ -168,7 +168,7 @@ describe('Auth Middleware', () => {
   });
 
   it('should pass through for /api/auth/status path (excluded)', async () => {
-    const { hashToken } = await import('@/lib/auth');
+    const { hashToken } = await import('@/lib/security/auth');
     const hash = hashToken('test-token');
     process.env.CM_AUTH_TOKEN_HASH = hash;
     vi.resetModules();
@@ -181,7 +181,7 @@ describe('Auth Middleware', () => {
   });
 
   it('should NOT pass through for /login-bypass path (S002: exact match only)', async () => {
-    const { hashToken } = await import('@/lib/auth');
+    const { hashToken } = await import('@/lib/security/auth');
     const hash = hashToken('test-token');
     process.env.CM_AUTH_TOKEN_HASH = hash;
     vi.resetModules();
@@ -194,7 +194,7 @@ describe('Auth Middleware', () => {
   });
 
   it('should redirect to /login for invalid cookie token', async () => {
-    const { hashToken } = await import('@/lib/auth');
+    const { hashToken } = await import('@/lib/security/auth');
     const hash = hashToken('real-token');
     process.env.CM_AUTH_TOKEN_HASH = hash;
     vi.resetModules();
@@ -207,7 +207,7 @@ describe('Auth Middleware', () => {
   });
 
   it('should return 401 for unauthenticated WebSocket upgrade', async () => {
-    const { hashToken } = await import('@/lib/auth');
+    const { hashToken } = await import('@/lib/security/auth');
     const hash = hashToken('test-token');
     process.env.CM_AUTH_TOKEN_HASH = hash;
     vi.resetModules();
@@ -220,7 +220,7 @@ describe('Auth Middleware', () => {
   });
 
   it('should pass through for authenticated WebSocket upgrade', async () => {
-    const { generateToken, hashToken } = await import('@/lib/auth');
+    const { generateToken, hashToken } = await import('@/lib/security/auth');
     const token = generateToken();
     const hash = hashToken(token);
     process.env.CM_AUTH_TOKEN_HASH = hash;

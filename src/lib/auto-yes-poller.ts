@@ -9,19 +9,19 @@
  */
 
 import type { CLIToolType } from './cli-tools/types';
-import { captureSessionOutput } from './cli-session';
-import { detectPrompt } from './prompt-detector';
-import { resolveAutoAnswer } from './auto-yes-resolver';
+import { captureSessionOutput } from './session/cli-session';
+import { detectPrompt } from './detection/prompt-detector';
+import { resolveAutoAnswer } from './polling/auto-yes-resolver';
 import { sendPromptAnswer } from './prompt-answer-sender';
 import { CLIToolManager } from './cli-tools/manager';
-import { stripAnsi, stripBoxDrawing, detectThinking, buildDetectPromptOptions } from './cli-patterns';
-import { generatePromptKey } from './prompt-key';
+import { stripAnsi, stripBoxDrawing, detectThinking, buildDetectPromptOptions } from './detection/cli-patterns';
+import { generatePromptKey } from './detection/prompt-key';
 import { getErrorMessage } from './errors';
-import { invalidateCache } from './tmux-capture-cache';
+import { invalidateCache } from './tmux/tmux-capture-cache';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('auto-yes-poller');
-import { isValidWorktreeId } from './path-validator';
+import { isValidWorktreeId } from './security/path-validator';
 import {
   getAutoYesState,
   isAutoYesExpired,

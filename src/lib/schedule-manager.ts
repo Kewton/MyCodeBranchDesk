@@ -19,7 +19,7 @@
 
 import { Cron } from 'croner';
 import { readCmateFile, parseSchedulesSection } from './cmate-parser';
-import { getActiveProcesses } from './claude-executor';
+import { getActiveProcesses } from './session/claude-executor';
 import {
   getCmateMtime,
   getAllWorktrees,

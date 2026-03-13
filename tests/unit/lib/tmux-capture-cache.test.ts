@@ -15,7 +15,7 @@ import {
   CACHE_TTL_MS,
   CACHE_MAX_ENTRIES,
   CACHE_MAX_CAPTURE_LINES,
-} from '@/lib/tmux-capture-cache';
+} from '@/lib/tmux/tmux-capture-cache';
 
 // Mock logger module (Issue #480)
 const { mockLogger } = vi.hoisted(() => {

@@ -15,7 +15,7 @@ import { validateRepositoryPath, disableRepository } from '@/lib/db-repository';
 import { cleanupMultipleWorktrees } from '@/lib/session-cleanup';
 import { cleanupRooms, broadcastMessage } from '@/lib/ws-server';
 import { CLIToolManager } from '@/lib/cli-tools/manager';
-import { killSession } from '@/lib/tmux';
+import { killSession } from '@/lib/tmux/tmux';
 import type { CLIToolType } from '@/lib/cli-tools/types';
 import { createLogger } from '@/lib/logger';
 

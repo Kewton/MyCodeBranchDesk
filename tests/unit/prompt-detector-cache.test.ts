@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { detectPrompt, resetDetectPromptCache } from '@/lib/prompt-detector';
+import { detectPrompt, resetDetectPromptCache } from '@/lib/detection/prompt-detector';
 
 // Mock logger module (Issue #480)
 const { mockLogger } = vi.hoisted(() => {

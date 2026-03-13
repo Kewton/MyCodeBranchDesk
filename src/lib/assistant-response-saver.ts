@@ -14,15 +14,15 @@
  */
 
 import Database from 'better-sqlite3';
-import { captureSessionOutput } from './cli-session';
+import { captureSessionOutput } from './session/cli-session';
 import {
   createMessage,
   getSessionState,
   updateSessionState,
 } from './db';
 import { broadcastMessage } from './ws-server';
-import { cleanClaudeResponse, cleanGeminiResponse, cleanOpenCodeResponse } from './response-poller';
-import { stripAnsi } from './cli-patterns';
+import { cleanClaudeResponse, cleanGeminiResponse, cleanOpenCodeResponse } from './polling/response-poller';
+import { stripAnsi } from './detection/cli-patterns';
 import type { CLIToolType } from './cli-tools/types';
 import type { ChatMessage } from '@/types/models';
 import { createLogger } from '@/lib/logger';

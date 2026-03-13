@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDbInstance } from '@/lib/db-instance';
 import { getWorktreeById, deleteSessionState, deleteAllMessages, deleteMessagesByCliTool } from '@/lib/db';
 import { CLIToolManager } from '@/lib/cli-tools/manager';
-import { killSession } from '@/lib/tmux';
+import { killSession } from '@/lib/tmux/tmux';
 import { broadcast } from '@/lib/ws-server';
 import { CLI_TOOL_IDS, type CLIToolType } from '@/lib/cli-tools/types';
 import { createLogger } from '@/lib/logger';

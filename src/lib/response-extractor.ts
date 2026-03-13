@@ -10,7 +10,7 @@ import type { CLIToolType } from './cli-tools/types';
 import {
   OPENCODE_RESPONSE_COMPLETE,
   OPENCODE_PROCESSING_INDICATOR,
-} from './cli-patterns';
+} from './detection/cli-patterns';
 
 /**
  * Check if OpenCode has completed its response.

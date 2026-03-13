@@ -14,13 +14,13 @@ import {
   capturePane,
   killSession,
   sendSpecialKey,
-} from './tmux';
+} from './tmux/tmux';
 import {
   CLAUDE_PROMPT_PATTERN,
   stripAnsi,
-} from './cli-patterns';
+} from './detection/cli-patterns';
 import { detectAndResendIfPastedText } from './pasted-text-helper';
-import { invalidateCache } from './tmux-capture-cache';
+import { invalidateCache } from './tmux/tmux-capture-cache';
 import { getErrorMessage } from './errors';
 import { exec } from 'child_process';
 import { promisify } from 'util';

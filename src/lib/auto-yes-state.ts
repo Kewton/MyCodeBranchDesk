@@ -9,7 +9,7 @@
  */
 
 import { DEFAULT_AUTO_YES_DURATION, validateStopPattern, type AutoYesDuration, type AutoYesStopReason } from '@/config/auto-yes-config';
-import { isValidWorktreeId } from './path-validator';
+import { isValidWorktreeId } from './security/path-validator';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('auto-yes-state');

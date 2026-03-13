@@ -15,7 +15,7 @@ import {
   stripBoxDrawing,
   OPENCODE_SKIP_PATTERNS,
   OPENCODE_RESPONSE_COMPLETE,
-} from './cli-patterns';
+} from './detection/cli-patterns';
 
 /**
  * State for accumulating TUI content across polling intervals.

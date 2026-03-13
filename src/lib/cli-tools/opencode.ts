@@ -17,9 +17,9 @@ import {
   sendKeys,
   sendSpecialKey,
   killSession,
-} from '../tmux';
+} from '../tmux/tmux';
 import { detectAndResendIfPastedText } from '../pasted-text-helper';
-import { invalidateCache } from '../tmux-capture-cache';
+import { invalidateCache } from '../tmux/tmux-capture-cache';
 import { ensureOpencodeConfig } from './opencode-config';
 import { execFile } from 'child_process';
 import { promisify } from 'util';

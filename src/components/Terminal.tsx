@@ -10,7 +10,7 @@ import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import { WebLinksAddon } from 'xterm-addon-web-links';
 import 'xterm/css/xterm.css';
-import { isTmuxControlModeEnabledForClient } from '@/lib/tmux-control-mode-flags';
+import { isTmuxControlModeEnabledForClient } from '@/lib/tmux/tmux-control-mode-flags';
 
 interface TerminalComponentProps {
   worktreeId: string;

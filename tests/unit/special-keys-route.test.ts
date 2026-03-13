@@ -30,20 +30,20 @@ vi.mock('@/lib/db', () => ({
   getWorktreeById: vi.fn(),
 }));
 
-vi.mock('@/lib/tmux', () => ({
+vi.mock('@/lib/tmux/tmux', () => ({
   hasSession: vi.fn(),
   sendSpecialKeys: vi.fn(),
   isAllowedSpecialKey: vi.fn((key: string) => ['Up', 'Down', 'Enter', 'Escape', 'Tab', 'BTab'].includes(key)),
   sendSpecialKeysAndInvalidate: vi.fn(),
 }));
 
-vi.mock('@/lib/tmux-capture-cache', () => ({
+vi.mock('@/lib/tmux/tmux-capture-cache', () => ({
   invalidateCache: vi.fn(),
 }));
 
 import { POST } from '@/app/api/worktrees/[id]/special-keys/route';
 import { getWorktreeById } from '@/lib/db';
-import { hasSession, sendSpecialKeysAndInvalidate } from '@/lib/tmux';
+import { hasSession, sendSpecialKeysAndInvalidate } from '@/lib/tmux/tmux';
 import { isCliToolType } from '@/lib/cli-tools/types';
 
 function createRequest(body: unknown): NextRequest {

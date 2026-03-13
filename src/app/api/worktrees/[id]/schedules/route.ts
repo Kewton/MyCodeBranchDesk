@@ -10,12 +10,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { getDbInstance } from '@/lib/db-instance';
 import { getWorktreeById } from '@/lib/db';
-import { isValidWorktreeId } from '@/lib/path-validator';
+import { isValidWorktreeId } from '@/lib/security/path-validator';
 import {
   MAX_SCHEDULE_NAME_LENGTH,
   MAX_SCHEDULE_MESSAGE_LENGTH,
 } from '@/config/schedule-config';
-import { ALLOWED_CLI_TOOLS } from '@/lib/claude-executor';
+import { ALLOWED_CLI_TOOLS } from '@/lib/session/claude-executor';
 import { isValidCronExpression } from '@/config/cmate-constants';
 import { createLogger } from '@/lib/logger';
 
