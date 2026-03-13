@@ -368,11 +368,13 @@ const MAX_CONTINUATION_LINES = 5;
 
 /**
  * Maximum continuation lines for deeply indented wrapped option text.
- * Codex approval prompts can wrap long "don't ask again..." labels across many
- * lines with 5+ spaces of indentation. Allow a wider window for those cases
- * without relaxing the 2-space body-text safeguard above.
+ * CLI confirmation prompts (Claude commit messages, Codex "don't ask again..."
+ * labels) can wrap across many lines with 4+ spaces of indentation. Allow a
+ * wider window for those cases without relaxing the 2-space body-text safeguard.
+ * Raised from 12 to 25 to accommodate long commit messages in Claude's
+ * "Yes, and don't ask again for: git commit -m ..." option text.
  */
-const MAX_DEEP_INDENT_CONTINUATION_LINES = 12;
+const MAX_DEEP_INDENT_CONTINUATION_LINES = 25;
 
 /**
  * Validates whether a new option number logically precedes the already-collected options.
