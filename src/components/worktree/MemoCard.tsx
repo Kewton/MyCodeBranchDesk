@@ -153,13 +153,6 @@ export const MemoCard = memo(function MemoCard({
   }, [memo.id, onDelete]);
 
   /**
-   * Copy memo content to clipboard (Issue #321).
-   * Shows Check icon for COPY_FEEDBACK_DURATION_MS on success.
-   * Empty or whitespace-only content is silently ignored (UI-level guard).
-   * Failure is silently handled -- the icon remains unchanged, which serves
-   * as implicit feedback to the user (see design policy Section 8.3).
-   */
-  /**
    * Issue #485: Insert memo content into message input.
    * Empty or whitespace-only content is silently ignored.
    */
@@ -168,6 +161,13 @@ export const MemoCard = memo(function MemoCard({
     onInsertToMessage?.(content);
   }, [content, onInsertToMessage]);
 
+  /**
+   * Copy memo content to clipboard (Issue #321).
+   * Shows Check icon for COPY_FEEDBACK_DURATION_MS on success.
+   * Empty or whitespace-only content is silently ignored (UI-level guard).
+   * Failure is silently handled -- the icon remains unchanged, which serves
+   * as implicit feedback to the user (see design policy Section 8.3).
+   */
   const handleCopy = useCallback(async () => {
     if (!content.trim()) return;
     try {
