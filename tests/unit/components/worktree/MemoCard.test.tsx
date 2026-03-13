@@ -230,6 +230,43 @@ describe('MemoCard', () => {
     });
   });
 
+  describe('Insert to message (Issue #485)', () => {
+    it('should render insert button when onInsertToMessage is provided', () => {
+      const onInsert = vi.fn();
+      render(<MemoCard {...defaultProps} onInsertToMessage={onInsert} />);
+
+      expect(screen.getByTestId('insert-memo-content')).toBeInTheDocument();
+    });
+
+    it('should not render insert button when onInsertToMessage is not provided', () => {
+      render(<MemoCard {...defaultProps} />);
+
+      expect(screen.queryByTestId('insert-memo-content')).not.toBeInTheDocument();
+    });
+
+    it('should call onInsertToMessage with memo content when clicked', () => {
+      const onInsert = vi.fn();
+      render(<MemoCard {...defaultProps} onInsertToMessage={onInsert} />);
+
+      fireEvent.click(screen.getByTestId('insert-memo-content'));
+      expect(onInsert).toHaveBeenCalledWith('Test content');
+    });
+
+    it('should not call onInsertToMessage when content is empty', () => {
+      const onInsert = vi.fn();
+      render(
+        <MemoCard
+          {...defaultProps}
+          memo={{ ...mockMemo, content: '' }}
+          onInsertToMessage={onInsert}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId('insert-memo-content'));
+      expect(onInsert).not.toHaveBeenCalled();
+    });
+  });
+
   describe('Copy functionality', () => {
     beforeEach(() => {
       mockCopyToClipboard.mockResolvedValue(undefined);

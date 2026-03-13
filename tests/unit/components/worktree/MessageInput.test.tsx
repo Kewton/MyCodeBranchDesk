@@ -476,6 +476,60 @@ describe('MessageInput', () => {
     });
   });
 
+  // ===== pendingInsertText behavior (Issue #485) =====
+
+  describe('pendingInsertText insertion (Issue #485)', () => {
+    it('should insert text into empty message when pendingInsertText is provided', () => {
+      const onInsertConsumed = vi.fn();
+      render(
+        <MessageInput
+          {...defaultProps}
+          pendingInsertText="Inserted text"
+          onInsertConsumed={onInsertConsumed}
+        />
+      );
+
+      expect(getTextarea().value).toBe('Inserted text');
+      expect(onInsertConsumed).toHaveBeenCalled();
+    });
+
+    it('should append text with double newline when message already has content', () => {
+      const onInsertConsumed = vi.fn();
+      const { rerender } = render(
+        <MessageInput {...defaultProps} />
+      );
+
+      // Type some existing text
+      typeMessage('Existing text');
+
+      // Rerender with pendingInsertText
+      rerender(
+        <MessageInput
+          {...defaultProps}
+          pendingInsertText="Appended text"
+          onInsertConsumed={onInsertConsumed}
+        />
+      );
+
+      expect(getTextarea().value).toBe('Existing text\n\nAppended text');
+      expect(onInsertConsumed).toHaveBeenCalled();
+    });
+
+    it('should not insert when pendingInsertText is null', () => {
+      const onInsertConsumed = vi.fn();
+      render(
+        <MessageInput
+          {...defaultProps}
+          pendingInsertText={null}
+          onInsertConsumed={onInsertConsumed}
+        />
+      );
+
+      expect(getTextarea().value).toBe('');
+      expect(onInsertConsumed).not.toHaveBeenCalled();
+    });
+  });
+
   // ===== Error handling =====
 
   describe('Error handling', () => {

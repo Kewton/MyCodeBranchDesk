@@ -45,6 +45,8 @@ export interface HistoryPaneProps {
   className?: string;
   /** Toast notification callback for copy feedback (optional) */
   showToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
+  /** Issue #485: Callback when a message is inserted into message input */
+  onInsertToMessage?: (content: string) => void;
 }
 
 // ============================================================================
@@ -148,6 +150,7 @@ export const HistoryPane = memo(function HistoryPane({
   isLoading = false,
   className = '',
   showToast,
+  onInsertToMessage,
 }: HistoryPaneProps) {
   // worktreeId is kept in props for future use (e.g., filtering, fetching)
   // Using underscore prefix to indicate intentionally unused parameter
@@ -239,6 +242,7 @@ export const HistoryPane = memo(function HistoryPane({
         isExpanded={isExpanded(pair.id)}
         onToggleExpand={createToggleHandler(pair.id)}
         onCopy={handleCopy}
+        onInsertToMessage={onInsertToMessage}
       />
     ));
   };

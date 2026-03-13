@@ -35,6 +35,8 @@ export interface NotesAndLogsPaneProps {
   worktreeId: string;
   /** Additional CSS classes */
   className?: string;
+  /** Issue #485: Callback when memo content is inserted into message input */
+  onInsertToMessage?: (content: string) => void;
   /** Issue #368: Currently selected agents for the worktree */
   selectedAgents: CLIToolType[];
   /** Issue #368: Callback when selected agents change */
@@ -81,6 +83,7 @@ export const NotesAndLogsPane = memo(function NotesAndLogsPane({
   vibeLocalContextWindow,
   onVibeLocalContextWindowChange,
   maxAgents,
+  onInsertToMessage,
 }: NotesAndLogsPaneProps) {
   const t = useTranslations('schedule');
   // Internal sub-tab state (not leaked to parent)
@@ -111,7 +114,7 @@ export const NotesAndLogsPane = memo(function NotesAndLogsPane({
       {/* Sub-tab content */}
       <div className="flex-1 min-h-0 overflow-hidden">
         {activeSubTab === 'notes' && (
-          <MemoPane worktreeId={worktreeId} className="h-full" />
+          <MemoPane worktreeId={worktreeId} className="h-full" onInsertToMessage={onInsertToMessage} />
         )}
         {activeSubTab === 'logs' && (
           <ExecutionLogPane worktreeId={worktreeId} className="h-full" />

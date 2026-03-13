@@ -11,8 +11,11 @@ import type { CLIToolType } from '@/lib/cli-tools/types';
 
 // Mock child components
 vi.mock('@/components/worktree/MemoPane', () => ({
-  MemoPane: ({ worktreeId }: { worktreeId: string }) => (
-    <div data-testid="memo-pane">MemoPane: {worktreeId}</div>
+  MemoPane: ({ worktreeId, onInsertToMessage }: { worktreeId: string; onInsertToMessage?: (text: string) => void }) => (
+    <div data-testid="memo-pane">
+      MemoPane: {worktreeId}
+      {onInsertToMessage && <span data-testid="memo-pane-has-insert">has-insert</span>}
+    </div>
   ),
 }));
 
@@ -57,6 +60,22 @@ describe('NotesAndLogsPane', () => {
     it('should render Agent tab', () => {
       render(<NotesAndLogsPane {...defaultProps} />);
       expect(screen.getByText('schedule.agentTab')).toBeDefined();
+    });
+  });
+
+  describe('Insert to message propagation (Issue #485)', () => {
+    it('should pass onInsertToMessage to MemoPane when notes tab is active', () => {
+      const onInsertToMessage = vi.fn();
+      render(<NotesAndLogsPane {...defaultProps} onInsertToMessage={onInsertToMessage} />);
+
+      // Notes tab is active by default
+      expect(screen.getByTestId('memo-pane-has-insert')).toBeInTheDocument();
+    });
+
+    it('should not pass insert indicator when onInsertToMessage is not provided', () => {
+      render(<NotesAndLogsPane {...defaultProps} />);
+
+      expect(screen.queryByTestId('memo-pane-has-insert')).not.toBeInTheDocument();
     });
   });
 
