@@ -11,6 +11,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MessageInput } from '@/components/worktree/MessageInput';
+import { useSlashCommands } from '@/hooks/useSlashCommands';
 import {
   mockCommandGroups,
   createDefaultProps,
@@ -62,6 +63,17 @@ describe('MessageInput', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsMobile = false;
+    vi.mocked(useSlashCommands).mockReturnValue({
+      groups: mockCommandGroups,
+      filteredGroups: mockCommandGroups,
+      allCommands: mockCommandGroups.flatMap(g => g.commands),
+      loading: false,
+      error: null,
+      filter: '',
+      setFilter: vi.fn(),
+      refresh: vi.fn(),
+      cliTool: 'claude',
+    });
   });
 
   afterEach(() => {
@@ -349,6 +361,44 @@ describe('MessageInput', () => {
         });
       });
 
+      it('should insert Codex prompt using /prompts:<name> format when selected', async () => {
+        const codexGroups = [
+          {
+            category: 'skill' as const,
+            label: 'Skills',
+            commands: [
+              {
+                name: 'github-insights',
+                invocation: 'codex-prompt' as const,
+                description: 'Codex custom prompt',
+                category: 'skill' as const,
+                filePath: '.codex/prompts/github-insights.md',
+                source: 'codex-skill' as const,
+                cliTools: ['codex'] as ('codex')[],
+              },
+            ],
+          },
+        ];
+        vi.mocked(useSlashCommands).mockReturnValue({
+          groups: codexGroups,
+          filteredGroups: codexGroups,
+          allCommands: codexGroups.flatMap(g => g.commands),
+          loading: false,
+          error: null,
+          filter: '',
+          setFilter: vi.fn(),
+          refresh: vi.fn(),
+          cliTool: 'codex',
+        });
+
+        render(<MessageInput {...defaultProps} cliToolId="codex" />);
+
+        openSelector();
+        fireEvent.click(screen.getByText('/prompts:github-insights'));
+
+        expect(getTextarea()).toHaveValue('/prompts:github-insights ');
+      });
+
       it('TC-3: should show selector again after clearing message in free input mode', () => {
         render(<MessageInput {...defaultProps} />);
 
@@ -473,6 +523,60 @@ describe('MessageInput', () => {
         // Selector should appear (isFreeInputMode was reset)
         expect(queryMobileSheet()).toBeInTheDocument();
       });
+    });
+  });
+
+  // ===== pendingInsertText behavior (Issue #485) =====
+
+  describe('pendingInsertText insertion (Issue #485)', () => {
+    it('should insert text into empty message when pendingInsertText is provided', () => {
+      const onInsertConsumed = vi.fn();
+      render(
+        <MessageInput
+          {...defaultProps}
+          pendingInsertText="Inserted text"
+          onInsertConsumed={onInsertConsumed}
+        />
+      );
+
+      expect(getTextarea().value).toBe('Inserted text');
+      expect(onInsertConsumed).toHaveBeenCalled();
+    });
+
+    it('should append text with double newline when message already has content', () => {
+      const onInsertConsumed = vi.fn();
+      const { rerender } = render(
+        <MessageInput {...defaultProps} />
+      );
+
+      // Type some existing text
+      typeMessage('Existing text');
+
+      // Rerender with pendingInsertText
+      rerender(
+        <MessageInput
+          {...defaultProps}
+          pendingInsertText="Appended text"
+          onInsertConsumed={onInsertConsumed}
+        />
+      );
+
+      expect(getTextarea().value).toBe('Existing text\n\nAppended text');
+      expect(onInsertConsumed).toHaveBeenCalled();
+    });
+
+    it('should not insert when pendingInsertText is null', () => {
+      const onInsertConsumed = vi.fn();
+      render(
+        <MessageInput
+          {...defaultProps}
+          pendingInsertText={null}
+          onInsertConsumed={onInsertConsumed}
+        />
+      );
+
+      expect(getTextarea().value).toBe('');
+      expect(onInsertConsumed).not.toHaveBeenCalled();
     });
   });
 

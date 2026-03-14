@@ -24,7 +24,7 @@
  * coupling via a minimal DTO/projection type.
  */
 
-import { stripAnsi, stripBoxDrawing, detectThinking, getCliToolPatterns, buildDetectPromptOptions, OPENCODE_RESPONSE_COMPLETE, OPENCODE_PROCESSING_INDICATOR, OPENCODE_SELECTION_LIST_PATTERN, CLAUDE_SELECTION_LIST_FOOTER } from './cli-patterns';
+import { stripAnsi, stripBoxDrawing, detectThinking, getCliToolPatterns, buildDetectPromptOptions, OPENCODE_RESPONSE_COMPLETE, OPENCODE_PROCESSING_INDICATOR, OPENCODE_SELECTION_LIST_PATTERN, CLAUDE_SELECTION_LIST_FOOTER, CODEX_PROMPT_PATTERN } from './cli-patterns';
 import { detectPrompt } from './prompt-detector';
 import type { PromptDetectionResult } from './prompt-detector';
 import type { CLIToolType } from '@/lib/cli-tools/types';
@@ -176,12 +176,12 @@ export function detectSessionStatus(
   // Gemini wraps prompts in box-drawing characters (╭╮╰╯│─) which prevent
   // detectPrompt() from recognizing the prompt content.
   // OpenCode TUI uses ┃ borders and █ scrollbar that need stripping.
-  // For OpenCode and Codex, use full cleanOutput instead of lastLines (15-line window)
-  // because their multiple-choice prompts with descriptions can exceed
-  // 15 lines. Codex approval prompts include long file lists that push the
-  // › indicator line outside the 15-line window. detectPrompt() applies its
-  // own 50-line window internally.
-  const promptInput = (cliToolId === 'opencode' || cliToolId === 'codex')
+  // For OpenCode, Codex, and Claude, use full cleanOutput instead of lastLines
+  // (15-line window) because their multiple-choice prompts with descriptions
+  // can exceed 15 lines. Examples: Codex approval prompts with long file lists,
+  // Claude "Yes, and don't ask again for: git commit -m ..." options that embed
+  // full commit messages. detectPrompt() applies its own 50-line window internally.
+  const promptInput = (cliToolId === 'opencode' || cliToolId === 'codex' || cliToolId === 'claude')
     ? stripBoxDrawing(cleanOutput)
     : stripBoxDrawing(lastLines);
   const promptDetection = detectPrompt(promptInput, promptOptions);
@@ -315,6 +315,73 @@ export function detectSessionStatus(
           confidence: 'high',
           reason: STATUS_REASON.PROMPT_DETECTED,
           hasActivePrompt: true,
+          promptDetection,
+        };
+      }
+    }
+  }
+
+  // 2.7. Codex TUI content area detection (thinking + idle prompt)
+  // Codex TUI layout: conversation area (top) | empty padding (~30 lines) | input area + status bar (bottom).
+  // Standard windowed checks (last 5/15 lines) only see padding/status bar, missing both:
+  // A. Thinking indicators (• Ran, • Planning) in the conversation area → should show spinner
+  // B. Idle prompt (›) at the end of the conversation area → should show ready
+  // Strategy: find the Codex status bar, extract content above it, then check for thinking/idle.
+  if (cliToolId === 'codex') {
+    const codexStatusBarPattern = /^\s*\S+.*\d+%\s+left\s+·/;
+    let codexFooterBoundary = -1;
+    for (let ci = contentLines.length - 1; ci >= Math.max(0, contentLines.length - 10); ci--) {
+      if (codexStatusBarPattern.test(contentLines[ci])) {
+        codexFooterBoundary = ci;
+        break;
+      }
+    }
+    if (codexFooterBoundary >= 0) {
+      // Find last non-empty content line above footer (skip padding + input area)
+      let lastContentIdx = codexFooterBoundary - 1;
+      while (lastContentIdx >= 0 && contentLines[lastContentIdx].trim() === '') {
+        lastContentIdx--;
+      }
+      if (lastContentIdx >= 0) {
+        // A. Check content area for thinking indicators (wider window than step 2)
+        const codexThinkingWindow = contentLines
+          .slice(Math.max(0, lastContentIdx - STATUS_THINKING_LINE_COUNT + 1), lastContentIdx + 1)
+          .join('\n');
+        if (detectThinking('codex', codexThinkingWindow)) {
+          return {
+            status: 'running',
+            confidence: 'high',
+            reason: 'thinking_indicator',
+            hasActivePrompt: false,
+            promptDetection,
+          };
+        }
+
+        // B. Check if the last content line is the idle › prompt.
+        // The last non-empty line above the status bar is the current active line.
+        // When Codex is idle, this is the › prompt (with optional suggestion text).
+        // When processing, this is command output (not ›), so the check naturally fails.
+        const lastContentLine = contentLines[lastContentIdx].trim();
+        if (CODEX_PROMPT_PATTERN.test(lastContentLine)) {
+          return {
+            status: 'ready',
+            confidence: 'high',
+            reason: 'input_prompt',
+            hasActivePrompt: false,
+            promptDetection,
+          };
+        }
+
+        // C. Fallback: status bar present but neither thinking nor idle › detected.
+        // This means Codex is actively processing — command output has pushed the
+        // • Ran/• Working indicators beyond the 5-line thinking window.
+        // The status bar ("model · N% left · path") is always visible during Codex
+        // sessions, and the only idle state (›) was checked in B above.
+        return {
+          status: 'running',
+          confidence: 'high',
+          reason: 'thinking_indicator',
+          hasActivePrompt: false,
           promptDetection,
         };
       }

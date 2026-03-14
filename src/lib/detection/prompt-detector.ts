@@ -368,11 +368,36 @@ const MAX_CONTINUATION_LINES = 5;
 
 /**
  * Maximum continuation lines for deeply indented wrapped option text.
- * Codex approval prompts can wrap long "don't ask again..." labels across many
- * lines with 5+ spaces of indentation. Allow a wider window for those cases
- * without relaxing the 2-space body-text safeguard above.
+ * CLI confirmation prompts (Claude commit messages, Codex "don't ask again..."
+ * labels) can wrap across many lines with 4+ spaces of indentation. Allow a
+ * wider window for those cases without relaxing the 2-space body-text safeguard.
+ * Raised from 12 to 25 to accommodate long commit messages in Claude's
+ * "Yes, and don't ask again for: git commit -m ..." option text.
  */
-const MAX_DEEP_INDENT_CONTINUATION_LINES = 12;
+const MAX_DEEP_INDENT_CONTINUATION_LINES = 25;
+
+/**
+ * Validates whether a new option number logically precedes the already-collected options.
+ * Prevents diff line numbers (e.g., Codex approval prompt file diffs with lines like
+ * "  1 +{", "  2 +  \"name\":...") from being collected as prompt options.
+ *
+ * When no options have been collected yet, any number is valid (first option).
+ * When options exist, the new number must be firstNumber-1 or firstNumber-2
+ * (matching isConsecutiveFromOne's single-gap tolerance).
+ *
+ * @param number - The candidate option number to prepend
+ * @param collectedOptions - Already-collected options array (unshift order: lowest first)
+ * @returns true if the number is a valid preceding option
+ */
+function isValidPrecedingOption(
+  number: number,
+  collectedOptions: ReadonlyArray<{ number: number }>
+): boolean {
+  if (collectedOptions.length === 0) return true;
+  const firstNumber = collectedOptions[0].number;
+  // Reject duplicates (number >= firstNumber) and large gaps (number < firstNumber - 2)
+  return number < firstNumber && number >= firstNumber - 2;
+}
 
 /**
  * Creates a "no prompt detected" result.
@@ -579,7 +604,13 @@ function isContinuationLine(rawLine: string, line: string): boolean {
 
   // Check 1: Indented non-option line (label text wrapping with indentation).
   // Must have 2+ leading spaces, not start with a number (option line), and not end with '?'.
+  // Exception: deeply indented lines (4+ spaces) are accepted even if they start with a
+  // digit, since option lines use 2-space indent. This handles Codex approval prompts
+  // where wrapped filenames like "14.md workspace/..." start with digits.
   if (!endsWithQuestion && /^\s{2,}[^\d]/.test(rawLine) && !/^\s*\d+\./.test(rawLine)) {
+    return true;
+  }
+  if (!endsWithQuestion && /^\s{4,}/.test(rawLine) && !/^\s*\d+\.\s/.test(rawLine)) {
     return true;
   }
 
@@ -771,7 +802,7 @@ function detectMultipleChoicePrompt(output: string, options?: DetectPromptOption
     const defaultMatch = line.match(DEFAULT_OPTION_PATTERN);
     if (defaultMatch) {
       const number = parseInt(defaultMatch[1], 10);
-      if (number <= 20) {
+      if (number <= 20 && isValidPrecedingOption(number, collectedOptions)) {
         const label = defaultMatch[2].trim();
         collectedOptions.unshift({ number, label, isDefault: true });
         continuationLineCount = 0;
@@ -787,6 +818,8 @@ function detectMultipleChoicePrompt(output: string, options?: DetectPromptOption
       // collapsed output matches as option 373). CLI prompts never exceed 20 options.
       if (number > 20) {
         // Treat as non-option line
+      } else if (!isValidPrecedingOption(number, collectedOptions)) {
+        // Treat as non-option line (e.g., diff line numbers from Codex approval prompts)
       } else {
         const label = normalMatch[2].trim();
         collectedOptions.unshift({ number, label, isDefault: false });

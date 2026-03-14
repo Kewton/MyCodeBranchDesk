@@ -169,6 +169,7 @@ tests/
 | `src/lib/auto-yes-state.ts` | Auto-Yes状態管理・DB永続化連携（Issue #479） |
 | `src/lib/polling/auto-yes-resolver.ts` | Auto-Yes自動応答判定 |
 | `src/config/auto-yes-config.ts` | Auto-Yes設定定数・バリデーション |
+| `src/config/html-extensions.ts` | HTML拡張子定義・判定関数・SandboxLevel型・SANDBOX_ATTRIBUTES（Issue #490） |
 | `src/config/file-polling-config.ts` | ファイルポーリング定数（FILE_TREE_POLL_INTERVAL_MS, FILE_CONTENT_POLL_INTERVAL_MS）（Issue #469） |
 | `src/lib/detection/prompt-key.ts` | promptKey重複排除ユーティリティ |
 | `src/lib/cli-tools/` | CLIツール抽象化（Strategy パターン） |
@@ -194,7 +195,7 @@ tests/
 | `src/lib/file-operations.ts` | ファイルCRUD操作（5層セキュリティ） |
 | `src/lib/git/clone-manager.ts` | クローン処理管理（排他制御） |
 | `src/lib/version-checker.ts` | バージョンアップ通知 |
-| `src/lib/slash-commands.ts` | スラッシュコマンドローダー |
+| `src/lib/slash-commands.ts` | スラッシュコマンドローダー（.claude/commands, .claude/skills, .codex/skills対応）（Issue #166） |
 | `src/lib/url-path-encoder.ts` | ファイルパスURLエンコード |
 | `src/lib/file-search.ts` | ファイル内容検索 |
 | `src/lib/terminal-highlight.ts` | CSS Custom Highlight API ラッパー（Issue #47）XSS安全なターミナルハイライト |
@@ -212,14 +213,21 @@ tests/
 | `src/i18n.ts` | next-intl設定 |
 | `src/lib/locale-cookie.ts` | ロケールCookie管理 |
 | `src/lib/date-locale.ts` | date-fnsロケールマッピング |
-| `src/components/worktree/WorktreeDetailRefactored.tsx` | Worktree詳細画面（メイン画面、ツリーポーリング対応）（Issue #469） |
+| `src/components/worktree/WorktreeDetailRefactored.tsx` | Worktree詳細画面（メイン画面、ツリーポーリング対応、履歴・メモ挿入state管理）（Issue #469, #485） |
 | `src/components/worktree/AgentSettingsPane.tsx` | エージェント選択UI |
-| `src/components/worktree/MessageInput.tsx` | メッセージ入力（下書き永続化対応） |
+| `src/components/worktree/MessageInput.tsx` | メッセージ入力（下書き永続化対応、pendingInsertText外部挿入対応）（Issue #485） |
+| `src/components/worktree/ConversationPairCard.tsx` | 会話ペアカード（ユーザー/アシスタントメッセージ表示、挿入ボタン）（Issue #485） |
+| `src/components/worktree/MemoCard.tsx` | メモカード（メモ表示・コピー・挿入ボタン）（Issue #485） |
+| `src/components/worktree/HistoryPane.tsx` | 履歴ペイン（会話履歴表示、onInsertToMessage伝播）（Issue #485） |
+| `src/components/worktree/MemoPane.tsx` | メモペイン（メモ一覧表示、onInsertToMessage伝播）（Issue #485） |
+| `src/components/worktree/NotesAndLogsPane.tsx` | Notes&Logsペイン（メモ・ログタブ、onInsertToMessage伝播）（Issue #485） |
+| `src/components/worktree/WorktreeDetailSubComponents.tsx` | Worktree詳細サブコンポーネント（MobileContent等、onInsertToMessage伝播）（Issue #485） |
 | `src/components/worktree/MarkdownEditor.tsx` | マークダウンエディタメイン（Issue #479） |
 | `src/components/worktree/TerminalSearchBar.tsx` | ターミナル内テキスト検索バーUI（Issue #47）件数表示・前/次ナビ・Esc閉じ |
 | `src/components/worktree/FilePanelSplit.tsx` | ターミナル+ファイルパネル分割 |
 | `src/components/worktree/FilePanelTabs.tsx` | ファイルタブバーUI |
 | `src/components/worktree/FilePanelContent.tsx` | ファイルコンテンツ表示（ファイル内容ポーリング対応）（Issue #469） |
+| `src/components/worktree/HtmlPreview.tsx` | HTMLファイルプレビューコンポーネント（iframe srcdoc + Safe/Interactiveサンドボックス）（Issue #490） |
 | `src/components/worktree/FileViewer.tsx` | ファイルビューア |
 | `src/components/worktree/FileSearchBar.tsx` | ファイル検索バー共通コンポーネント（Issue #469） |
 | `src/components/worktree/FileTreeView.tsx` | ファイルツリービュー（Issue #479） |

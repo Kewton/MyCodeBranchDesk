@@ -33,6 +33,8 @@ export interface MemoPaneProps {
   worktreeId: string;
   /** Additional CSS classes */
   className?: string;
+  /** Issue #485: Callback when memo content is inserted into message input */
+  onInsertToMessage?: (content: string) => void;
 }
 
 // ============================================================================
@@ -50,6 +52,7 @@ export interface MemoPaneProps {
 export const MemoPane = memo(function MemoPane({
   worktreeId,
   className = '',
+  onInsertToMessage,
 }: MemoPaneProps) {
   // State
   const [memos, setMemos] = useState<WorktreeMemo[]>([]);
@@ -210,6 +213,7 @@ export const MemoPane = memo(function MemoPane({
           memo={memo}
           onUpdate={handleUpdateMemo}
           onDelete={handleDeleteMemo}
+          onInsertToMessage={onInsertToMessage}
         />
       ))}
 

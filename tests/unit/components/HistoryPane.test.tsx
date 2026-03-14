@@ -403,6 +403,48 @@ describe('HistoryPane', () => {
     });
   });
 
+  describe('Insert to message propagation (Issue #485)', () => {
+    it('should pass onInsertToMessage to ConversationPairCard', () => {
+      const onInsertToMessage = vi.fn();
+      const messages: ChatMessage[] = [
+        createTestMessage({ content: 'User message', role: 'user' }),
+        createTestMessage({ content: 'Response', role: 'assistant' }),
+      ];
+
+      render(
+        <HistoryPane
+          messages={messages}
+          worktreeId={defaultWorktreeId}
+          onFilePathClick={mockOnFilePathClick}
+          onInsertToMessage={onInsertToMessage}
+        />
+      );
+
+      // The insert button should be rendered via ConversationPairCard
+      const insertButton = screen.getByTestId('insert-user-message');
+      expect(insertButton).toBeInTheDocument();
+      fireEvent.click(insertButton);
+      expect(onInsertToMessage).toHaveBeenCalledWith('User message');
+    });
+
+    it('should not render insert button when onInsertToMessage is not provided', () => {
+      const messages: ChatMessage[] = [
+        createTestMessage({ content: 'User message', role: 'user' }),
+        createTestMessage({ content: 'Response', role: 'assistant' }),
+      ];
+
+      render(
+        <HistoryPane
+          messages={messages}
+          worktreeId={defaultWorktreeId}
+          onFilePathClick={mockOnFilePathClick}
+        />
+      );
+
+      expect(screen.queryByTestId('insert-user-message')).not.toBeInTheDocument();
+    });
+  });
+
   describe('className prop', () => {
     it('should accept additional className prop', () => {
       render(

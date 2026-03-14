@@ -14,12 +14,17 @@ import { useSlashCommands } from '@/hooks/useSlashCommands';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useImageAttachment } from '@/hooks/useImageAttachment';
 import type { SlashCommand } from '@/types/slash-commands';
+import { getSlashCommandTrigger } from '@/lib/slash-command-format';
 
 export interface MessageInputProps {
   worktreeId: string;
   onMessageSent?: (cliToolId: CLIToolType) => void;
   cliToolId?: CLIToolType;
   isSessionRunning?: boolean;
+  /** Issue #485: Text to insert into message input from history or memo */
+  pendingInsertText?: string | null;
+  /** Issue #485: Callback to signal that pendingInsertText has been consumed */
+  onInsertConsumed?: () => void;
 }
 
 /**
@@ -33,7 +38,7 @@ export interface MessageInputProps {
 /** localStorage key prefix for draft message persistence */
 const DRAFT_STORAGE_KEY_PREFIX = 'commandmate:draft-message:';
 
-export const MessageInput = memo(function MessageInput({ worktreeId, onMessageSent, cliToolId, isSessionRunning = false }: MessageInputProps) {
+export const MessageInput = memo(function MessageInput({ worktreeId, onMessageSent, cliToolId, isSessionRunning = false, pendingInsertText, onInsertConsumed }: MessageInputProps) {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -113,6 +118,18 @@ export const MessageInput = memo(function MessageInput({ worktreeId, onMessageSe
   }, [message]);
 
   /**
+   * Issue #485: Insert pending text into message input
+   */
+  useEffect(() => {
+    if (!pendingInsertText) return;
+    setMessage((prev) => {
+      if (prev.trim() === '') return pendingInsertText;
+      return prev + '\n\n' + pendingInsertText;
+    });
+    onInsertConsumed?.();
+  }, [pendingInsertText, onInsertConsumed]);
+
+  /**
    * Handle message submission
    */
   const submitMessage = useCallback(async () => {
@@ -180,7 +197,7 @@ export const MessageInput = memo(function MessageInput({ worktreeId, onMessageSe
    * Handle slash command selection
    */
   const handleCommandSelect = useCallback((command: SlashCommand) => {
-    setMessage(`/${command.name} `);
+    setMessage(`${getSlashCommandTrigger(command)} `);
     setShowCommandSelector(false);
     textareaRef.current?.focus();
   }, []);
