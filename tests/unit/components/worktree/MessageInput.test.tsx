@@ -11,6 +11,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MessageInput } from '@/components/worktree/MessageInput';
+import { useSlashCommands } from '@/hooks/useSlashCommands';
 import {
   mockCommandGroups,
   createDefaultProps,
@@ -62,6 +63,9 @@ describe('MessageInput', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsMobile = false;
+    vi.mocked(useSlashCommands).mockReturnValue({
+      groups: mockCommandGroups,
+    });
   });
 
   afterEach(() => {
@@ -347,6 +351,35 @@ describe('MessageInput', () => {
             { cliToolId: 'claude' }
           );
         });
+      });
+
+      it('should insert Codex prompt using /prompts:<name> format when selected', async () => {
+        vi.mocked(useSlashCommands).mockReturnValue({
+          groups: [
+            {
+              category: 'skill',
+              label: 'Skills',
+              commands: [
+                {
+                  name: 'github-insights',
+                  invocation: 'codex-prompt',
+                  description: 'Codex custom prompt',
+                  category: 'skill',
+                  filePath: '.codex/prompts/github-insights.md',
+                  source: 'codex-skill',
+                  cliTools: ['codex'],
+                },
+              ],
+            },
+          ],
+        });
+
+        render(<MessageInput {...defaultProps} cliToolId="codex" />);
+
+        openSelector();
+        fireEvent.click(screen.getByText('/prompts:github-insights'));
+
+        expect(getTextarea()).toHaveValue('/prompts:github-insights ');
       });
 
       it('TC-3: should show selector again after clearing message in free input mode', () => {
