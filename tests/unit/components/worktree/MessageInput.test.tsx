@@ -65,6 +65,14 @@ describe('MessageInput', () => {
     mockIsMobile = false;
     vi.mocked(useSlashCommands).mockReturnValue({
       groups: mockCommandGroups,
+      filteredGroups: mockCommandGroups,
+      allCommands: mockCommandGroups.flatMap(g => g.commands),
+      loading: false,
+      error: null,
+      filter: '',
+      setFilter: vi.fn(),
+      refresh: vi.fn(),
+      cliTool: 'claude',
     });
   });
 
@@ -354,24 +362,33 @@ describe('MessageInput', () => {
       });
 
       it('should insert Codex prompt using /prompts:<name> format when selected', async () => {
+        const codexGroups = [
+          {
+            category: 'skill' as const,
+            label: 'Skills',
+            commands: [
+              {
+                name: 'github-insights',
+                invocation: 'codex-prompt' as const,
+                description: 'Codex custom prompt',
+                category: 'skill' as const,
+                filePath: '.codex/prompts/github-insights.md',
+                source: 'codex-skill' as const,
+                cliTools: ['codex'] as ('codex')[],
+              },
+            ],
+          },
+        ];
         vi.mocked(useSlashCommands).mockReturnValue({
-          groups: [
-            {
-              category: 'skill',
-              label: 'Skills',
-              commands: [
-                {
-                  name: 'github-insights',
-                  invocation: 'codex-prompt',
-                  description: 'Codex custom prompt',
-                  category: 'skill',
-                  filePath: '.codex/prompts/github-insights.md',
-                  source: 'codex-skill',
-                  cliTools: ['codex'],
-                },
-              ],
-            },
-          ],
+          groups: codexGroups,
+          filteredGroups: codexGroups,
+          allCommands: codexGroups.flatMap(g => g.commands),
+          loading: false,
+          error: null,
+          filter: '',
+          setFilter: vi.fn(),
+          refresh: vi.fn(),
+          cliTool: 'codex',
         });
 
         render(<MessageInput {...defaultProps} cliToolId="codex" />);
